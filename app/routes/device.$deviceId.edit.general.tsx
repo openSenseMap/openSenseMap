@@ -15,7 +15,7 @@ import { type Route } from './+types/device.$deviceId.edit.general'
 import { MarkdownContent } from '~/components/markdown-content'
 import { Button } from '~/components/ui/button'
 import { getDevice, getDeviceWithoutSensors } from '~/db/models/device.server'
-import { verifyLogin } from '~/db/models/user.server'
+import { getUserById } from '~/db/models/user.server'
 import { type Device } from '~/db/schema'
 import {
 	uploadDeviceImage,
@@ -23,7 +23,7 @@ import {
 	getDeviceImageUrl,
 } from '~/lib/s3.server'
 import { updateDevice, deleteDevice } from '~/services/device-service.server'
-import { getUserEmail, getUserId } from '~/services/session-service.server'
+import { getUserId } from '~/services/session-service.server'
 import {
 	useAutosaveFetcher,
 	AUTOSAVE_DELAY_MS,
@@ -401,13 +401,15 @@ export async function action({ request, params }: Route.ActionArgs) {
 				)
 			}
 
-			const userEmail = await getUserEmail(request)
-
-			invariant(typeof userEmail === 'string', 'email not found')
-
-			const user = await verifyLogin(userEmail, passwordDelete)
+			const user = await getUserById(userId)
 
 			if (!user) {
+				throw new Response('Unauthorized', { status: 401 })
+			}
+
+			const deleteResult = await deleteDevice(user, device, passwordDelete)
+
+			if (deleteResult === 'invalid-password') {
 				return data(
 					{
 						intent,
@@ -423,19 +425,13 @@ export async function action({ request, params }: Route.ActionArgs) {
 				)
 			}
 
-			const deviceWithoutSensors = (await getDeviceWithoutSensors({
-				id: deviceID,
-			})) as Device | null
-
-			if (deviceWithoutSensors?.image) {
-				try {
-					await deleteDeviceImage(deviceWithoutSensors.image)
-				} catch (error) {
-					console.error('Failed to delete device image:', error)
-				}
+			if (deleteResult === 'not-owner') {
+				throw new Response('Forbidden', { status: 403 })
 			}
 
-			await deleteDevice(user, device, passwordDelete)
+			if (deleteResult === 'not-found') {
+				throw new Response('Device not found', { status: 404 })
+			}
 
 			return redirect('/profile/me')
 		}

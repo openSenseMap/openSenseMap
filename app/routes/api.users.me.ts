@@ -29,8 +29,9 @@ import {
 	requestContentTypeJson,
 	requestContentTypeJsonOrForm,
 } from '~/middleware/content-type-header.server'
-import { parseFormRequest, parseJsonBody } from '~/lib/request-parsing'
+import { parseJsonBody, parseJsonOrFormRequest } from '~/lib/request-parsing'
 import { NewPasswordSchema } from '~/lib/openapi/schemas/auth'
+import { OkMessageResponseSchema } from '~/lib/openapi/schemas/common'
 
 const messages = {
 	noChanges: 'No changed properties supplied. User remains unchanged.',
@@ -196,7 +197,7 @@ export const openapi: ZodOpenApiPathItemObject = {
 
 			403: forbiddenResponse(
 				ForbiddenErrorSchema,
-				'Invalid or missing JWT authorization.',
+				'Forbidden. The JWT is invalid or missing, or the supplied current password is incorrect.',
 			),
 
 			405: methodNotAllowedResponse(
@@ -215,13 +216,19 @@ export const openapi: ZodOpenApiPathItemObject = {
 		tags: ['User Management'],
 		summary: 'Delete current user account',
 		description:
-			"Permanently deletes the authenticated user's account. The current password must be supplied as form data.",
+			"Permanently deletes the authenticated user's account. The current password may be supplied as JSON or form data.",
 		security: [{ bearerAuth: [] }],
 
 		requestBody: {
 			required: true,
 			content: {
+				'application/json': {
+					schema: DeleteCurrentUserRequestSchema,
+				},
 				'application/x-www-form-urlencoded': {
+					schema: DeleteCurrentUserRequestSchema,
+				},
+				'multipart/form-data': {
 					schema: DeleteCurrentUserRequestSchema,
 				},
 			},
@@ -232,17 +239,14 @@ export const openapi: ZodOpenApiPathItemObject = {
 				description: 'Account successfully deleted.',
 				content: {
 					'application/json': {
-						schema: z.null().meta({
-							description:
-								'JSON null response indicating successful account deletion.',
-						}),
+						schema: OkMessageResponseSchema,
 					},
 				},
 			},
 
 			400: badRequestResponse(
 				BadRequestErrorSchema,
-				'Bad request. This can happen when the form body cannot be parsed or the password is missing.',
+				'Bad request. This can happen when the body cannot be parsed or the password is missing.',
 			),
 
 			401: unauthorizedResponse(
@@ -351,6 +355,9 @@ const put = async (user: User, request: Request): Promise<Response> => {
 
 		if (updated === false || updateMessages.length === 0) {
 			if (updated === false && updateMessages.length > 0) {
+				if (updateMessages.includes(messages.passwordIncorrect)) {
+					return StandardResponse.forbidden(messages.passwordIncorrect)
+				}
 				return StandardResponse.badRequest(messageText)
 			}
 
@@ -387,7 +394,7 @@ const put = async (user: User, request: Request): Promise<Response> => {
 
 const del = async (user: User, request: Request): Promise<Response> => {
 	try {
-		const requestData = await parseFormRequest(
+		const requestData = await parseJsonOrFormRequest(
 			request,
 			DeleteCurrentUserRequestSchema,
 		)
@@ -408,7 +415,14 @@ const del = async (user: User, request: Request): Promise<Response> => {
 			return StandardResponse.unauthorized(apiMessages.passwordIncorrect)
 		}
 
-		return StandardResponse.ok(null)
+		if (!deleted) {
+			return StandardResponse.internalServerError()
+		}
+
+		return StandardResponse.ok({
+			code: 'Ok',
+			message: `User and all boxes of user marked for deletion. Bye Bye ${user.name}!`,
+		})
 	} catch {
 		return StandardResponse.internalServerError()
 	}

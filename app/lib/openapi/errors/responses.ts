@@ -1,14 +1,5 @@
-import { z, type ZodType } from 'zod/v4'
-
-export const MessageResponseSchema = z
-	.object({
-		message: z.string().meta({
-			example: 'Operation completed successfully.',
-		}),
-	})
-	.meta({
-		id: 'MessageResponse',
-	})
+import { type ZodType } from 'zod/v4'
+import { OkMessageResponseSchema } from '~/lib/openapi/schemas/common'
 
 export const jsonResponse = (description: string, schema: ZodType) => ({
 	description,
@@ -19,9 +10,9 @@ export const jsonResponse = (description: string, schema: ZodType) => ({
 	},
 })
 
-export const messageResponse = (
+export const okMessageResponse = (
 	description = 'Operation completed successfully.',
-) => jsonResponse(description, MessageResponseSchema)
+) => jsonResponse(description, OkMessageResponseSchema)
 
 export const jsonErrorResponse = (description: string, schema: ZodType) =>
 	jsonResponse(description, schema)

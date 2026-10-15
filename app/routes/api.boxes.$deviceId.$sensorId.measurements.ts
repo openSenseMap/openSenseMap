@@ -14,16 +14,15 @@ import { type ZodOpenApiPathItemObject } from 'zod-openapi'
 import {
 	DeviceSensorPathParamsSchema,
 	IsoDateTimeToDateSchema,
+	OkMessageResponseSchema,
 } from '~/lib/openapi/schemas/common'
 
 import {
 	BadRequestErrorSchema,
 	ForbiddenErrorSchema,
 	InternalServerErrorSchema,
-	MessageResponseSchema,
 	MethodNotAllowedErrorSchema,
 	NotFoundErrorSchema,
-	messageResponse,
 	badRequestResponse,
 	forbiddenResponse,
 	internalServerErrorResponse,
@@ -33,31 +32,45 @@ import {
 
 import { parsePathParams } from '~/lib/request-parsing'
 
+const TimestampListSchema = z.preprocess((value) => {
+	const values = Array.isArray(value) ? value : [value]
+	return values.flatMap((entry) =>
+		typeof entry === 'string' ? entry.split(',') : entry,
+	)
+}, z.array(IsoDateTimeToDateSchema).min(1))
+
+const DeleteAllMeasurementsSchema = z
+	.preprocess(
+		(value) => (typeof value === 'boolean' ? String(value) : value),
+		z.enum(['true', 'false']),
+	)
+	.transform((value) => value === 'true')
+
 const DeleteSensorMeasurementsQueryParamsSchema = z
 	.object({
 		'from-date': IsoDateTimeToDateSchema.optional().meta({
 			description: 'Beginning date of the measurement range to delete.',
 			example: '2026-05-13T12:00:00.000Z',
 		}),
+		fromDate: IsoDateTimeToDateSchema.optional().meta({
+			description: 'Legacy camel-case alias for `from-date`.',
+		}),
 
 		'to-date': IsoDateTimeToDateSchema.optional().meta({
 			description: 'End date of the measurement range to delete.',
 			example: '2026-05-15T12:00:00.000Z',
 		}),
+		toDate: IsoDateTimeToDateSchema.optional().meta({
+			description: 'Legacy camel-case alias for `to-date`.',
+		}),
 
-		timestamps: z
-			.union([IsoDateTimeToDateSchema, z.array(IsoDateTimeToDateSchema)])
-			.optional()
-			.transform((value) => {
-				if (value === undefined) return undefined
-				return Array.isArray(value) ? value : [value]
-			})
-			.meta({
-				description: 'One or more exact measurement timestamps to delete.',
-				example: ['2026-05-15T12:00:00.000Z'],
-			}),
+		timestamps: TimestampListSchema.optional().meta({
+			description:
+				'One or more exact measurement timestamps to delete. Repeated and comma-separated values are accepted.',
+			example: ['2026-05-15T12:00:00.000Z'],
+		}),
 
-		deleteAllMeasurements: z.enum(['true', 'false']).optional().meta({
+		deleteAllMeasurements: DeleteAllMeasurementsSchema.optional().meta({
 			description: 'Set to `true` to delete all measurements of this sensor.',
 			example: 'true',
 		}),
@@ -65,7 +78,7 @@ const DeleteSensorMeasurementsQueryParamsSchema = z
 	.meta({
 		id: 'DeleteSensorMeasurementsQueryParams',
 		description:
-			'Query parameters selecting which measurements should be deleted.',
+			'Query parameters selecting which measurements should be deleted. The same fields are also accepted in a JSON request body.',
 	})
 
 export const openapi: ZodOpenApiPathItemObject = {
@@ -73,7 +86,7 @@ export const openapi: ZodOpenApiPathItemObject = {
 		tags: ['Measurements'],
 		summary: 'Delete measurements of a sensor',
 		description:
-			'Deletes measurements for the specified sensor. The measurements to delete are selected via query parameters. You can delete all measurements, delete specific timestamps, or delete a time range using `from-date` and `to-date`.',
+			'Deletes measurements for the specified sensor. Selectors can be supplied as legacy JSON or as query parameters. Specify exactly one of `deleteAllMeasurements=true`, `timestamps`, or a complete `from-date`/`to-date` range.',
 		security: [{ bearerAuth: [] }],
 
 		requestParams: {
@@ -81,8 +94,24 @@ export const openapi: ZodOpenApiPathItemObject = {
 			query: DeleteSensorMeasurementsQueryParamsSchema,
 		},
 
+		requestBody: {
+			required: false,
+			content: {
+				'application/json': {
+					schema: DeleteSensorMeasurementsQueryParamsSchema,
+				},
+			},
+		},
+
 		responses: {
-			200: messageResponse('Measurements deleted successfully.'),
+			200: {
+				description: 'Measurements deleted successfully.',
+				content: {
+					'application/json': {
+						schema: OkMessageResponseSchema,
+					},
+				},
+			},
 
 			400: badRequestResponse(
 				BadRequestErrorSchema,
@@ -112,35 +141,103 @@ export const openapi: ZodOpenApiPathItemObject = {
 	},
 }
 
-const parseQueryParams = (
-	request: Request,
-): z.output<typeof DeleteSensorMeasurementsQueryParamsSchema> | Response => {
-	const url = new URL(request.url)
-	const timestamps = url.searchParams.getAll('timestamps')
+type DeleteSensorMeasurementsSelector = {
+	fromDate?: Date
+	toDate?: Date
+	timestamps?: Date[]
+	deleteAllMeasurements: boolean
+}
 
-	const params = {
-		'from-date': url.searchParams.get('from-date') ?? undefined,
-		'to-date': url.searchParams.get('to-date') ?? undefined,
-		deleteAllMeasurements:
-			url.searchParams.get('deleteAllMeasurements') ?? undefined,
-		timestamps:
-			timestamps.length === 0
-				? undefined
-				: timestamps.length === 1
-					? timestamps[0]
-					: timestamps,
+const selectorParameterNames = [
+	'from-date',
+	'fromDate',
+	'to-date',
+	'toDate',
+	'timestamps',
+	'deleteAllMeasurements',
+] as const
+
+const parseSelectorParams = async (
+	request: Request,
+): Promise<DeleteSensorMeasurementsSelector | Response> => {
+	let body: Record<string, unknown> = {}
+	const contentType = request.headers.get('content-type')?.toLowerCase() ?? ''
+
+	if (contentType.includes('application/json')) {
+		const rawBody = await request.text()
+
+		if (rawBody.trim()) {
+			try {
+				const parsedBody: unknown = JSON.parse(rawBody)
+				if (
+					typeof parsedBody !== 'object' ||
+					parsedBody === null ||
+					Array.isArray(parsedBody)
+				) {
+					return StandardResponse.badRequest(
+						'JSON request body must be an object',
+					)
+				}
+				body = parsedBody as Record<string, unknown>
+			} catch {
+				return StandardResponse.badRequest('Invalid JSON in request body')
+			}
+		}
 	}
 
-	const parsed = DeleteSensorMeasurementsQueryParamsSchema.safeParse(params)
+	const mergedParams: Record<string, unknown> = { ...body }
+	const searchParams = new URL(request.url).searchParams
+
+	for (const name of selectorParameterNames) {
+		const values = searchParams.getAll(name)
+		if (values.length === 1) mergedParams[name] = values[0]
+		if (values.length > 1) mergedParams[name] = values
+	}
+
+	const parsed =
+		DeleteSensorMeasurementsQueryParamsSchema.safeParse(mergedParams)
 
 	if (!parsed.success) {
 		return StandardResponse.badRequest(
-			parsed.error.issues[0]?.message ?? 'Invalid query parameters',
+			parsed.error.issues[0]?.message ?? 'Invalid deletion selector',
 		)
 	}
 
-	return parsed.data
+	const fromDate = parsed.data.fromDate ?? parsed.data['from-date']
+	const toDate = parsed.data.toDate ?? parsed.data['to-date']
+
+	if (Boolean(fromDate) !== Boolean(toDate)) {
+		return StandardResponse.badRequest(
+			'from-date and to-date need to be specified simultaneously',
+		)
+	}
+
+	if (fromDate && toDate && fromDate > toDate) {
+		return StandardResponse.badRequest('from-date must not be after to-date')
+	}
+
+	const deleteAllMeasurements = parsed.data.deleteAllMeasurements === true
+	const selectionCount =
+		Number(deleteAllMeasurements) +
+		Number(parsed.data.timestamps !== undefined) +
+		Number(fromDate !== undefined && toDate !== undefined)
+
+	if (selectionCount !== 1) {
+		return StandardResponse.badRequest(
+			'Specify exactly one of deleteAllMeasurements=true, timestamps, or a from-date/to-date range',
+		)
+	}
+
+	return {
+		fromDate,
+		toDate,
+		timestamps: parsed.data.timestamps,
+		deleteAllMeasurements,
+	}
 }
+
+const formatLegacyTimestamp = (date: Date): string =>
+	date.toISOString().replace(/\.\d{3}Z$/, 'Z')
 
 export async function action({ request, params }: Route.ActionArgs) {
 	if (request.method !== 'DELETE') {
@@ -173,35 +270,49 @@ export async function action({ request, params }: Route.ActionArgs) {
 				)
 			}
 
-			const queryParams = parseQueryParams(request)
+			const selector = await parseSelectorParams(request)
 
-			if (queryParams instanceof Response) {
-				return queryParams
+			if (selector instanceof Response) {
+				return selector
 			}
 
-			let count = 0
+			let message: string
+			let deletedCount: number
 
-			if (queryParams.deleteAllMeasurements === 'true') {
-				count = (await deleteMeasurementsForSensor(parsedParams.sensorId)).count
-			} else if (queryParams.timestamps) {
-				count = (
-					await deleteSensorMeasurementsForTimes(
-						parsedParams.sensorId,
-						queryParams.timestamps,
-					)
-				).count
-			} else if (queryParams['from-date'] && queryParams['to-date']) {
-				count = (
-					await deleteSensorMeasurementsForTimeRange(
-						parsedParams.sensorId,
-						queryParams['from-date'],
-						queryParams['to-date'],
-					)
-				).count
+			if (selector.deleteAllMeasurements) {
+				const result = await deleteMeasurementsForSensor(parsedParams.sensorId)
+				deletedCount = result.count
+				message = `Successfully deleted all measurements of sensor ${parsedParams.sensorId}`
+			} else if (selector.timestamps) {
+				const result = await deleteSensorMeasurementsForTimes(
+					parsedParams.sensorId,
+					selector.timestamps,
+				)
+				deletedCount = result.count
+				message = `Successfully deleted ${selector.timestamps.length} measurements of sensor ${parsedParams.sensorId}`
+			} else if (selector.fromDate && selector.toDate) {
+				const result = await deleteSensorMeasurementsForTimeRange(
+					parsedParams.sensorId,
+					selector.fromDate,
+					selector.toDate,
+				)
+				deletedCount = result.count
+				message = `Successfully deleted measurements between ${formatLegacyTimestamp(selector.fromDate)} and ${formatLegacyTimestamp(selector.toDate)} of sensor ${parsedParams.sensorId}`
+			} else {
+				return StandardResponse.internalServerError(
+					'Validated deletion selector is incomplete',
+				)
 			}
 
-			const responseParsed = await MessageResponseSchema.safeParseAsync({
-				message: `Successfully deleted ${count} of sensor ${parsedParams.sensorId}`,
+			if (deletedCount === 0) {
+				return StandardResponse.notFound(
+					'No matching measurements for specified query',
+				)
+			}
+
+			const responseParsed = await OkMessageResponseSchema.safeParseAsync({
+				code: 'Ok',
+				message,
 			})
 
 			if (!responseParsed.success) {

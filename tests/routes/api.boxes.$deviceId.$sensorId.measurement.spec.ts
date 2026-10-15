@@ -130,7 +130,9 @@ describe('openSenseMap API Routes: /boxes/:deviceId/:sensorId/measurement', () =
 			// Assert
 			expect(response.status).toBe(200)
 			expect(body).toHaveProperty('message')
-			expect(body.message).toBe(`Successfully deleted 1 of sensor ${sensorId}`)
+			expect(body.message).toBe(
+				`Successfully deleted measurements between 1954-01-01T00:00:00Z and 1954-12-31T23:59:59Z of sensor ${sensorId}`,
+			)
 		})
 
 		it('should remove measurements by exact timestamps', async () => {
@@ -158,7 +160,9 @@ describe('openSenseMap API Routes: /boxes/:deviceId/:sensorId/measurement', () =
 			// Assert
 			expect(response.status).toBe(200)
 			expect(body).toHaveProperty('message')
-			expect(body.message).toBe(`Successfully deleted 1 of sensor ${sensorId}`)
+			expect(body.message).toBe(
+				`Successfully deleted 1 measurements of sensor ${sensorId}`,
+			)
 		})
 
 		it('should remove all measurements when deleteAll is used', async () => {
@@ -182,7 +186,9 @@ describe('openSenseMap API Routes: /boxes/:deviceId/:sensorId/measurement', () =
 			// Assert
 			expect(response.status).toBe(200)
 			expect(body).toHaveProperty('message')
-			expect(body.message).toBe(`Successfully deleted 1 of sensor ${sensorId}`)
+			expect(body.message).toBe(
+				`Successfully deleted all measurements of sensor ${sensorId}`,
+			)
 		})
 
 		it('should deny to delete sensordata of boxes not owned by the user', async () => {
@@ -228,9 +234,11 @@ describe('openSenseMap API Routes: /boxes/:deviceId/:sensorId/measurement', () =
 			const response = dataFunctionValue as Response
 			const body = await response.json()
 
-			expect(response.status).toBe(200)
-			expect(body).toHaveProperty('message')
-			expect(body.message).toBe(`Successfully deleted 0 of sensor ${sensorId}`)
+			expect(response.status).toBe(400)
+			expect(body).toHaveProperty('error')
+			expect(body.error).toBe(
+				'Specify exactly one of deleteAllMeasurements=true, timestamps, or a from-date/to-date range',
+			)
 		})
 	})
 

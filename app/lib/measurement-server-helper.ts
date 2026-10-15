@@ -1,5 +1,6 @@
 import { desc, eq, inArray, or, type SQL, sql } from 'drizzle-orm'
 import {
+	device,
 	deviceToLocation,
 	type LastMeasurement,
 	location,
@@ -74,7 +75,11 @@ export async function findOrCreateLocations(
 	let foundLocations: LocationWithId[] = []
 
 	const existingLocations = await tx
-		.select({ id: location.id, location: location.location })
+		.select({
+			id: location.id,
+			location: location.location,
+			heightAboveGround: location.heightAboveGround,
+		})
 		.from(location)
 		.where(
 			or(
@@ -83,7 +88,7 @@ export async function findOrCreateLocations(
 						sql`ST_EQUALS(
               ${location.location},
               ST_SetSRID(ST_MakePoint(${newLocation.lng}, ${newLocation.lat}), 4326)
-            )`,
+            ) AND ${location.heightAboveGround} IS NOT DISTINCT FROM ${newLocation.height ?? null}`,
 				),
 			),
 		)
@@ -92,7 +97,7 @@ export async function findOrCreateLocations(
 		return {
 			lng: location.location.x,
 			lat: location.location.y,
-			height: undefined,
+			height: location.heightAboveGround ?? undefined,
 			id: location.id,
 		}
 	})
@@ -105,7 +110,8 @@ export async function findOrCreateLocations(
 			arr.findIndex(
 				(candidate) =>
 					candidate.lng === newLocation.lng &&
-					candidate.lat === newLocation.lat,
+					candidate.lat === newLocation.lat &&
+					(candidate.height ?? null) === (newLocation.height ?? null),
 			) === index,
 	)
 
@@ -117,6 +123,7 @@ export async function findOrCreateLocations(
 						uniqueToInsert.map((newLocation) => {
 							return {
 								location: sql`ST_SetSRID(ST_MakePoint(${newLocation.lng}, ${newLocation.lat}), 4326)`,
+								heightAboveGround: newLocation.height ?? null,
 							}
 						}),
 					)
@@ -128,7 +135,7 @@ export async function findOrCreateLocations(
 		foundLocations.push({
 			lng: value.location.x,
 			lat: value.location.y,
-			height: undefined,
+			height: value.heightAboveGround ?? undefined,
 			id: value.id,
 		}),
 	)
@@ -156,7 +163,9 @@ function foundLocationEquals(
 	location: Location,
 ): boolean {
 	return (
-		foundLocation.lat === location.lat && foundLocation.lng === location.lng
+		foundLocation.lat === location.lat &&
+		foundLocation.lng === location.lng &&
+		(foundLocation.height ?? null) === (location.height ?? null)
 	)
 }
 
@@ -186,7 +195,7 @@ export async function addLocationUpdates(
         even though it should've been inserted`)
 		})
 
-	if (filteredUpdates.length > 0)
+	if (filteredUpdates.length > 0) {
 		await tx
 			.insert(deviceToLocation)
 			.values(
@@ -199,6 +208,33 @@ export async function addLocationUpdates(
 				}),
 			)
 			.onConflictDoNothing()
+
+		const latestUpdate = filteredUpdates.reduce((latest, update) =>
+			update.time > latest.time ? update : latest,
+		)
+
+		await tx
+			.update(device)
+			.set({
+				longitude: latestUpdate.location.lng,
+				latitude: latestUpdate.location.lat,
+				heightAboveGround: latestUpdate.location.height ?? null,
+				terrainElevation: sql`CASE
+						WHEN ${device.longitude} IS DISTINCT FROM ${latestUpdate.location.lng}
+							OR ${device.latitude} IS DISTINCT FROM ${latestUpdate.location.lat}
+						THEN NULL
+						ELSE ${device.terrainElevation}
+					END`,
+				terrainElevationDataset: sql`CASE
+						WHEN ${device.longitude} IS DISTINCT FROM ${latestUpdate.location.lng}
+							OR ${device.latitude} IS DISTINCT FROM ${latestUpdate.location.lat}
+						THEN NULL
+						ELSE ${device.terrainElevationDataset}
+					END`,
+				updatedAt: sql`NOW()`,
+			})
+			.where(eq(device.id, deviceId))
+	}
 }
 
 /**

@@ -3,8 +3,8 @@ import { getUserFromJwt } from '~/lib/jwt'
 import { StandardResponse } from '~/lib/responses'
 import { resendEmailConfirmation } from '~/services/user-service.server'
 
-import * as z from 'zod/v4'
 import { type ZodOpenApiPathItemObject } from 'zod-openapi'
+import { OkMessageResponseSchema } from '~/lib/openapi/schemas/common'
 
 import {
 	ForbiddenErrorSchema,
@@ -14,20 +14,6 @@ import {
 	internalServerErrorResponse,
 	unprocessableContentResponse,
 } from '~/lib/openapi/errors'
-
-const ResendEmailConfirmationResponseSchema = z
-	.object({
-		code: z.literal('Ok').default('Ok'),
-		message: z.string().meta({
-			description:
-				'Confirmation that the email confirmation message has been sent.',
-			example: 'Email confirmation has been sent to user@example.com',
-		}),
-	})
-	.meta({
-		id: 'ResendEmailConfirmationResponse',
-		description: 'Email confirmation resend response.',
-	})
 
 export const openapi: ZodOpenApiPathItemObject = {
 	post: {
@@ -42,7 +28,7 @@ export const openapi: ZodOpenApiPathItemObject = {
 				description: 'Email confirmation sent successfully.',
 				content: {
 					'application/json': {
-						schema: ResendEmailConfirmationResponseSchema,
+						schema: OkMessageResponseSchema,
 					},
 				},
 			},

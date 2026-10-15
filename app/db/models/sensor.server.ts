@@ -1,6 +1,7 @@
 import { eq, sql, inArray, and } from 'drizzle-orm'
 import {
 	type Measurement,
+	location,
 	sensor,
 	device,
 	type Sensor,
@@ -74,6 +75,16 @@ export function getSensorsFromDevice(deviceId: Sensor['deviceId']) {
 	})
 }
 
+export function getSensorFromDevice(
+	deviceId: Sensor['deviceId'],
+	sensorId: Sensor['id'],
+) {
+	return drizzleClient.query.sensor.findFirst({
+		where: (sensor, { and, eq }) =>
+			and(eq(sensor.deviceId, deviceId), eq(sensor.id, sensorId)),
+	})
+}
+
 export async function getSensorWithLastMeasurement(
 	deviceId: Sensor['deviceId'],
 	sensorId: Sensor['id'],
@@ -143,16 +154,30 @@ export async function getMeasurements(
 	fromDate: string,
 	toDate: string,
 	count: number = 10000,
-): Promise<Measurement[]> {
-	return (await drizzleClient.execute(
-		sql`SELECT *
-          FROM measurement
-          WHERE sensor_id = ${sensorId} AND
-          time >= ${fromDate} AND
-          time <= ${toDate}
-          ORDER BY time DESC
-          LIMIT ${count}`,
-	)) as Measurement[]
+) {
+	return drizzleClient.query.measurement.findMany({
+		where: (measurement, { and, eq, gte, lte }) =>
+			and(
+				eq(measurement.sensorId, sensorId),
+				gte(measurement.time, new Date(fromDate)),
+				lte(measurement.time, new Date(toDate)),
+			),
+		orderBy: (measurement, { desc }) => [desc(measurement.time)],
+		limit: count,
+		// Required by the legacy response serializer for located measurements.
+		with: {
+			location: {
+				columns: {
+					id: true,
+					heightAboveGround: true,
+				},
+				extras: {
+					x: sql<number>`ST_X(${location.location})`.as('x'),
+					y: sql<number>`ST_Y(${location.location})`.as('y'),
+				},
+			},
+		},
+	})
 }
 
 export async function registerSensor(newSensor: Sensor) {
@@ -284,10 +309,6 @@ export async function findMatchingSensors(params: BoxesDataQueryParams) {
 				deviceConditions.length > 0 ? and(...deviceConditions) : undefined,
 			),
 		)
-
-	if (!rows || rows.length === 0) {
-		throw new Response('No senseBoxes found', { status: 404 })
-	}
 
 	const sensorsMap: Record<
 		string,

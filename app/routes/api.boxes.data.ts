@@ -12,11 +12,9 @@ import { type ZodOpenApiPathItemObject } from 'zod-openapi'
 import {
 	BadRequestErrorSchema,
 	InternalServerErrorSchema,
-	NotFoundErrorSchema,
 	UnprocessableContentErrorSchema,
 	badRequestResponse,
 	internalServerErrorResponse,
-	notFoundResponse,
 	unprocessableContentResponse,
 } from '~/lib/openapi/errors'
 
@@ -36,6 +34,7 @@ import {
 const DevicesDataRequestSchema = DateRangeQuerySchema.extend({
 	phenomenon: z.string().optional(),
 	grouptag: z.string().optional(),
+	boxId: z.union([z.string(), z.array(z.string())]).optional(),
 	boxid: z.union([z.string(), z.array(z.string())]).optional(),
 	exposure: z.union([ExposureSchema, z.array(ExposureSchema)]).optional(),
 	bbox: BboxSchema,
@@ -60,9 +59,14 @@ const DevicesDataQueryParamsSchema = DateRangeQuerySchema.extend({
 		example: 'co2-campaign',
 	}),
 
-	boxid: z.string().optional().meta({
+	boxId: z.string().optional().meta({
 		description: 'Filter by device ID.',
 		example: '5bdbe70f55d0ad001a04edc9',
+	}),
+
+	boxid: z.string().optional().meta({
+		description: 'Deprecated lowercase alias for `boxId`.',
+		deprecated: true,
 	}),
 
 	exposure: ExposureSchema.optional(),
@@ -90,7 +94,7 @@ const DevicesDataJsonResponseSchema = z
 		example: [
 			{
 				createdAt: '2026-05-13T12:00:00.000Z',
-				value: 21.5,
+				value: '21.5',
 				boxId: '5bdbe70f55d0ad001a04edc9',
 				boxName: 'My device',
 				sensorId: '60a13611a877b3001b8ffd59',
@@ -148,11 +152,6 @@ export const openapi: ZodOpenApiPathItemObject = {
 				'Bad request. This can happen for invalid query parameters.',
 			),
 
-			404: notFoundResponse(
-				NotFoundErrorSchema,
-				'No matching devices or sensors found.',
-			),
-
 			422: unprocessableContentResponse(
 				UnprocessableContentErrorSchema,
 				'Unprocessable content. This can happen for invalid bounding box parameters.',
@@ -168,9 +167,9 @@ export const openapi: ZodOpenApiPathItemObject = {
 	post: {
 		tags: ['Measurements'],
 		summary:
-			'Stream measurements across devices and sensors using a JSON request body',
+			'Stream measurements across devices and sensors using a request body',
 		description:
-			'POST variant of the devices data query. Parameters can be sent as a JSON request body. If the request body cannot be parsed as JSON, the server falls back to query parameters.',
+			'POST variant of the devices data query. Parameters can be sent as JSON or form data; query parameters take precedence when both are supplied.',
 
 		requestParams: {
 			query: DevicesDataQueryParamsSchema,
@@ -180,6 +179,12 @@ export const openapi: ZodOpenApiPathItemObject = {
 			required: false,
 			content: {
 				'application/json': {
+					schema: DevicesDataRequestSchema,
+				},
+				'application/x-www-form-urlencoded': {
+					schema: DevicesDataRequestSchema,
+				},
+				'multipart/form-data': {
 					schema: DevicesDataRequestSchema,
 				},
 			},
@@ -214,11 +219,6 @@ export const openapi: ZodOpenApiPathItemObject = {
 				'Bad request. This can happen for invalid query or body parameters.',
 			),
 
-			404: notFoundResponse(
-				NotFoundErrorSchema,
-				'No matching devices or sensors found.',
-			),
-
 			422: unprocessableContentResponse(
 				UnprocessableContentErrorSchema,
 				'Unprocessable content. This can happen for invalid bounding box parameters.',
@@ -250,10 +250,6 @@ export async function loader({ request }: Route.LoaderArgs) {
 
 		const { sensorsMap, sensorIds } = await findMatchingSensors(params)
 
-		if (sensorIds.length === 0) {
-			return StandardResponse.notFound('No matching sensors found')
-		}
-
 		const headers = new Headers()
 		headers.set(
 			'Content-Type',
@@ -265,7 +261,7 @@ export async function loader({ request }: Route.LoaderArgs) {
 			const filename = createDownloadFilename(
 				new Date(),
 				'download',
-				[params.phenomenon || 'data'],
+				[params.phenomenon || 'data', ...params.columns],
 				params.format,
 			)
 			headers.set('Content-Disposition', `attachment; filename=${filename}`)
@@ -294,6 +290,22 @@ export async function loader({ request }: Route.LoaderArgs) {
 						params.bbox,
 					)) {
 						for (const measurement of batch) {
+							const locationId = measurement.location_id ?? null
+							const locationsMap =
+								locationId !== null &&
+								measurement.location_lng !== null &&
+								measurement.location_lat !== null
+									? {
+											[locationId.toString()]: {
+												lon: Number(measurement.location_lng),
+												lat: Number(measurement.location_lat),
+												height:
+													measurement.location_height === null
+														? undefined
+														: Number(measurement.location_height),
+											},
+										}
+									: {}
 							const transformed = transformMeasurement(
 								{
 									sensorId: measurement.sensor_id,
@@ -301,10 +313,10 @@ export async function loader({ request }: Route.LoaderArgs) {
 										? new Date(measurement.time)
 										: null,
 									value: measurement.value,
-									locationId: measurement.location_id ?? null,
+									locationId,
 								},
 								sensorsMap,
-								{},
+								locationsMap,
 								params.columns,
 							)
 

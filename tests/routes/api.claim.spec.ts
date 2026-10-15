@@ -69,7 +69,7 @@ describe('openSenseMap API Routes: /boxes/claim', () => {
 		jwt = t
 
 		queryableDevice = await createDevice(
-			{ ...generateMinimalDevice(), latitude: 123, longitude: 12 },
+			{ ...generateMinimalDevice(), latitude: 12, longitude: 123 },
 			user.id,
 		)
 	})
@@ -143,7 +143,7 @@ describe('openSenseMap API Routes: /boxes/claim', () => {
 
 		it('should reject claim with invalid content-type', async () => {
 			const testDevice = await createDevice(
-				{ ...generateMinimalDevice(), latitude: 456, longitude: 78 },
+				{ ...generateMinimalDevice(), latitude: 45.6, longitude: 78 },
 				(user as User).id,
 			)
 
@@ -186,7 +186,7 @@ describe('openSenseMap API Routes: /boxes/claim', () => {
 
 		it('should reject claim without Authorization header', async () => {
 			const testDevice = await createDevice(
-				{ ...generateMinimalDevice(), latitude: 789, longitude: 101 },
+				{ ...generateMinimalDevice(), latitude: 78.9, longitude: 101 },
 				(user as User).id,
 			)
 

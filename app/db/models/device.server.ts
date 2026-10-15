@@ -2,6 +2,7 @@ import { point } from '@turf/helpers'
 import {
 	eq,
 	sql,
+	asc,
 	desc,
 	ilike,
 	arrayContains,
@@ -13,7 +14,9 @@ import {
 	type SQL,
 	gte,
 	lt,
+	lte,
 	exists,
+	inArray,
 } from 'drizzle-orm'
 import { alias, type PgTransaction } from 'drizzle-orm/pg-core'
 import { type PostgresJsQueryResultHKT } from 'drizzle-orm/postgres-js'
@@ -144,7 +147,9 @@ export function getDevice({ id }: Pick<Device, 'id'>) {
 				},
 				with: {
 					geometry: {
-						columns: {},
+						columns: {
+							heightAboveGround: true,
+						},
 						extras: {
 							x: sql<number>`ST_X(${location.location})`.as('x'),
 							y: sql<number>`ST_Y(${location.location})`.as('y'),
@@ -253,6 +258,7 @@ export function getLocations(
 			time: deviceToLocation.time,
 			x: sql<number>`ST_X(${location.location})`.as('x'),
 			y: sql<number>`ST_Y(${location.location})`.as('y'),
+			heightAboveGround: location.heightAboveGround,
 		})
 		.from(location)
 		.innerJoin(deviceToLocation, eq(deviceToLocation.locationId, location.id))
@@ -262,7 +268,7 @@ export function getLocations(
 				between(deviceToLocation.time, fromDate, toDate),
 			),
 		)
-		.orderBy(desc(deviceToLocation.time))
+		.orderBy(asc(deviceToLocation.time))
 }
 export function getDeviceWithoutSensors({ id }: Pick<Device, 'id'>) {
 	return drizzleClient.query.device.findFirst({
@@ -275,6 +281,8 @@ export function getDeviceWithoutSensors({ id }: Pick<Device, 'id'>) {
 			image: true,
 			tags: true,
 			website: true,
+			link: true,
+			createdAt: true,
 			updatedAt: true,
 			latitude: true,
 			longitude: true,
@@ -286,6 +294,16 @@ export function getDeviceWithoutSensors({ id }: Pick<Device, 'id'>) {
 			deviceSchemaVersionId: true,
 		},
 	})
+}
+
+export async function deviceExists({ id }: Pick<Device, 'id'>) {
+	const [existingDevice] = await drizzleClient
+		.select({ id: device.id })
+		.from(device)
+		.where(eq(device.id, id))
+		.limit(1)
+
+	return existingDevice !== undefined
 }
 
 export async function detachDeviceSchema({
@@ -395,6 +413,7 @@ export type UpdateDeviceArgs = {
 	image?: string
 	model?: string
 	useAuth?: boolean
+	generateAccessToken?: boolean
 	location?: {
 		lat: number
 		lng: number
@@ -481,7 +500,10 @@ export async function updateDevice(
 			const [existingLocation] = await tx
 				.select()
 				.from(location)
-				.where(sql`ST_Equals(location, ST_GeomFromText(${pointWKT}, 4326))`)
+				.where(
+					sql`ST_Equals(${location.location}, ST_GeomFromText(${pointWKT}, 4326))
+						AND ${location.heightAboveGround} IS NOT DISTINCT FROM ${heightAboveGround ?? null}`,
+				)
 				.limit(1)
 
 			let locationId: bigint
@@ -493,6 +515,7 @@ export async function updateDevice(
 					.insert(location)
 					.values({
 						location: sql`ST_GeomFromText(${pointWKT}, 4326)`,
+						heightAboveGround: heightAboveGround ?? null,
 					})
 					.returning()
 
@@ -545,14 +568,23 @@ export async function updateDevice(
 				.select()
 				.from(sensor)
 				.where(eq(sensor.deviceId, deviceId))
-
-			const sensorsToDelete = args.sensors.filter(
-				(s) => 'deleted' in s && s._id,
+			const existingSensorIds = new Set(
+				existingSensors.map((existing) => existing.id),
 			)
-			const remainingSensorCount =
-				existingSensors.length - sensorsToDelete.length
 
-			if (sensorsToDelete.length > 0 && remainingSensorCount < 1) {
+			const sensorsToDelete = new Set(
+				args.sensors
+					.filter(
+						(s) =>
+							s.deleted === true &&
+							s._id !== undefined &&
+							existingSensorIds.has(s._id),
+					)
+					.map((s) => s._id as string),
+			)
+			const remainingSensorCount = existingSensors.length - sensorsToDelete.size
+
+			if (sensorsToDelete.size > 0 && remainingSensorCount < 1) {
 				throw new DeviceUpdateError(
 					'Unable to delete sensor(s). A box needs at least one sensor.',
 				)
@@ -562,29 +594,14 @@ export async function updateDevice(
 				Math.max(...existingSensors.map((sensor) => sensor.order ?? -1)) + 1
 
 			for (const s of args.sensors) {
-				const hasDeleted = 'deleted' in s
-				const hasEdited = 'edited' in s
-				const hasNew = 'new' in s
+				const isDeleted = s.deleted === true
+				const isEdited = s.edited === true
+				const isNew = s.new === true
+				const sensorExists = Boolean(s._id && existingSensorIds.has(s._id))
 
-				if (!hasDeleted && !hasEdited && !hasNew) continue
-
-				if (hasDeleted) {
-					if (!s._id) {
-						throw new DeviceUpdateError('Sensor deletion requires _id')
-					}
-
-					const sensorExists = existingSensors.some(
-						(existing) => existing.id === s._id,
-					)
-
-					if (!sensorExists) {
-						throw new DeviceUpdateError(
-							`Sensor with id ${s._id} not found for deletion.`,
-						)
-					}
-
+				if (sensorExists && isDeleted && s._id) {
 					await tx.delete(sensor).where(eq(sensor.id, s._id))
-				} else if (hasEdited && hasNew) {
+				} else if (isEdited && isNew && !sensorExists) {
 					if (!s.title || !s.unit || !s.sensorType) {
 						throw new DeviceUpdateError(
 							'New sensor requires title, unit, and sensorType',
@@ -600,17 +617,7 @@ export async function updateDevice(
 						order: nextSensorOrder,
 					})
 					nextSensorOrder += 1
-				} else if (hasEdited && s._id) {
-					const sensorExists = existingSensors.some(
-						(existing) => existing.id === s._id,
-					)
-
-					if (!sensorExists) {
-						throw new DeviceUpdateError(
-							`Sensor with id ${s._id} not found for editing.`,
-						)
-					}
-
+				} else if (sensorExists && isEdited && s._id) {
 					if (!s.title || !s.unit || !s.sensorType) {
 						throw new DeviceUpdateError(
 							'Editing sensor requires all properties: _id, title, unit, sensorType, icon',
@@ -627,12 +634,21 @@ export async function updateDevice(
 							updatedAt: sql`NOW()`,
 						})
 						.where(eq(sensor.id, s._id))
+				} else if (!sensorExists) {
+					throw new DeviceUpdateError(
+						`Sensor with id ${s._id} not found for ${isDeleted ? 'deletion' : 'editing'}.`,
+						404,
+					)
 				}
 			}
 		}
 
-		if (args.useAuth === true && !updatedDevice.apiKey) {
-			await addOrReplaceDeviceApiKey(updatedDevice, tx)
+		if (args.generateAccessToken === true) {
+			const { apiKey } = await addOrReplaceDeviceApiKey(updatedDevice, tx)
+			updatedDevice = { ...updatedDevice, apiKey }
+		} else if (args.useAuth === true && !updatedDevice.apiKey) {
+			const { apiKey } = await addOrReplaceDeviceApiKey(updatedDevice, tx)
+			updatedDevice = { ...updatedDevice, apiKey }
 		}
 
 		return updatedDevice
@@ -645,9 +661,22 @@ export function deleteDevice({ id }: Pick<Device, 'id'>) {
 	return drizzleClient.delete(device).where(eq(device.id, id))
 }
 
-export function getUserDevices(userId: Device['userId']) {
+export function deleteUserDevice({
+	id,
+	userId,
+}: Pick<Device, 'id' | 'userId'>) {
+	return drizzleClient
+		.delete(device)
+		.where(and(eq(device.id, id), eq(device.userId, userId)))
+}
+
+export function getUserDevices(
+	userId: Device['userId'],
+	options: { limit?: number; offset?: number } = {},
+) {
 	return drizzleClient.query.device.findMany({
 		where: (device, { eq }) => eq(device.userId, userId),
+		orderBy: (device, { asc }) => [asc(device.createdAt)],
 		columns: DEVICE_COLUMNS_WITH_SENSORS,
 		extras: {
 			heightAboveSeaLevel: calculatedDeviceHeightAboveSeaLevel().as(
@@ -657,6 +686,8 @@ export function getUserDevices(userId: Device['userId']) {
 		with: {
 			sensors: true,
 		},
+		...(options.limit !== undefined && { limit: options.limit }),
+		...(options.offset !== undefined && { offset: options.offset }),
 	})
 }
 
@@ -909,7 +940,7 @@ interface BuildWhereClauseOptions {
 	bbox?: {
 		coordinates: (number | undefined)[][][]
 	}
-	near?: [number, number] // [lat, lng]
+	near?: [number, number] // [lng, lat]
 	maxDistance?: number
 	grouptag?: string[]
 	exposure?: string[]
@@ -918,6 +949,8 @@ interface BuildWhereClauseOptions {
 
 export interface FindDevicesOptions extends BuildWhereClauseOptions {
 	minimal?: string | boolean
+	full?: string | boolean
+	classify?: boolean
 	limit?: number
 	format?: 'json' | 'geojson'
 }
@@ -941,28 +974,53 @@ const buildWhereClause = function buildWhereClause(
 		grouptag,
 	} = opts
 	const clause = []
-	const columns = {}
+	const columns: Record<string, any> = {}
 
 	if (name) {
 		clause.push(ilike(device.name, `%${name}%`))
 	}
 
 	if (phenomenon) {
-		// @ts-ignore
 		columns['sensors'] = {
-			// @ts-ignore
-			where: (sensor, { ilike }) =>
-				// @ts-ignore
-				ilike(sensorTable['title'], `%${phenomenon}%`),
+			where: ilike(sensor.title, `%${phenomenon}%`),
 		}
+
+		const sensorConditions: SQL[] = [
+			eq(sensor.deviceId, device.id),
+			ilike(sensor.title, `%${phenomenon}%`),
+		]
+		let matchingSensors = drizzleClient
+			.select({ id: sensor.id })
+			.from(sensor)
+			.$dynamic()
+
+		if (fromDate || toDate) {
+			matchingSensors = matchingSensors.innerJoin(
+				measurement,
+				eq(measurement.sensorId, sensor.id),
+			)
+			if (fromDate)
+				sensorConditions.push(gte(measurement.time, new Date(fromDate)))
+			if (toDate) sensorConditions.push(lte(measurement.time, new Date(toDate)))
+		}
+
+		clause.push(exists(matchingSensors.where(and(...sensorConditions))))
 	}
 
-	// simple string parameters
-	// for (const param of ['exposure', 'model'] as const) {
-	// 	if (opts[param]) {
-	// 	  clause.push(inArray(device[param], opts[param]!));
-	// 	}
-	// }
+	if (opts.exposure?.length) {
+		clause.push(
+			inArray(
+				device.exposure,
+				opts.exposure as Array<NonNullable<Device['exposure']>>,
+			),
+		)
+	}
+
+	if (opts.model?.length) {
+		clause.push(
+			inArray(device.model, opts.model as Array<NonNullable<Device['model']>>),
+		)
+	}
 
 	if (grouptag) {
 		clause.push(arrayContains(device.tags, grouptag))
@@ -984,35 +1042,10 @@ const buildWhereClause = function buildWhereClause(
 		clause.push(
 			sql`ST_DWithin(
 			ST_SetSRID(ST_MakePoint(${device.longitude}, ${device.latitude}), 4326)::geography,
-			ST_SetSRID(ST_MakePoint(${near[1]}, ${near[0]}), 4326)::geography,
+			ST_SetSRID(ST_MakePoint(${near[0]}, ${near[1]}), 4326)::geography,
 			${maxDistance}
 		)`,
 		)
-	}
-
-	if (phenomenon && (fromDate || toDate)) {
-		// @ts-ignore
-		columns['sensors'] = {
-			include: {
-				measurements: {
-					where: (measurement: any) => {
-						const conditions = []
-
-						if (fromDate && toDate) {
-							conditions.push(
-								sql`${measurement.createdAt} BETWEEN ${fromDate} AND ${toDate}`,
-							)
-						} else if (fromDate) {
-							conditions.push(sql`${measurement.createdAt} >= ${fromDate}`)
-						} else if (toDate) {
-							conditions.push(sql`${measurement.createdAt} <= ${toDate}`)
-						}
-
-						return and(...conditions)
-					},
-				},
-			},
-		}
 	}
 
 	return {
@@ -1027,6 +1060,7 @@ const MINIMAL_COLUMNS = {
 	exposure: true,
 	longitude: true,
 	latitude: true,
+	updatedAt: true,
 }
 
 const DEFAULT_COLUMNS = {
@@ -1034,14 +1068,22 @@ const DEFAULT_COLUMNS = {
 	name: true,
 	model: true,
 	exposure: true,
-	grouptag: true,
+	tags: true,
 	image: true,
 	description: true,
+	website: true,
 	link: true,
 	createdAt: true,
 	updatedAt: true,
 	longitude: true,
 	latitude: true,
+	heightAboveGround: true,
+	terrainElevation: true,
+	terrainElevationDataset: true,
+	useAuth: true,
+	public: true,
+	expiresAt: true,
+	sensorWikiModel: true,
 }
 
 export async function findDevices(
@@ -1100,27 +1142,18 @@ export async function createDevice(deviceData: any, userId: string) {
 				)
 			}
 
-			// If model is specified but sensors are not, get sensors from model layout
-			if (deviceData.model && !deviceData.sensors) {
-				const modelSensors = getSensorsForModel(deviceData.model as any)
+			// If a predefined model is specified without sensors, use its layout.
+			if (deviceData.model && !deviceData.sensors && !isCustomDevice) {
+				const modelSensors = getSensorsForModel(
+					deviceData.model,
+					deviceData.sensorTemplates,
+				)
 
-				if (
-					!Array.isArray(modelSensors) &&
-					deviceData.model?.toLowerCase() !== 'custom'
-				) {
+				if (!modelSensors || modelSensors.length === 0) {
 					throw new Error(`Unknown model: ${deviceData.model}`)
 				}
 
-				if (
-					Array.isArray(deviceData.sensorTemplates) &&
-					deviceData.sensorTemplates.length > 0
-				) {
-					sensorsToAdd = modelSensors.filter((sensor) =>
-						deviceData.sensorTemplates.includes(sensor.id),
-					)
-				} else {
-					sensorsToAdd = modelSensors
-				}
+				sensorsToAdd = modelSensors
 			}
 
 			if (isCustomDevice && deviceData.sensors) {
@@ -1199,6 +1232,38 @@ export async function createDevice(deviceData: any, userId: string) {
 				throw new Error('Failed to create device.')
 			}
 
+			const initialHeightAboveGround = deviceData.heightAboveGround ?? null
+			const point = sql`ST_SetSRID(ST_MakePoint(${deviceData.longitude}, ${deviceData.latitude}), 4326)`
+			let [initialLocation] = await tx
+				.insert(location)
+				.values({
+					location: point,
+					heightAboveGround: initialHeightAboveGround,
+				})
+				.onConflictDoNothing()
+				.returning()
+
+			if (!initialLocation) {
+				;[initialLocation] = await tx
+					.select()
+					.from(location)
+					.where(
+						sql`ST_Equals(${location.location}, ${point})
+							AND ${location.heightAboveGround} IS NOT DISTINCT FROM ${initialHeightAboveGround}`,
+					)
+					.limit(1)
+			}
+
+			if (!initialLocation) {
+				throw new Error('Failed to create initial device location.')
+			}
+
+			await tx.insert(deviceToLocation).values({
+				deviceId: createdDevice.id,
+				locationId: initialLocation.id,
+				time: createdDevice.createdAt,
+			})
+
 			// Add sensors in the same transaction and collect them
 			const createdSensors = []
 			if (
@@ -1247,59 +1312,67 @@ export async function createDevice(deviceData: any, userId: string) {
 			]
 		})
 
-		const lng = (usr.language?.split('_')[0] as 'de' | 'en') ?? 'en'
-		switch (newDevice.model) {
-			case 'luftdaten.info':
-			case 'luftdaten_sds011':
-			case 'luftdaten_sds011_bme280':
-			case 'luftdaten_sds011_bmp180':
-			case 'luftdaten_sds011_dht11':
-			case 'luftdaten_sds011_dht22':
-				await sendMail({
-					recipientAddress: usr.email,
-					recipientName: usr.name,
-					subject: NewLufdatenDeviceMessages[lng].heading,
-					body: BaseNewDeviceEmail({
-						user: { name: usr.name },
-						device: newDevice,
-						language: lng,
-						content: NewLufdatenDeviceMessages,
-					}),
-				})
-				break
-			case 'homeV2Ethernet':
-			case 'homeV2Lora':
-			case 'homeV2Wifi':
-			case 'homeEthernet':
-			case 'homeEthernetFeinstaub':
-			case 'homeWifi':
-			case 'homeWifiFeinstaub':
-			case 'senseBox:Edu':
-				await sendMail({
-					recipientAddress: usr.email,
-					recipientName: usr.name,
-					subject: NewSenseboxDeviceMessages[lng].heading,
-					body: BaseNewDeviceEmail({
-						user: { name: usr.name },
-						device: newDevice,
-						language: lng,
-						content: NewSenseboxDeviceMessages,
-					}),
-				})
-				break
-			default:
-				await sendMail({
-					recipientAddress: usr.email,
-					recipientName: usr.name,
-					subject: BaseNewDeviceMessages[lng].heading,
-					body: BaseNewDeviceEmail({
-						user: { name: usr.name },
-						device: newDevice,
-						language: lng,
-						content: BaseNewDeviceMessages,
-					}),
-				})
-				break
+		const userLanguage = usr.language?.split('_')[0]
+		const lng: 'de' | 'en' = userLanguage === 'de' ? 'de' : 'en'
+		try {
+			switch (newDevice.model) {
+				case 'luftdaten.info':
+				case 'luftdaten_sds011':
+				case 'luftdaten_sds011_bme280':
+				case 'luftdaten_sds011_bmp180':
+				case 'luftdaten_sds011_dht11':
+				case 'luftdaten_sds011_dht22':
+					await sendMail({
+						recipientAddress: usr.email,
+						recipientName: usr.name,
+						subject: NewLufdatenDeviceMessages[lng].heading,
+						body: BaseNewDeviceEmail({
+							user: { name: usr.name },
+							device: newDevice,
+							language: lng,
+							content: NewLufdatenDeviceMessages,
+						}),
+					})
+					break
+				case 'homeV2Ethernet':
+				case 'homeV2Lora':
+				case 'homeV2Wifi':
+				case 'homeEthernet':
+				case 'homeEthernetFeinstaub':
+				case 'homeWifi':
+				case 'homeWifiFeinstaub':
+				case 'senseBox:Edu':
+					await sendMail({
+						recipientAddress: usr.email,
+						recipientName: usr.name,
+						subject: NewSenseboxDeviceMessages[lng].heading,
+						body: BaseNewDeviceEmail({
+							user: { name: usr.name },
+							device: newDevice,
+							language: lng,
+							content: NewSenseboxDeviceMessages,
+						}),
+					})
+					break
+				default:
+					await sendMail({
+						recipientAddress: usr.email,
+						recipientName: usr.name,
+						subject: BaseNewDeviceMessages[lng].heading,
+						body: BaseNewDeviceEmail({
+							user: { name: usr.name },
+							device: newDevice,
+							language: lng,
+							content: BaseNewDeviceMessages,
+						}),
+					})
+					break
+			}
+		} catch (error) {
+			console.error('Failed to send new-device email:', {
+				deviceId: newDevice.id,
+				error,
+			})
 		}
 
 		return newDevice

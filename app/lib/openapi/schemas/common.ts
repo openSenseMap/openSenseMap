@@ -19,7 +19,7 @@ export const DeviceSensorPathParamsSchema = z.object({
 	sensorId: SensorIdSchema,
 })
 
-export const IsoDateTimeSchema = z.iso.datetime().meta({
+export const IsoDateTimeSchema = z.iso.datetime({ offset: true }).meta({
 	description: 'ISO 8601 timestamp',
 	example: '2026-05-18T12:34:56.000Z',
 })
@@ -27,3 +27,15 @@ export const IsoDateTimeSchema = z.iso.datetime().meta({
 export const IsoDateTimeToDateSchema = IsoDateTimeSchema.transform(
 	(value) => new Date(value),
 )
+
+export const OkMessageResponseSchema = z
+	.object({
+		code: z.literal('Ok'),
+		message: z.string().meta({
+			example: 'Operation completed successfully.',
+		}),
+	})
+	.meta({
+		id: 'OkMessageResponse',
+		description: 'Successful API response containing a message.',
+	})

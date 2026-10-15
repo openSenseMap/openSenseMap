@@ -24,7 +24,7 @@ import {
 } from '~/lib/openapi/errors'
 
 import { parseJsonOrFormRequest } from '~/lib/request-parsing'
-import { User } from '~/db/schema'
+import { type User } from '~/db/schema'
 import { requestContentTypeJsonOrForm } from '~/middleware/content-type-header.server'
 
 const TransferTokenSchema = z.string().min(1).meta({
@@ -43,9 +43,9 @@ const CreateDeviceTransferRequestSchema = z
 				error: 'boxId is required',
 			}),
 
-		expiresAt: z.iso.datetime().optional(),
+		expiresAt: z.iso.datetime({ offset: true }).optional(),
 
-		date: z.iso.datetime().optional().meta({
+		date: z.iso.datetime({ offset: true }).optional().meta({
 			description:
 				'Legacy alias for `expiresAt`. Prefer `expiresAt` for new clients.',
 			deprecated: true,
@@ -88,7 +88,7 @@ const DeviceTransferDataSchema = z
 
 		token: TransferTokenSchema,
 
-		expiresAt: z.iso.datetime().meta({
+		expiresAt: z.iso.datetime({ offset: true }).meta({
 			description: 'Expiration date of the transfer token.',
 			example: '2026-05-22T12:00:00.000Z',
 		}),
@@ -102,8 +102,8 @@ const CreateDeviceTransferResponseSchema = z
 	.object({
 		code: z.literal('Created').default('Created'),
 		message: z
-			.literal('Device successfully prepared for transfer')
-			.default('Device successfully prepared for transfer'),
+			.literal('Box successfully prepared for transfer')
+			.default('Box successfully prepared for transfer'),
 		data: DeviceTransferDataSchema,
 	})
 	.meta({
@@ -133,7 +133,7 @@ export const openapi: ZodOpenApiPathItemObject = {
 
 		responses: {
 			201: {
-				description: 'Device successfully prepared for transfer.',
+				description: 'Box successfully prepared for transfer.',
 				content: {
 					'application/json': {
 						schema: CreateDeviceTransferResponseSchema,
@@ -272,7 +272,7 @@ const handleCreateTransfer = async (request: Request, user: User) => {
 		const responseParsed =
 			await CreateDeviceTransferResponseSchema.safeParseAsync({
 				code: 'Created',
-				message: 'Device successfully prepared for transfer',
+				message: 'Box successfully prepared for transfer',
 				data: {
 					...transferCode,
 					expiresAt:

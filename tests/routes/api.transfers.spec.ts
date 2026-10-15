@@ -59,7 +59,7 @@ describe('openSenseMap API Routes: /boxes/transfer and /boxes/claim', () => {
 		jwt = t
 
 		queryableDevice = await createDevice(
-			{ ...generateMinimalDevice(), latitude: 123, longitude: 12 },
+			{ ...generateMinimalDevice(), latitude: 12, longitude: 123 },
 			user.id,
 		)
 	})
@@ -88,7 +88,7 @@ describe('openSenseMap API Routes: /boxes/transfer and /boxes/claim', () => {
 			expect(response.status).toBe(201)
 			expect(body).toHaveProperty(
 				'message',
-				'Device successfully prepared for transfer',
+				'Box successfully prepared for transfer',
 			)
 			expect(body).toHaveProperty('data')
 			expect(body.data).toBeDefined()

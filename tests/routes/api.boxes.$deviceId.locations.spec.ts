@@ -1,4 +1,4 @@
-import { or, sql } from 'drizzle-orm'
+import { eq, or, sql } from 'drizzle-orm'
 import { type Params } from 'react-router'
 import { generateTestUserCredentials } from 'tests/data/generate_test_user'
 import { type Route } from '../../.react-router/types/app/routes/+types/api.boxes.$deviceId.locations'
@@ -11,7 +11,7 @@ import {
 } from '~/db/models/measurement.server'
 import { getSensors } from '~/db/models/sensor.server'
 import { deleteUserByEmail } from '~/db/models/user.server'
-import { type Sensor, location } from '~/db/schema'
+import { deviceToLocation, type Sensor, location } from '~/db/schema'
 import { drizzleClient } from '~/db.server'
 import { loader } from '~/routes/api.boxes.$deviceId.locations'
 import { registerUser } from '~/services/user-service.server'
@@ -104,6 +104,10 @@ describe('openSenseMap API Routes: /api/boxes/:deviceId/locations', () => {
 
 		device = await createDevice(DEVICE_SENSOR_ID_BOX, user.id)
 		deviceId = device.id
+		// This route test supplies its own historical location series.
+		await drizzleClient
+			.delete(deviceToLocation)
+			.where(eq(deviceToLocation.deviceId, deviceId))
 		sensors = await getSensors(deviceId)
 
 		MEASUREMENTS.forEach((meas) => (meas.sensor_id = sensors[0].id))
@@ -134,16 +138,14 @@ describe('openSenseMap API Routes: /api/boxes/:deviceId/locations', () => {
 				'application/json; charset=utf-8',
 			)
 			expect(body).toHaveLength(2)
-			expect(body[0].coordinates).toHaveLength(2)
+			expect(body[0].coordinates).toHaveLength(3)
 			expect(body[1].coordinates).toHaveLength(2)
-			expect(body[0].coordinates[0]).toBe(56.78123)
-			expect(body[0].coordinates[1]).toBe(32.198)
-			expect(body[1].coordinates[0]).toBe(-179.65)
-			expect(body[1].coordinates[1]).toBe(89.76)
+			expect(body[0].coordinates).toEqual([-179.65, 89.76, 3.123])
+			expect(body[1].coordinates).toEqual([56.78123, 32.198])
 			expect(body[0].type).toBe('Point')
 			expect(body[1].type).toBe('Point')
-			expect(body[0].timestamp).toBe('1988-03-14T01:59:26.000Z')
-			expect(body[1].timestamp).toBe('1954-06-07T12:00:00.000Z')
+			expect(body[0].timestamp).toBe('1954-06-07T12:00:00.000Z')
+			expect(body[1].timestamp).toBe('1988-03-14T01:59:26.000Z')
 		})
 
 		it('should return locations of a box in geojson format', async () => {
@@ -171,15 +173,13 @@ describe('openSenseMap API Routes: /api/boxes/:deviceId/locations', () => {
 			expect(body.type).toBe('Feature')
 			expect(body.geometry.type).toBe('LineString')
 			expect(body.geometry.coordinates).toHaveLength(2)
-			expect(body.geometry.coordinates[0]).toHaveLength(2)
+			expect(body.geometry.coordinates[0]).toHaveLength(3)
 			expect(body.geometry.coordinates[1]).toHaveLength(2)
-			expect(body.geometry.coordinates[0][0]).toBe(56.78123)
-			expect(body.geometry.coordinates[0][1]).toBe(32.198)
-			expect(body.geometry.coordinates[1][0]).toBe(-179.65)
-			expect(body.geometry.coordinates[1][1]).toBe(89.76)
+			expect(body.geometry.coordinates[0]).toEqual([-179.65, 89.76, 3.123])
+			expect(body.geometry.coordinates[1]).toEqual([56.78123, 32.198])
 			expect(body.properties.timestamps).toHaveLength(2)
-			expect(body.properties.timestamps[0]).toBe('1988-03-14T01:59:26.000Z')
-			expect(body.properties.timestamps[1]).toBe('1954-06-07T12:00:00.000Z')
+			expect(body.properties.timestamps[0]).toBe('1954-06-07T12:00:00.000Z')
+			expect(body.properties.timestamps[1]).toBe('1988-03-14T01:59:26.000Z')
 		})
 	})
 

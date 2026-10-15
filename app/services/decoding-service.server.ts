@@ -1,3 +1,5 @@
+import { parseFiniteNumber } from '~/lib/numbers'
+
 type SensorLike = {
 	id: string
 	title?: string
@@ -126,77 +128,88 @@ function findHackairSensorId(
 	return undefined
 }
 
+// Preserve the legacy decoder's runtime precision: 7 coordinate and 4 height decimals.
+const LEGACY_COORDINATE_ROUNDING_FACTOR = 10_000_000
+const LEGACY_HEIGHT_ROUNDING_FACTOR = 10_000
+
 function parseLocation(
 	loc: any,
 ): { lng: number; lat: number; height?: number } | null {
 	if (!loc) return null
 
+	let lng: number
+	let lat: number
+	let height: number | undefined
+
 	if (Array.isArray(loc)) {
-		if (loc.length >= 2) {
-			const lng = Number(loc[0])
-			const lat = Number(loc[1])
-
-			if (isNaN(lng) || isNaN(lat)) {
-				console.warn('Invalid coordinates in array format:', loc)
-				return null
-			}
-
-			return {
-				lng,
-				lat,
-				height: loc[2] !== undefined ? Number(loc[2]) : undefined,
-			}
+		if (loc.length < 2) {
+			throw new Error(
+				`missing latitude or longitude in location ${JSON.stringify(loc)}`,
+			)
 		}
-		return null
-	}
-
-	if (typeof loc === 'object' && loc !== null) {
+		lng = parseNumericValue(loc[0])
+		lat = parseNumericValue(loc[1])
+		height = parseFiniteNumber(loc[2])
+	} else if (typeof loc === 'object' && loc !== null) {
 		if (loc.lng !== undefined && loc.lat !== undefined) {
-			const lng = Number(loc.lng)
-			const lat = Number(loc.lat)
-
-			if (isNaN(lng) || isNaN(lat)) {
-				console.warn('Invalid coordinates in object format:', loc)
-				return null
-			}
-
-			return {
-				lng,
-				lat,
-				height: loc.height !== undefined ? Number(loc.height) : undefined,
-			}
+			lng = parseNumericValue(loc.lng)
+			lat = parseNumericValue(loc.lat)
+			height = parseFiniteNumber(loc.height)
+		} else if (loc.longitude !== undefined && loc.latitude !== undefined) {
+			lng = parseNumericValue(loc.longitude)
+			lat = parseNumericValue(loc.latitude)
+			height = parseFiniteNumber(loc.height)
+		} else {
+			throw new Error(
+				`missing latitude or longitude in location ${JSON.stringify(loc)}`,
+			)
 		}
-
-		if (loc.longitude !== undefined && loc.latitude !== undefined) {
-			const lng = Number(loc.longitude)
-			const lat = Number(loc.latitude)
-
-			if (isNaN(lng) || isNaN(lat)) {
-				console.warn('Invalid coordinates in longitude/latitude format:', loc)
-				return null
-			}
-
-			return {
-				lng,
-				lat,
-				height: loc.height !== undefined ? Number(loc.height) : undefined,
-			}
-		}
+	} else {
+		throw new Error(
+			`missing latitude or longitude in location ${JSON.stringify(loc)}`,
+		)
 	}
 
-	console.warn('Unrecognized location format:', loc)
-	return null
+	if (!Number.isFinite(lng) || !Number.isFinite(lat)) {
+		throw new Error(
+			`missing latitude or longitude in location ${JSON.stringify(loc)}`,
+		)
+	}
+	if (Math.abs(lng) > 180 || Math.abs(lat) > 90) {
+		throw new Error(
+			`latitude or longitude is out of bounds in location ${JSON.stringify(loc)}`,
+		)
+	}
+	return {
+		lng:
+			Math.round(lng * LEGACY_COORDINATE_ROUNDING_FACTOR) /
+			LEGACY_COORDINATE_ROUNDING_FACTOR,
+		lat:
+			Math.round(lat * LEGACY_COORDINATE_ROUNDING_FACTOR) /
+			LEGACY_COORDINATE_ROUNDING_FACTOR,
+		...(height === undefined
+			? {}
+			: {
+					height:
+						Math.round(height * LEGACY_HEIGHT_ROUNDING_FACTOR) /
+						LEGACY_HEIGHT_ROUNDING_FACTOR,
+				}),
+	}
+}
+
+function parseNumericValue(value: unknown): number {
+	return parseFiniteNumber(value) ?? Number.NaN
 }
 
 const decodeHandlers: {
 	[key: string]: { decodeMessage: (data: any, options: any) => any[] }
 } = {
 	'application/json': {
-		decodeMessage: (body: any, {}: { sensors: any[] }) => {
+		decodeMessage: (body: any, _options: { sensors: any[] }) => {
 			if (Array.isArray(body)) {
 				return body.map((measurement) => ({
 					sensor_id: measurement.sensor_id ?? measurement.sensor,
-					value: parseFloat(measurement.value),
+					value: parseNumericValue(measurement.value),
 					createdAt: measurement.createdAt
 						? new Date(measurement.createdAt)
 						: new Date(),
@@ -207,11 +220,16 @@ const decodeHandlers: {
 					let measurementValue, createdAt, location
 
 					if (Array.isArray(value)) {
-						measurementValue = parseFloat(value[0])
+						if (value.length < 1 || value.length > 3) {
+							throw new Error(
+								`Array for sensorID '${sensorId}' has an illegal length`,
+							)
+						}
+						measurementValue = parseNumericValue(value[0])
 						createdAt = value[1] ? new Date(value[1]) : new Date()
 						location = parseLocation(value[2])
 					} else {
-						measurementValue = parseFloat(value)
+						measurementValue = parseNumericValue(value)
 						createdAt = new Date()
 						location = null
 					}
@@ -228,30 +246,39 @@ const decodeHandlers: {
 	},
 
 	'text/csv': {
-		decodeMessage: (body: string, {}: { sensors: any[] }) => {
-			const lines = body.trim().split('\n')
-			return lines.map((line) => {
-				const parts = line.split(',').map((part) => part.trim())
-				const sensorId = parts[0]
-				const value = parseFloat(parts[1])
-				const createdAt = parts[2] ? new Date(parts[2]) : new Date()
+		decodeMessage: (body: string, _options: { sensors: any[] }) => {
+			const measurements = []
 
-				let location = null
-				if (parts[3] && parts[4]) {
-					location = parseLocation({
-						lng: parseFloat(parts[3]),
-						lat: parseFloat(parts[4]),
-						height: parts[5] ? parseFloat(parts[5]) : undefined,
-					})
+			for (const line of body.split(/\r?\n/)) {
+				const parts = line.split(',').map((part) => part.trim())
+				while (parts[0] === '') parts.shift()
+				if (parts.length === 0) continue
+				if (parts.length < 2 || parts.length > 6) {
+					throw new Error(`illegal line '${parts.join(',')}'`)
 				}
 
-				return {
+				const sensorId = parts.shift()
+				const value = parseNumericValue(parts.shift())
+				const timestamp = parts.shift()
+				const createdAt = timestamp ? new Date(timestamp) : new Date()
+				const location =
+					parts.length >= 2
+						? parseLocation({
+								lng: parts.shift(),
+								lat: parts.shift(),
+								height: parts.shift(),
+							})
+						: null
+
+				measurements.push({
 					sensor_id: sensorId,
 					value,
 					createdAt,
 					location,
-				}
-			})
+				})
+			}
+
+			return measurements
 		},
 	},
 
@@ -269,7 +296,7 @@ const decodeHandlers: {
 					const sensor_id = findLuftdatenSensorId(sensors, sdv.value_type)
 					if (!sensor_id) return null
 
-					const value = parseFloat(sdv.value)
+					const value = parseNumericValue(sdv.value)
 					if (Number.isNaN(value)) return null
 
 					return {
@@ -303,7 +330,7 @@ const decodeHandlers: {
 					const sensor_id = findHackairSensorId(sensors, key)
 					if (!sensor_id) return null
 
-					const value = parseFloat(body.reading[key])
+					const value = parseNumericValue(body.reading[key])
 					if (Number.isNaN(value)) return null
 
 					return {
@@ -324,7 +351,7 @@ const decodeHandlers: {
 	},
 
 	'application/sbx-bytes': {
-		decodeMessage: (body: ArrayBuffer, { sensors }: { sensors: any[] }) => {
+		decodeMessage: (body: ArrayBuffer, _options: { sensors: any[] }) => {
 			const DATA_LENGTH_NO_TIMESTAMP = 16 // 12 bytes sensorId + 4 bytes float32
 			const bytes = new Uint8Array(body)
 			const measurements = []
@@ -349,10 +376,7 @@ const decodeHandlers: {
 				first < bytes.length;
 				first += DATA_LENGTH_NO_TIMESTAMP
 			) {
-				const measurement = extractMeasurement(bytes, first, sensors, false)
-				if (measurement) {
-					measurements.push(measurement)
-				}
+				measurements.push(extractMeasurement(bytes, first, false))
 			}
 
 			return measurements
@@ -360,7 +384,7 @@ const decodeHandlers: {
 	},
 
 	'application/sbx-bytes-ts': {
-		decodeMessage: (body: ArrayBuffer, { sensors }: { sensors: any[] }) => {
+		decodeMessage: (body: ArrayBuffer, _options: { sensors: any[] }) => {
 			const DATA_LENGTH_WITH_TIMESTAMP = 20 // 12 bytes sensorId + 4 bytes float32 + 4 bytes timestamp
 			const bytes = new Uint8Array(body)
 			const measurements = []
@@ -385,10 +409,7 @@ const decodeHandlers: {
 				first < bytes.length;
 				first += DATA_LENGTH_WITH_TIMESTAMP
 			) {
-				const measurement = extractMeasurement(bytes, first, sensors, true)
-				if (measurement) {
-					measurements.push(measurement)
-				}
+				measurements.push(extractMeasurement(bytes, first, true))
 			}
 
 			return measurements
@@ -397,12 +418,12 @@ const decodeHandlers: {
 }
 
 export function hasDecoder(contentType: string): boolean {
+	const normalized = contentType.toLowerCase()
 	return (
-		Object.prototype.hasOwnProperty.call(decodeHandlers, contentType) ||
-		contentType.includes('application/json') ||
-		contentType.includes('text/csv') ||
-		contentType.includes('application/sbx-bytes') ||
-		contentType.includes('text/plain;charset=UTF-8')
+		Object.prototype.hasOwnProperty.call(decodeHandlers, normalized) ||
+		normalized.includes('application/json') ||
+		normalized.includes('text/csv') ||
+		normalized.includes('application/sbx-bytes')
 	)
 }
 
@@ -451,9 +472,8 @@ export async function decodeMeasurements(
 function extractMeasurement(
 	bytes: Uint8Array,
 	offset: number,
-	sensors: any[],
 	withTimestamp: boolean,
-): any | null {
+): any {
 	const view = new DataView(bytes.buffer, bytes.byteOffset + offset)
 
 	// Extract sensor ID (first 12 bytes as hex string)
@@ -462,17 +482,8 @@ function extractMeasurement(
 		.map((b) => b.toString(16).padStart(2, '0'))
 		.join('')
 
-	const matchingSensor = sensors.find(
-		(s) => s.id.toLowerCase() === sensorId.toLowerCase(),
-	)
-
-	if (!matchingSensor) {
-		console.warn(`No matching sensor found for ID: ${sensorId}`)
-		return null
-	}
-
 	// Extract value (4 bytes float32, little endian)
-	const value = view.getFloat32(12, true)
+	const value = Number(view.getFloat32(12, true).toFixed(1))
 
 	// Extract timestamp if present
 	let createdAt = new Date()
@@ -481,7 +492,7 @@ function extractMeasurement(
 		createdAt = new Date(timestampSeconds * 1000)
 
 		const now = new Date()
-		const maxFutureTime = 5 * 60 * 1000
+		const maxFutureTime = 60 * 1000
 		if (createdAt.getTime() > now.getTime() + maxFutureTime) {
 			throw new Error(
 				`Timestamp ${createdAt.toISOString()} is too far into the future.`,
@@ -490,7 +501,7 @@ function extractMeasurement(
 	}
 
 	return {
-		sensor_id: matchingSensor.id,
+		sensor_id: sensorId,
 		value: value,
 		createdAt: createdAt,
 		location: null,

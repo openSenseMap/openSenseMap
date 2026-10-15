@@ -42,10 +42,11 @@ export const apiRoutes: { noauth: RouteInfo[]; auth: RouteInfo[] } = {
 			method: 'GET',
 			tosExempt: true,
 		},
-		// {
-		//   path: `boxes/:boxId`,
-		//   method: "GET",
-		// },
+		{
+			path: `boxes/:boxId`,
+			method: 'GET',
+			tosExempt: true,
+		},
 		{
 			path: `boxes/:boxId/sensors`,
 			method: 'GET',
@@ -56,18 +57,21 @@ export const apiRoutes: { noauth: RouteInfo[]; auth: RouteInfo[] } = {
 			method: 'GET',
 			tosExempt: true,
 		},
-		// {
-		//   path: `boxes/:boxId/data/:sensorId`,
-		//   method: "GET",
-		// },
-		// {
-		//   path: `boxes/:boxId/locations`,
-		//   method: "GET",
-		// },
-		// {
-		//   path: `boxes/data`,
-		//   method: "POST",
-		// },
+		{
+			path: `boxes/:boxId/data/:sensorId`,
+			method: 'GET',
+			tosExempt: true,
+		},
+		{
+			path: `boxes/:boxId/locations`,
+			method: 'GET',
+			tosExempt: true,
+		},
+		{
+			path: `boxes/data`,
+			method: 'POST',
+			tosExempt: true,
+		},
 		{
 			path: `boxes/:boxId/data`,
 			method: 'POST',
@@ -135,10 +139,11 @@ export const apiRoutes: { noauth: RouteInfo[]; auth: RouteInfo[] } = {
 			method: 'GET',
 			tosExempt: true,
 		},
-		// {
-		//   path: `boxes/:boxId/script`,
-		//   method: "GET",
-		// },
+		{
+			path: `boxes/:boxId/script`,
+			method: 'GET',
+			tosExempt: true,
+		},
 		{
 			path: `boxes`,
 			method: 'POST',

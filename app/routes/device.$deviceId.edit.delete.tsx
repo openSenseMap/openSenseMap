@@ -20,13 +20,13 @@ import {
 import { Label } from '~/components/ui/label'
 import { PasswordInput } from '~/components/ui/password-input'
 import {
-	deleteDevice,
 	getDeviceWithoutSensors,
 	getUserDevice,
 } from '~/db/models/device.server'
-import { verifyLogin } from '~/db/models/user.server'
-import { deleteDeviceImage } from '~/lib/s3.server'
-import { getUserEmail, getUserId } from '~/services/session-service.server'
+import { getUserById } from '~/db/models/user.server'
+import { type Device } from '~/db/schema'
+import { deleteDevice } from '~/services/device-service.server'
+import { getUserId } from '~/services/session-service.server'
 
 export async function loader({ request, params }: Route.LoaderArgs) {
 	const userId = await getUserId(request)
@@ -52,27 +52,38 @@ export async function action({ request, params }: Route.ActionArgs) {
 	const passwordDelete = formData.get('passwordDelete')
 	invariant(typeof passwordDelete === 'string', 'password must be a string')
 
-	const userEmail = await getUserEmail(request)
-	invariant(typeof userEmail === 'string', 'email not found')
-
-	const user = await verifyLogin(userEmail, passwordDelete)
+	const user = await getUserById(userId)
 	if (!user) {
+		return redirect('/')
+	}
+
+	const device = (await getDeviceWithoutSensors({
+		id: deviceId,
+	})) as Device | null
+	if (!device) {
+		throw new Response('Device not found', { status: 404 })
+	}
+
+	if (device.userId !== user.id) {
+		throw new Response('Forbidden', { status: 403 })
+	}
+
+	const deleteResult = await deleteDevice(user, device, passwordDelete)
+
+	if (deleteResult === 'invalid-password') {
 		return data(
 			{ errors: { passwordDelete: 'Invalid password' } },
 			{ status: 400 },
 		)
 	}
 
-	const device = await getDeviceWithoutSensors({ id: deviceId })
-	if (device?.image) {
-		try {
-			await deleteDeviceImage(device.image)
-		} catch (err) {
-			console.error('Failed to delete device image:', err)
-		}
+	if (deleteResult === 'not-owner') {
+		throw new Response('Forbidden', { status: 403 })
 	}
 
-	await deleteDevice({ id: deviceId })
+	if (deleteResult === 'not-found') {
+		throw new Response('Device not found', { status: 404 })
+	}
 
 	return redirect('/profile/me')
 }

@@ -5,6 +5,7 @@ import { BASE_URL } from '../../vitest.setup'
 import { createDevice, deleteDevice } from '~/db/models/device.server'
 import { deleteUserByEmail } from '~/db/models/user.server'
 import { type User } from '~/db/schema'
+import { createToken } from '~/lib/jwt'
 import { loader } from '~/routes/api.boxes.$deviceId.script'
 import { registerUser } from '~/services/user-service.server'
 
@@ -52,6 +53,7 @@ vi.mock('@sensebox/sketch-templater', () => {
 
 describe('openSenseMap API Routes: /boxes/:deviceId/script', () => {
 	let deviceId = ''
+	let jwt = ''
 
 	beforeAll(async () => {
 		const registration = await registerUser(
@@ -69,6 +71,8 @@ describe('openSenseMap API Routes: /boxes/:deviceId/script', () => {
 		}
 
 		const user = registration.user
+		const token = await createToken(user as User)
+		jwt = token.token
 
 		const device = await createDevice(DEVICE_SENSOR_BOX, (user as User).id)
 		deviceId = device.id
@@ -82,7 +86,10 @@ describe('openSenseMap API Routes: /boxes/:deviceId/script', () => {
 	it('should generate a sketch for a valid deviceId', async () => {
 		const request = new Request(
 			`${BASE_URL}/boxes/${deviceId}/script?enable_debug=true&display_enabled=false`,
-			{ method: 'GET' },
+			{
+				method: 'GET',
+				headers: { Authorization: `Bearer ${jwt}` },
+			},
 		)
 
 		const dataFunctionValue = await loader({
@@ -99,6 +106,7 @@ describe('openSenseMap API Routes: /boxes/:deviceId/script', () => {
 	it('should return 400 if deviceId is missing', async () => {
 		const request = new Request(`${BASE_URL}/boxes//script?enable_debug=true`, {
 			method: 'GET',
+			headers: { Authorization: `Bearer ${jwt}` },
 		})
 
 		const dataFunctionValue = await loader({

@@ -72,7 +72,7 @@ const locations: LocationWithId[] = [
 const containedLocation: Location = {
 	lng: 1,
 	lat: 2,
-	height: 4,
+	height: 3,
 }
 
 const otherContainedLocation: Location = {
@@ -141,6 +141,10 @@ describe('measurement server helper', () => {
 
 		device = await createDevice(DEVICE_SENSOR_ID_BOX, (user as User).id)
 		deviceId = device.id
+		// This suite exercises location-history helpers from an empty history.
+		await drizzleClient
+			.delete(deviceToLocation)
+			.where(eq(deviceToLocation.deviceId, deviceId))
 		sensors = await getSensors(deviceId)
 
 		MEASUREMENTS.forEach((meas) => (meas.sensor_id = sensors[0].id))
@@ -163,6 +167,7 @@ describe('measurement server helper', () => {
 			.insert(location)
 			.values({
 				location: sql`ST_SetSRID(ST_MakePoint(${90}, ${45}), 4326)`,
+				heightAboveGround: 3.123,
 			})
 			.returning()
 

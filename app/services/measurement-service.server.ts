@@ -2,6 +2,7 @@ import { type BoxesDataColumn } from '../lib/api-schemas/boxes-data-query-schema
 import { validLngLat } from '../lib/location'
 import { assertDeviceIsWritable } from './device-service.server'
 import {
+	deviceExists,
 	type DeviceWithoutSensors,
 	getDeviceWithoutSensors,
 	getDeviceForMeasurementWrite,
@@ -23,18 +24,26 @@ export type DeviceWithSensors = DeviceWithoutSensors & {
 	sensors: SensorWithLatestMeasurement[]
 }
 
+export class MeasurementServiceError extends Error {
+	constructor(
+		name: string,
+		message: string,
+		public readonly statusCode: number,
+	) {
+		super(message)
+		this.name = name
+	}
+}
+
 export async function getLatestMeasurementsForSensor(
 	boxId: string,
 	sensorId: string,
 	count?: number,
 ): Promise<SensorWithLatestMeasurement | null> {
-	const device: DeviceWithoutSensors = await getDeviceWithoutSensors({
-		id: boxId,
-	})
-	if (!device) return null
+	if (!(await deviceExists({ id: boxId }))) return null
 
 	// single sensor, no need for having info about device
-	return await getSensorWithLastMeasurement(device.id, sensorId, count)
+	return await getSensorWithLastMeasurement(boxId, sensorId, count)
 }
 
 /**
@@ -116,8 +125,7 @@ const normalizeLocation = (
  * @param lng The longitude value to normalize
  * @returns A normalized longitude in the value range [-180, 180)
  */
-const normalizeLongitude = (lng: number): number =>
-	lng % 180 === 0 ? -180 : lng
+const normalizeLongitude = (lng: number): number => (lng === 180 ? -180 : lng)
 
 export const postNewMeasurements = async (
 	deviceId: string,
@@ -134,21 +142,27 @@ export const postNewMeasurements = async (
 	}
 
 	if (!hasDecoder(contentType)) {
-		throw new Error('UnsupportedMediaTypeError: Unsupported content-type.')
+		throw new MeasurementServiceError(
+			'UnsupportedMediaTypeError',
+			'Unsupported content-type.',
+			415,
+		)
 	}
 
 	const device = await getDeviceForMeasurementWrite({ id: deviceId })
 	if (!device) {
-		throw new Error('NotFoundError: Device not found')
+		throw new MeasurementServiceError('NotFoundError', 'Device not found', 404)
 	}
 
 	assertDeviceIsWritable(device)
 
-	if (device.useAuth && !isTrustedService) {
+	if ((device.useAuth || hackair) && device.apiKey && !isTrustedService) {
 		if (device.apiKey !== authorization) {
-			const error = new Error('Device access token not valid!')
-			error.name = 'UnauthorizedError'
-			throw error
+			throw new MeasurementServiceError(
+				'UnauthorizedError',
+				'Device access token not valid!',
+				401,
+			)
 		}
 	}
 
@@ -157,12 +171,57 @@ export const postNewMeasurements = async (
 		sensors: device.sensors,
 	})
 
+	if (measurements.length === 0) {
+		throw new MeasurementServiceError(
+			'UnprocessableEntityError',
+			'Cannot save empty or invalid measurements.',
+			422,
+		)
+	}
+
+	if (measurements.length > 2500) {
+		throw new MeasurementServiceError(
+			'UnprocessableEntityError',
+			'Too many measurements. Please submit at most 2500 measurements at once.',
+			422,
+		)
+	}
+
 	for (const m of measurements) {
+		if (typeof m.sensor_id !== 'string' || m.sensor_id.trim() === '') {
+			throw new MeasurementServiceError(
+				'UnprocessableEntityError',
+				'Missing sensor id',
+				422,
+			)
+		}
+		if (!Number.isFinite(m.value)) {
+			throw new MeasurementServiceError(
+				'UnprocessableEntityError',
+				'Invalid measurement value',
+				422,
+			)
+		}
+		if (!Number.isFinite(new Date(m.createdAt).getTime())) {
+			throw new MeasurementServiceError(
+				'UnprocessableEntityError',
+				'Invalid measurement timestamp',
+				422,
+			)
+		}
+
 		const locationData: LocationData | null = m.location ?? null
-		if (locationData && !validLngLat(locationData.lng, locationData.lat)) {
-			const error = new Error('Invalid location coordinates')
-			error.name = 'UnprocessableEntityError'
-			throw error
+		if (
+			locationData &&
+			(!validLngLat(locationData.lng, locationData.lat) ||
+				(locationData.height !== undefined &&
+					!Number.isFinite(locationData.height)))
+		) {
+			throw new MeasurementServiceError(
+				'UnprocessableEntityError',
+				'Invalid location coordinates',
+				422,
+			)
 		}
 	}
 
@@ -305,7 +364,7 @@ export function transformMeasurement(
 				result.createdAt = m.createdAt ? m.createdAt.toISOString() : null
 				break
 			case 'value':
-				result.value = m.value
+				result.value = m.value === null ? null : m.value.toString()
 				break
 			case 'lat':
 				result.lat = measurementLocation?.lat ?? sensor?.lat
@@ -316,8 +375,11 @@ export function transformMeasurement(
 			case 'height':
 				result.height = measurementLocation?.height ?? sensor?.height ?? null
 				break
+			case 'boxId':
+				result.boxId = sensor?.boxId
+				break
 			case 'boxid':
-				result.boxid = sensor?.boxid
+				result.boxid = sensor?.boxId
 				break
 			case 'boxName':
 				result.boxName = sensor?.boxName

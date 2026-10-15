@@ -4,10 +4,14 @@ import {
 	findDevices,
 	type FindDevicesOptions,
 } from '~/db/models/device.server'
-import { type User } from '~/db/schema'
-import { transformDeviceToApiFormat } from '~/lib/device-transform'
+import { type Sensor, type User } from '~/db/schema'
+import {
+	deriveDeviceStatus,
+	transformDeviceToApiFormat,
+} from '~/lib/device-transform'
 import { StandardResponse } from '~/lib/responses'
 
+import * as z from 'zod/v4'
 import { type ZodOpenApiPathItemObject } from 'zod-openapi'
 import {
 	ApiDeviceSchema,
@@ -25,6 +29,8 @@ import {
 	methodNotAllowedResponse,
 	UnprocessableContentErrorSchema,
 	unprocessableContentResponse,
+	UnsupportedMediaTypeErrorSchema,
+	unsupportedMediaTypeResponse,
 } from '~/lib/openapi/errors'
 import { withAuthenticatedUser } from '~/lib/jwt'
 import {
@@ -36,6 +42,7 @@ import {
 	getTerrainElevation,
 } from '~/services/elevation-service.server'
 import { applyElevationConsentChoice } from '~/db/models/elevation-consent.server'
+import { requestContentTypeJson } from '~/middleware/content-type-header.server'
 
 const DevicesQueryParamsSchema = DevicesQuerySchema.meta({
 	id: 'DevicesQueryParams',
@@ -48,11 +55,15 @@ const CreateDeviceRequestSchema = CreateDeviceSchema.meta({
 	description: 'Payload for creating a new device.',
 })
 
-const CreatedDeviceResponseSchema = ApiDeviceSchema.meta({
-	id: 'CreatedDeviceResponse',
-	description:
-		'Created device response transformed through `transformDeviceToApiFormat`.',
-})
+const CreatedDeviceResponseSchema = z
+	.object({
+		message: z.literal('Box successfully created'),
+		data: ApiDeviceSchema,
+	})
+	.meta({
+		id: 'CreatedDeviceResponse',
+		description: 'Device creation response.',
+	})
 
 export const openapi: ZodOpenApiPathItemObject = {
 	get: {
@@ -126,6 +137,16 @@ export const openapi: ZodOpenApiPathItemObject = {
 				'Invalid or missing JWT authorization.',
 			),
 
+			415: unsupportedMediaTypeResponse(
+				UnsupportedMediaTypeErrorSchema,
+				'Unsupported content type. Use application/json.',
+			),
+
+			422: unprocessableContentResponse(
+				UnprocessableContentErrorSchema,
+				'Accepted legacy configuration is not yet supported by the rewrite.',
+			),
+
 			405: methodNotAllowedResponse(
 				MethodNotAllowedErrorSchema,
 				'Method not allowed.',
@@ -139,8 +160,13 @@ export const openapi: ZodOpenApiPathItemObject = {
 	},
 }
 
+export const middleware: Route.MiddlewareFunction[] = [
+	requestContentTypeJson(['POST']),
+]
+
 function normalizeBoxesQueryParams(query: Record<string, unknown>) {
-	const maxDistance = query.maxDistance ?? query.maxdistance
+	const maxDistance =
+		query.maxDistance ?? query.maxdistance ?? (query.near ? '1000' : undefined)
 
 	return {
 		...query,
@@ -150,7 +176,14 @@ function normalizeBoxesQueryParams(query: Record<string, unknown>) {
 
 export async function loader({ request }: Route.LoaderArgs) {
 	const url = new URL(request.url)
-	const queryObj = Object.fromEntries(url.searchParams)
+	const queryObj: Record<string, string | string[]> = Object.fromEntries(
+		url.searchParams,
+	)
+
+	for (const name of ['date', 'exposure', 'model', 'grouptag']) {
+		const values = url.searchParams.getAll(name)
+		if (values.length > 1) queryObj[name] = values
+	}
 
 	const normalizedQueryObj = normalizeBoxesQueryParams(queryObj)
 
@@ -166,27 +199,73 @@ export async function loader({ request }: Route.LoaderArgs) {
 		)
 	}
 
-	const params: FindDevicesOptions = parseResult.data
+	const { date, ...queryParams } = parseResult.data
+	const params: FindDevicesOptions = {
+		...queryParams,
+		...date,
+	}
 
-	const devices = await findDevices(params)
+	const devices = (await findDevices(params, {}, { sensors: true })) as Array<
+		Awaited<ReturnType<typeof findDevices>>[number] & { sensors: Sensor[] }
+	>
+	const responseDevices = params.minimal
+		? devices.map((device) => {
+				const timestamp = device.updatedAt.toISOString()
+				const latestMeasurementAt = device.sensors.reduce<string | null>(
+					(latest, sensor) => {
+						const createdAt = sensor.lastMeasurement?.createdAt
+						if (!createdAt) return latest
+						return latest === null || Date.parse(createdAt) > Date.parse(latest)
+							? createdAt
+							: latest
+					},
+					null,
+				)
+				const coordinates =
+					device.heightAboveSeaLevel === null
+						? [device.longitude, device.latitude]
+						: [device.longitude, device.latitude, device.heightAboveSeaLevel]
+
+				const responseDevice = {
+					_id: device.id,
+					name: device.name,
+					exposure: device.exposure,
+					currentLocation: {
+						type: 'Point' as const,
+						coordinates,
+						timestamp,
+					},
+					lastMeasurementAt: latestMeasurementAt ?? timestamp,
+				}
+
+				return params.classify
+					? {
+							...responseDevice,
+							state: deriveDeviceStatus(device.sensors),
+						}
+					: responseDevice
+			})
+		: devices.map((device) => {
+				const responseDevice = transformDeviceToApiFormat(device as any)
+				return params.classify
+					? { ...responseDevice, state: responseDevice.status }
+					: responseDevice
+			})
 
 	if (params.format === 'geojson') {
 		const geojson = {
 			type: 'FeatureCollection',
-			features: devices.map((device) => ({
-				type: 'Feature',
-				geometry: {
-					type: 'Point',
-					coordinates:
-						device.heightAboveSeaLevel === null
-							? [device.longitude, device.latitude]
-							: [device.longitude, device.latitude, device.heightAboveSeaLevel],
-				},
-				properties: {
-					...device,
-					height: device.heightAboveSeaLevel,
-				},
-			})),
+			features: responseDevices.map((device) => {
+				const { currentLocation, loc: _loc, ...properties } = device as any
+				return {
+					type: 'Feature',
+					geometry: {
+						type: 'Point',
+						coordinates: currentLocation.coordinates,
+					},
+					properties,
+				}
+			}),
 		}
 
 		return Response.json(geojson, {
@@ -195,17 +274,11 @@ export async function loader({ request }: Route.LoaderArgs) {
 			},
 		})
 	}
-	return Response.json(
-		devices.map((device) => ({
-			...device,
-			height: device.heightAboveSeaLevel,
-		})),
-		{
-			headers: {
-				'Content-Type': 'application/json; charset=utf-8',
-			},
+	return Response.json(responseDevices, {
+		headers: {
+			'Content-Type': 'application/json; charset=utf-8',
 		},
-	)
+	})
 }
 
 export const action = async ({ request }: Route.ActionArgs) => {
@@ -241,6 +314,25 @@ async function post(request: Request, user: User) {
 		}
 
 		const validatedData = validationResult.data
+		const unsupportedFields = [
+			'mqtt',
+			'ttn',
+			'sharedBox',
+			'serialPort',
+			'soilDigitalPort',
+			'soundMeterPort',
+			'windSpeedPort',
+		].filter(
+			(field) =>
+				validatedData[field as keyof typeof validatedData] !== undefined,
+		)
+
+		if (unsupportedFields.length > 0) {
+			return StandardResponse.unprocessableContent(
+				`Unsupported legacy configuration: ${unsupportedFields.join(', ')}`,
+			)
+		}
+
 		const sensorsProvided = validatedData.sensors?.length > 0
 		// Request height is relative to ground; sea-level height is best-effort.
 		const [longitude, latitude, heightAboveGround] = validatedData.location
@@ -268,8 +360,11 @@ async function post(request: Request, user: User) {
 		const newDevice = await createDevice(
 			{
 				name: validatedData.name,
+				description: validatedData.description,
 				exposure: validatedData.exposure,
 				model: sensorsProvided ? undefined : validatedData.model,
+				useAuth: validatedData.useAuth,
+				sensorTemplates: validatedData.sensorTemplates,
 				latitude: latitude,
 				longitude: longitude,
 				heightAboveGround: heightAboveGround ?? null,
@@ -281,6 +376,7 @@ async function post(request: Request, user: User) {
 							title: s.title,
 							sensorType: s.sensorType,
 							unit: s.unit,
+							icon: s.icon,
 						}))
 					: undefined,
 			},
@@ -290,7 +386,10 @@ async function post(request: Request, user: User) {
 		// Build response object using helper function
 		const responseData = transformDeviceToApiFormat(newDevice)
 
-		return StandardResponse.created(responseData)
+		return StandardResponse.created({
+			message: 'Box successfully created',
+			data: responseData,
+		})
 	} catch {
 		return StandardResponse.internalServerError()
 	}

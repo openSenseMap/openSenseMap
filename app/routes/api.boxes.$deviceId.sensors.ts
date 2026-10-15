@@ -54,6 +54,10 @@ const SensorWithLatestMeasurementSchema = z
 
 const DeviceWithSensorsSchema = z
 	.object({
+		_id: z.string().optional().meta({
+			description: 'Legacy alias for the device id.',
+		}),
+
 		id: z.string().meta({
 			description: 'Device id',
 			example: '5bdbe70f55d0ad001a04edc9',
@@ -64,6 +68,7 @@ const DeviceWithSensorsSchema = z
 				'Sensors of this device, each enriched with latest measurement data.',
 		}),
 	})
+	.catchall(z.unknown())
 	.meta({
 		id: 'DeviceWithSensors',
 		description: 'Device including sensors with their latest measurement data.',
@@ -152,8 +157,9 @@ export const loader = async ({
 			return StandardResponse.notFound(apiMessages.deviceNotFound)
 		}
 
-		const responseParsed =
-			await DeviceWithSensorsSchema.safeParseAsync(deviceWithSensors)
+		const responseParsed = await DeviceWithSensorsSchema.safeParseAsync(
+			serializeLegacyDeviceSensors(deviceWithSensors),
+		)
 
 		if (!responseParsed.success) {
 			return StandardResponse.internalServerError()
@@ -162,5 +168,48 @@ export const loader = async ({
 		return StandardResponse.ok(responseParsed.data)
 	} catch {
 		return StandardResponse.internalServerError()
+	}
+}
+
+function serializeLegacyDeviceSensors(
+	deviceWithSensors: NonNullable<
+		Awaited<ReturnType<typeof getLatestMeasurements>>
+	>,
+) {
+	// Normalize the database result to the legacy aliases and wire types.
+	return {
+		_id: deviceWithSensors.id,
+		id: deviceWithSensors.id,
+		name: deviceWithSensors.name,
+		model: deviceWithSensors.model,
+		exposure: deviceWithSensors.exposure,
+		grouptag: deviceWithSensors.tags ?? [],
+		image: deviceWithSensors.image,
+		description: deviceWithSensors.description,
+		link: deviceWithSensors.link ?? deviceWithSensors.website,
+		createdAt: deviceWithSensors.createdAt.toISOString(),
+		updatedAt: deviceWithSensors.updatedAt.toISOString(),
+		sensors: deviceWithSensors.sensors.map((sensor) => ({
+			...sensor,
+			_id: sensor.id,
+			lastMeasurement: sensor.lastMeasurement
+				? {
+						...sensor.lastMeasurement,
+						value:
+							sensor.lastMeasurement.value === null
+								? null
+								: String(sensor.lastMeasurement.value),
+					}
+				: null,
+			...('lastMeasurements' in sensor && Array.isArray(sensor.lastMeasurements)
+				? {
+						lastMeasurements: sensor.lastMeasurements.map((measurement) => ({
+							...measurement,
+							value:
+								measurement.value === null ? null : String(measurement.value),
+						})),
+					}
+				: {}),
+		})),
 	}
 }

@@ -46,23 +46,16 @@ import {
 	applyElevationConsentChoice,
 	hasCurrentElevationConsent,
 } from '~/db/models/elevation-consent.server'
+import { parseFiniteNumber } from '~/lib/numbers'
 
 function parseNumberInput(value: string): number | null {
-	if (value.trim() === '') return null
-
-	const parsed = Number(value)
-
-	if (!Number.isFinite(parsed)) return null
-
-	return parsed
+	return parseFiniteNumber(value) ?? null
 }
 
 function parseHeightInput(value: string): number | null | undefined {
 	if (value.trim() === '') return null
 
-	const parsed = Number(value)
-
-	return Number.isFinite(parsed) ? parsed : undefined
+	return parseFiniteNumber(value)
 }
 
 function normalizeCoordinate(value: number | null) {

@@ -119,7 +119,7 @@ describe('Device Sensors API: updating sensors', () => {
 		} as Route.ActionArgs)
 
 		expect(response.status).toBe(200)
-		const data = await response.json()
+		const { data } = await response.json()
 
 		const addedSensor = data.sensors.find(
 			(s: any) => s.title === newSensor.title,
@@ -171,7 +171,7 @@ describe('Device Sensors API: updating sensors', () => {
 		} as Route.ActionArgs)
 
 		expect(response.status).toBe(200)
-		const data = await response.json()
+		const { data } = await response.json()
 
 		const hasPM25 = data.sensors.some((s: any) => s.title === 'PM2.5')
 		const hasCO2 = data.sensors.some((s: any) => s.title === 'CO2')
@@ -225,7 +225,7 @@ describe('Device Sensors API: updating sensors', () => {
 		} as Route.ActionArgs)
 
 		expect(response.status).toBe(200)
-		const data = await response.json()
+		const { data } = await response.json()
 
 		const editedSensor = data.sensors.find(
 			(s: any) => s._id === existingSensor.id,
@@ -270,7 +270,7 @@ describe('Device Sensors API: updating sensors', () => {
 		} as Route.ActionArgs)
 
 		expect(response.status).toBe(200)
-		const data = await response.json()
+		const { data } = await response.json()
 		expect(data.sensors).toHaveLength(initialSensorCount - 1)
 
 		const deletedSensorStillExists = data.sensors.some(
@@ -313,7 +313,7 @@ describe('Device Sensors API: updating sensors', () => {
 		} as Route.ActionArgs)
 
 		expect(response.status).toBe(200)
-		const data = await response.json()
+		const { data } = await response.json()
 		expect(data.sensors).toHaveLength(initialSensorCount - 2)
 
 		const remainingSensors = data.sensors.map((s: any) => s._id)

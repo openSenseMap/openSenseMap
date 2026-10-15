@@ -4,13 +4,14 @@ import { drizzleClient } from '~/db.server'
 import {
 	ArchivedDeviceError,
 	createDevice as createDeviceInDb,
-	deleteDevice as deleteDeviceById,
+	deleteUserDevice as deleteDeviceOwnedByUser,
 	updateDevice as updateDeviceById,
 	type UpdateDeviceArgs,
 } from '~/db/models/device.server'
 import { verifyLogin } from '~/db/models/user.server'
 import { type Device, type User } from '~/db/schema'
 import { uploadedDeviceSchemaV1 } from '~/lib/device-schemas/device-schema-v1'
+import { UiDeviceModelZodEnum } from '~/lib/device-enums'
 import { deleteDeviceImage } from '~/lib/s3.server'
 
 export const CreateDeviceServiceSchema = z
@@ -32,16 +33,7 @@ export const CreateDeviceServiceSchema = z
 		heightAboveGround: z.number().optional().nullable(),
 		terrainElevation: z.number().optional().nullable(),
 		terrainElevationDataset: z.string().optional().nullable(),
-		model: z
-			.enum([
-				'homeV2Lora',
-				'homeV2Ethernet',
-				'homeV2Wifi',
-				'senseBox:Edu',
-				'luftdaten.info',
-				'custom',
-			])
-			.optional(),
+		model: UiDeviceModelZodEnum.optional(),
 		sensorTemplates: z.array(z.string()).optional(),
 		sensors: z
 			.array(
@@ -226,21 +218,34 @@ export const updateDevice = async (
 
 	return updateDeviceById(device.id, args)
 }
+export type DeleteDeviceResult =
+	| 'deleted'
+	| 'not-owner'
+	| 'invalid-password'
+	| 'not-found'
+
 /**
- * Deletes a device after verifiying that the user is entitled by checking
- * the password.
- * @param user The user deleting the device
- * @param password The users password to verify
- * @returns True if the device was deleted, otherwise false or "unauthorized"
- * if the user is not entitled to delete the device with the given parameters
+ * Deletes an owned device after verifying the current user's password.
+ *
+ * Ownership is checked both before password verification and in the delete
+ * query so that this service remains safe when called outside an API route.
  */
 export const deleteDevice = async (
 	user: User,
 	device: Device,
 	password: string,
-): Promise<boolean | 'unauthorized'> => {
+): Promise<DeleteDeviceResult> => {
+	if (device.userId !== user.id) return 'not-owner'
+
 	const verifiedUser = await verifyLogin(user.email, password)
-	if (verifiedUser === null) return 'unauthorized'
+	if (verifiedUser === null) return 'invalid-password'
+
+	const deleted = await deleteDeviceOwnedByUser({
+		id: device.id,
+		userId: user.id,
+	})
+
+	if (deleted.count === 0) return 'not-found'
 
 	if (device.image) {
 		try {
@@ -249,7 +254,8 @@ export const deleteDevice = async (
 			console.error('Failed to delete device image:', e)
 		}
 	}
-	return (await deleteDeviceById({ id: device.id })).count > 0
+
+	return 'deleted'
 }
 
 type TagsRow = {

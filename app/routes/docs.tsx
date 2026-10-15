@@ -29,6 +29,15 @@ export const loader = () => {
 			},
 		},
 		servers: generateOpenApiServerSpec(),
+		components: {
+			securitySchemes: {
+				bearerAuth: {
+					type: 'http',
+					scheme: 'bearer',
+					bearerFormat: 'JWT',
+				},
+			},
+		},
 		paths: generateOpenApiPathsSpec(),
 	})
 

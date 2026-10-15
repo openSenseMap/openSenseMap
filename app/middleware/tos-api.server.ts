@@ -18,27 +18,27 @@ type CompiledRule = {
 
 /**
  * Convert a route pattern like "/api/users/me/boxes/:boxId"
- * into a regex like ^/api/users/me/boxes/[^/]+$
+ * into a regex like ^/api/users/me/boxes/[^/]+/?$
  */
 function routeToRegex(apiPathPattern: string) {
-	const escaped = apiPathPattern
+	const normalized =
+		apiPathPattern.replace(/\/{2,}/g, '/').replace(/\/$/, '') || '/'
+	const escaped = normalized
 		.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') // escape regex special chars
-		.replace(/\\:([A-Za-z0-9_]+)/g, '[^/]+') // replace ":param" segments
-	return new RegExp(`^${escaped}$`)
+		.replace(/:([A-Za-z0-9_]+)/g, '[^/]+') // replace ":param" segments
+	return new RegExp(`^${escaped}/?$`)
 }
 
 /**
  * Build allowlist from route metadata:
  * - `auth` routes with `tosExempt: true` bypass ToS checks
  */
-const API_TOS_ALLOWLIST: CompiledRule[] = [
-	...apiRoutes.auth
-		.filter((r: any) => r.tosExempt)
-		.map((r: any) => ({
-			method: r.method as HttpMethod,
-			matcher: routeToRegex(`/api/${r.path}`),
-		})),
-]
+const API_TOS_ALLOWLIST: CompiledRule[] = apiRoutes.auth
+	.filter((r: any) => r.tosExempt)
+	.map((r: any) => ({
+		method: r.method as HttpMethod,
+		matcher: routeToRegex(`/api/${r.path}`),
+	}))
 
 function isAllowedApi(request: Request, pathname: string) {
 	const method = request.method as HttpMethod

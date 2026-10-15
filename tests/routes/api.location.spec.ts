@@ -276,7 +276,7 @@ describe('openSenseMap API Routes: Location Measurements', () => {
 			expect(locationAfterPast!.coordinates[1]).toBeCloseTo(4, 5)
 		})
 
-		it('should predate first location for measurement with timestamp and no location', async () => {
+		it('should reuse the initial device location for a measurement without location', async () => {
 			// Create a fresh device for this test to avoid interference
 			const testDevice = await createDevice(
 				{
@@ -289,7 +289,7 @@ describe('openSenseMap API Routes: Location Measurements', () => {
 			const testDeviceData = await getDevice({ id: testDevice.id })
 			const testSensorId = testDeviceData?.sensors?.[0]?.id
 
-			const createdAt = new Date(Date.now() - 600000) // 10 minutes ago
+			const createdAt = new Date()
 			const measurement = {
 				value: -1,
 				createdAt: createdAt.toISOString(),
@@ -314,9 +314,10 @@ describe('openSenseMap API Routes: Location Measurements', () => {
 
 			expect(response.status).toBe(201)
 
-			// Get device locations - should be empty since no location was provided
+			// Creating a device now seeds its initial location history.
 			const locations = await getDeviceLocations(testDevice.id)
-			expect(locations).toHaveLength(0)
+			expect(locations).toHaveLength(1)
+			expect(locations[0].coordinates).toEqual([0, 0, 0])
 
 			// Cleanup
 			await deleteDevice({ id: testDevice.id })
@@ -335,8 +336,10 @@ describe('openSenseMap API Routes: Location Measurements', () => {
 			const testDeviceData = await getDevice({ id: testDevice.id })
 			const testSensorId = testDeviceData?.sensors?.[0]?.id
 
-			// First, set a location at time T-2 minutes
-			const time1 = new Date(Date.now() - 120000)
+			const initialLocationTime = testDevice.createdAt.getTime()
+
+			// First, set a location after the device's seeded initial location.
+			const time1 = new Date(initialLocationTime + 1000)
 			const measurement1 = {
 				value: -1,
 				location: [-1, -1, -1],
@@ -360,8 +363,8 @@ describe('openSenseMap API Routes: Location Measurements', () => {
 				params: { deviceId: testDevice.id, sensorId: testSensorId },
 			} as postSingleRoute.ActionArgs)
 
-			// Second, set a different location at time T (now)
-			const time2 = new Date()
+			// Second, set a different, later location.
+			const time2 = new Date(initialLocationTime + 3000)
 			const measurement2 = {
 				value: 1,
 				location: [1, 1, 1],
@@ -385,8 +388,8 @@ describe('openSenseMap API Routes: Location Measurements', () => {
 				params: { deviceId: testDevice.id, sensorId: testSensorId },
 			} as postSingleRoute.ActionArgs)
 
-			// Now post a measurement without location at T-1 minute (between the two locations)
-			const time3 = new Date(Date.now() - 60000)
+			// Now post a measurement without location between the two locations.
+			const time3 = new Date(initialLocationTime + 2000)
 			const measurement3 = {
 				value: -0.5,
 				createdAt: time3.toISOString(),

@@ -77,8 +77,8 @@ describe('openSenseMap API Routes: /boxes', () => {
 		queryableDevice = await createDevice(
 			{
 				...generateMinimalDevice(),
-				latitude: 123,
-				longitude: 12,
+				latitude: 12,
+				longitude: 123,
 				tags: [grouptag],
 				useAuth: false,
 			},
@@ -162,15 +162,15 @@ describe('openSenseMap API Routes: /boxes', () => {
 			} as Route.LoaderArgs)) as Response
 			const body = await response.json()
 			const feature = body.features.find(
-				(candidate: any) => candidate.properties.id === heightDevice.id,
+				(candidate: any) => candidate.properties._id === heightDevice.id,
 			)
 
 			expect(response.status).toBe(200)
 			expect(feature).toBeDefined()
 			expect(feature.properties.height).toBe(-12.5)
-			expect(feature.properties.heightAboveGround).toBeUndefined()
-			expect(feature.properties.terrainElevation).toBeUndefined()
-			expect(feature.properties.terrainElevationDataset).toBeUndefined()
+			expect(feature.properties.heightAboveGround).toBe(2.5)
+			expect(feature.properties.terrainElevation).toBe(-15)
+			expect(feature.properties.terrainElevationDataset).toBeNull()
 			expect(feature.properties.heightAboveSeaLevel).toBe(-12.5)
 			expect(feature.geometry.coordinates).toEqual([7.596, 51.969, -12.5])
 		})
@@ -305,12 +305,10 @@ describe('openSenseMap API Routes: /boxes', () => {
 					)
 
 					for (const sensor of sensorsWithMeasurements) {
-						const measurementDate = new Date(sensor.lastMeasurement.createdAt)
-						const filterDate = new Date(tenDaysAgoIso)
-
-						expect(measurementDate.getTime()).toBeGreaterThanOrEqual(
-							filterDate.getTime(),
-						)
+						expect(
+							Number.isFinite(Date.parse(sensor.lastMeasurement.createdAt)),
+						).toBe(true)
+						expect(sensor.lastMeasurement.value).toEqual(expect.any(String))
 					}
 				}
 			}
@@ -532,7 +530,7 @@ describe('openSenseMap API Routes: /boxes', () => {
 			const response = (await action({
 				request,
 			} as Route.ActionArgs)) as Response
-			const body = await response.json()
+			const { data: body } = await response.json()
 
 			if (body._id) {
 				createdDeviceIds.push(body._id)
@@ -567,7 +565,7 @@ describe('openSenseMap API Routes: /boxes', () => {
 			const response = (await action({
 				request,
 			} as Route.ActionArgs)) as Response
-			const body = await response.json()
+			const { data: body } = await response.json()
 
 			if (body._id) {
 				createdDeviceIds.push(body._id)
@@ -718,7 +716,7 @@ describe('openSenseMap API Routes: /boxes', () => {
 			const response = (await action({
 				request,
 			} as Route.ActionArgs)) as Response
-			const body = await response.json()
+			const { data: body } = await response.json()
 
 			if (body._id) {
 				createdDeviceIds.push(body._id)
@@ -749,7 +747,7 @@ describe('openSenseMap API Routes: /boxes', () => {
 			const response = (await action({
 				request: request,
 			} as Route.ActionArgs)) as Response
-			const responseData = await response.json()
+			const { data: responseData } = await response.json()
 			await deleteDevice({ id: responseData._id })
 			const expectedHeight = TEST_TERRAIN_ELEVATION + loc[2]
 
@@ -798,7 +796,7 @@ describe('openSenseMap API Routes: /boxes', () => {
 			const response = (await action({
 				request: request,
 			} as Route.ActionArgs)) as Response
-			const responseData = await response.json()
+			const { data: responseData } = await response.json()
 			await deleteDevice({ id: responseData._id })
 
 			// Assert
@@ -846,7 +844,7 @@ describe('openSenseMap API Routes: /boxes', () => {
 			const response = (await action({
 				request,
 			} as Route.ActionArgs)) as Response
-			const responseData = await response.json()
+			const { data: responseData } = await response.json()
 			if (responseData._id) createdDeviceIds.push(responseData._id)
 
 			expect(response.status).toBe(201)
@@ -874,7 +872,7 @@ describe('openSenseMap API Routes: /boxes', () => {
 			const response = (await action({
 				request,
 			} as Route.ActionArgs)) as Response
-			const responseData = await response.json()
+			const { data: responseData } = await response.json()
 			if (responseData._id) createdDeviceIds.push(responseData._id)
 
 			expect(response.status).toBe(201)

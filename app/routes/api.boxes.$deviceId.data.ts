@@ -1,7 +1,10 @@
 import { type Route } from './+types/api.boxes.$deviceId.data'
 import { isValidServiceKey } from '~/db/models/integration.server'
 import { StandardResponse } from '~/lib/responses'
-import { postNewMeasurements } from '~/services/measurement-service.server'
+import {
+	MeasurementServiceError,
+	postNewMeasurements,
+} from '~/services/measurement-service.server'
 
 import * as z from 'zod/v4'
 import { type ZodOpenApiPathItemObject } from 'zod-openapi'
@@ -80,7 +83,7 @@ const MeasurementJsonArrayItemSchema = z
 			example: 21.5,
 		}),
 
-		createdAt: z.iso.datetime().optional().meta({
+		createdAt: z.iso.datetime({ offset: true }).optional().meta({
 			description: 'Measurement timestamp. Defaults to current server time.',
 			example: '2026-05-22T12:00:00.000Z',
 		}),
@@ -97,7 +100,7 @@ const MeasurementJsonObjectValueSchema = z.union([
 	z.string(),
 	z.tuple([
 		z.union([z.number(), z.string()]),
-		z.iso.datetime().optional(),
+		z.iso.datetime({ offset: true }).optional(),
 		MeasurementLocationSchema.optional(),
 	]),
 ])
@@ -244,7 +247,9 @@ export const action = async ({
 		const luftdaten = searchParams.get('luftdaten') !== null
 		const hackair = searchParams.get('hackair') !== null
 
-		const contentType = request.headers.get('content-type') || ''
+		const contentType = (
+			request.headers.get('content-type') || ''
+		).toLowerCase()
 		const serviceKey = request.headers.get('x-service-key')
 		const authorization =
 			request.headers.get('authorization') ??
@@ -254,7 +259,11 @@ export const action = async ({
 
 		let body: any
 		if (contentType.includes('application/json')) {
-			body = await request.json()
+			try {
+				body = await request.json()
+			} catch {
+				return StandardResponse.badRequest('Invalid JSON in request body')
+			}
 		} else if (contentType.includes('text/csv')) {
 			body = await request.text()
 		} else if (contentType.includes('application/sbx-bytes')) {
@@ -278,15 +287,28 @@ export const action = async ({
 			},
 		})
 	} catch (err: any) {
-		// Handle different error types
-		if (err.name === 'UnauthorizedError')
-			return StandardResponse.unauthorized(err.message)
+		if (err instanceof MeasurementServiceError) {
+			switch (err.statusCode) {
+				case 401:
+					return StandardResponse.unauthorized(err.message)
+				case 404:
+					return StandardResponse.notFound(err.message)
+				case 415:
+					return StandardResponse.unsupportedMediaType(err.message)
+				case 422:
+					return StandardResponse.unprocessableContent(err.message)
+				default:
+					return StandardResponse.internalServerError(
+						err.message || 'An unexpected error occurred',
+					)
+			}
+		}
 
-		if (err.name === 'ModelError' && err.type === 'UnprocessableEntityError')
+		if (err.name === 'ModelError')
 			return StandardResponse.unprocessableContent(err.message)
 
-		if (err.name === 'UnsupportedMediaTypeError')
-			return StandardResponse.unsupportedMediaType(err.message)
+		if (err.name === 'NotFoundError')
+			return StandardResponse.notFound(err.message)
 
 		if (err.name === 'ArchivedDeviceError')
 			return StandardResponse.conflict(
