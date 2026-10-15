@@ -30,7 +30,10 @@ import { AggregationFilter } from '../aggregation-filter'
 import { ClientOnly } from '../client-only'
 import { ColorPicker } from '../color-picker'
 import { DateRangeFilter } from '../daterange-filter'
-import { HoveredPointContext } from '../map/layers/mobile/mobile-box-layer'
+import {
+	HoveredPointContext,
+	type HoveredMeasurement,
+} from '../map/layers/mobile/mobile-box-layer'
 import Spinner from '../spinner'
 import {
 	DropdownMenu,
@@ -160,7 +163,7 @@ export default function Graph({
 		unknown
 	> | null>(null)
 	const isZoomingRef = useRef(false)
-	const lastHoveredPointRef = useRef<number | null>(hoveredPoint)
+	const lastHoveredPointRef = useRef<HoveredMeasurement | null>(hoveredPoint)
 	const previousChartInputRef = useRef({ sensors, isAggregated })
 
 	useEffect(() => {
@@ -168,8 +171,13 @@ export default function Graph({
 	}, [hoveredPoint])
 
 	const setHoveredPointIfChanged = useCallback(
-		(point: number | null) => {
-			if (lastHoveredPointRef.current === point) return
+		(point: HoveredMeasurement | null) => {
+			if (
+				lastHoveredPointRef.current?.locationId === point?.locationId &&
+				lastHoveredPointRef.current?.time === point?.time
+			) {
+				return
+			}
 
 			lastHoveredPointRef.current = point
 			setHoveredPoint(point)
@@ -324,7 +332,10 @@ export default function Graph({
 							const point = context.raw as MeasurementChartPoint
 
 							if (!isZoomingRef.current && point.locationId !== null) {
-								setHoveredPointIfChanged(point.locationId)
+								setHoveredPointIfChanged({
+									locationId: point.locationId,
+									time: new Date(point.timestamp).toISOString(),
+								})
 							}
 
 							return `${context.dataset.label}: ${context.raw.y}`
