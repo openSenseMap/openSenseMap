@@ -24,6 +24,46 @@ type SensorGroup = {
 	image?: string
 }
 
+const sensorImageThumbnailNames: Record<string, string> = {
+	'/img/sensor_images/BME680.jpg': 'BME680',
+	'/img/sensor_images/BMP280.png': 'BMP280',
+	'/img/sensor_images/DNMS.jpg': 'DNMS',
+	'/img/sensor_images/DPS310.jpg': 'DPS310',
+	'/img/sensor_images/HDC1008.png': 'HDC1008',
+	'/img/sensor_images/HDC1080.jpg': 'HDC1080',
+	'/img/sensor_images/SCD30.jpg': 'SCD30',
+	'/img/sensor_images/SDS011.png': 'SDS011',
+	'/img/sensor_images/SMT50.jpg': 'SMT50',
+	'/img/sensor_images/SPS30.jpg': 'SPS30',
+	'/img/sensor_images/SoundLevelSensor.jpg': 'SoundLevelSensor',
+	'/img/sensor_images/VEML6070.jpg': 'VEML6070',
+}
+
+function SensorImage({ src, alt }: { src: string; alt: string }) {
+	const thumbnailName = sensorImageThumbnailNames[src]
+
+	return (
+		<picture className="block h-10 w-10 shrink-0">
+			{thumbnailName ? (
+				<source
+					type="image/webp"
+					srcSet={`/img/sensor_images/thumbnails/${thumbnailName}-40.webp 40w, /img/sensor_images/thumbnails/${thumbnailName}-80.webp 80w`}
+					sizes="40px"
+				/>
+			) : null}
+			<img
+				src={src}
+				alt={alt}
+				width={40}
+				height={40}
+				loading="lazy"
+				decoding="async"
+				className="h-10 w-10 rounded object-cover"
+			/>
+		</picture>
+	)
+}
+
 export function SensorSelectionStep() {
 	const { watch, setValue } = useFormContext()
 	const selectedDevice = watch('model')
@@ -177,11 +217,7 @@ export function SensorSelectionStep() {
 								<div className="flex w-full items-center justify-between pr-4">
 									<div className="flex items-center gap-3">
 										{group.image ? (
-											<img
-												src={group.image}
-												alt={group.sensorType}
-												className="h-10 w-10 rounded object-cover"
-											/>
+											<SensorImage src={group.image} alt={group.sensorType} />
 										) : (
 											<div className="bg-muted flex h-10 w-10 items-center justify-center rounded">
 												<Cpu className="text-muted-foreground h-5 w-5" />
