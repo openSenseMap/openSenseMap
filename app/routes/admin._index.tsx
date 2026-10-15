@@ -13,6 +13,9 @@ export default function AdminIndexRoute() {
 					<Link to="/admin/devices">Edit devices</Link>
 				</div>
 				<div className="rounded border p-4">
+					<Link to="/admin/sensor-wiki-aliases">Edit Sensor-Wiki aliases</Link>
+				</div>
+				<div className="rounded border p-4">
 					<Link to="/admin/integrations">Integration services</Link>
 				</div>
 			</div>

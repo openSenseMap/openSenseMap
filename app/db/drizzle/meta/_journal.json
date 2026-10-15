@@ -344,6 +344,13 @@
       "when": 1788511701007,
       "tag": "0048_device_location_height",
       "breakpoints": true
+    },
+    {
+      "idx": 49,
+      "version": "7",
+      "when": 1791874360262,
+      "tag": "0049_sensor_wiki_aliases",
+      "breakpoints": true
     }
   ]
 }

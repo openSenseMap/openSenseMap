@@ -1,9 +1,10 @@
 import MultiSelectComboboxFilter from '~/components/ui/combobox-filter'
+import { type PhenomenonFilterOption } from '~/lib/phenomenon-filter'
 import { useTranslation } from 'react-i18next'
 
 interface FilterPhenomenaProps {
 	phenomena: string[]
-	availablePhenomena: string[]
+	availablePhenomena: PhenomenonFilterOption[]
 	onPhenomenaChange: (phenomena: string[]) => void
 }
 

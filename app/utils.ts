@@ -4,6 +4,8 @@ import { useMatches } from 'react-router'
 import { type MyBadge } from './db/models/badge.server'
 import { type User } from './db/schema/user'
 import { validLngLat } from './lib/location'
+import { type SensorWikiAliasEntry } from './lib/device-schemas/sensor-wiki-aliases'
+import { sensorMatchesAnyPhenomenonFilter } from './lib/phenomenon-filter'
 import { validateEmail as validateEmailNew } from './services/user-service'
 
 const DEFAULT_REDIRECT = '/'
@@ -94,6 +96,7 @@ export function validatePassLength(passwords: any) {
 export function getFilteredDevices(
 	devices: any,
 	filterParams: URLSearchParams,
+	sensorWikiAliasEntries: SensorWikiAliasEntry[],
 ) {
 	const statusFilter = filterParams.get('status')?.toLowerCase().split(',') || [
 		'all',
@@ -104,8 +107,8 @@ export function getFilteredDevices(
 		.split(',') || ['all']
 	const phenomenonList = filterParams
 		.get('phenomenon')
-		?.toLowerCase()
-		.split(',')
+		?.split(',')
+		.filter(Boolean)
 	const tagsFilter = filterParams.get('tags')?.toLowerCase().split(',') || []
 	const results = devices.features.filter((device: any) => {
 		// prevent data from invalid locations to be processed
@@ -116,9 +119,7 @@ export function getFilteredDevices(
 		)
 			return false
 
-		const sensorsList = device.properties.sensors?.map((s: any) =>
-			s.title.toLowerCase(),
-		)
+		const sensorsList = device.properties.sensors ?? []
 		const deviceTags =
 			device.properties.tags?.map((tag: string) => tag.toLowerCase()) || [] // Convert device tags to lowercase
 
@@ -132,7 +133,13 @@ export function getFilteredDevices(
 				statusFilter.includes(device.properties.status.toLowerCase())) &&
 			// If phenomenon is provided, check if any sensor matches the selected phenomenon
 			(!filterParams.get('phenomenon') ||
-				sensorsList.some((s: any) => phenomenonList?.includes(s))) &&
+				sensorsList.some((sensor: any) =>
+					sensorMatchesAnyPhenomenonFilter(
+						sensor,
+						phenomenonList ?? [],
+						sensorWikiAliasEntries,
+					),
+				)) &&
 			(tagsFilter.length === 0 ||
 				tagsFilter.some((tag) => deviceTags.includes(tag)))
 		)
