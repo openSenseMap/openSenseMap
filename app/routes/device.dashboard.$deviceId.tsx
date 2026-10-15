@@ -69,7 +69,7 @@ let deviceData = {
 			},
 		},
 	],
-	model: 'luftdaten_sds011_dht22',
+	model: 'luftdaten.info',
 	description:
 		'Mounted at the street side of my house. Traffic: approx. 8.000 vehicles/d',
 	image: '5b411d0e5dc1ec001b4f11c8_pblauf.jpg',

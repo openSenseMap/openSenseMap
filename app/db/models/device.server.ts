@@ -37,7 +37,10 @@ import { messages as NewLufdatenDeviceMessages } from '~/emails/new-device-luftd
 import { messages as NewSenseboxDeviceMessages } from '~/emails/new-device-sensebox'
 import { createDeviceApiKey } from '~/lib/jwt'
 import { sendMail } from '~/lib/mail.server'
-import { getSensorsForModel } from '~/lib/model-definitions'
+import {
+	getSensorsForModel,
+	getSensorTemplateValidationError,
+} from '~/lib/model-definitions'
 import {
 	createOrReusePrivateDeviceSchemaVersionFromUpload,
 	getVisibleDeviceSchemaVersionForCreation,
@@ -181,6 +184,7 @@ export function getDeviceForMeasurementWrite({ id }: Pick<Device, 'id'>) {
 					id: true,
 					title: true,
 					sensorType: true,
+					data: true,
 				},
 			},
 		},
@@ -1088,11 +1092,15 @@ export async function createDevice(deviceData: any, userId: string) {
 			let storedDeviceSchemaVersion = null
 			const isCustomDevice =
 				!deviceData.model || deviceData.model?.toLowerCase() === 'custom'
+			const hasExplicitSensors =
+				Array.isArray(deviceData.sensors) && deviceData.sensors.length > 0
+			const usesSensorDefinitions =
+				Boolean(deviceData.model) && !isCustomDevice && !hasExplicitSensors
 
 			// If model and sensors are both specified, reject (backwards compatibility)
 			if (
 				deviceData.model &&
-				deviceData.sensors &&
+				hasExplicitSensors &&
 				deviceData.model.toLowerCase() !== 'custom'
 			) {
 				throw new Error(
@@ -1101,8 +1109,17 @@ export async function createDevice(deviceData: any, userId: string) {
 			}
 
 			// If model is specified but sensors are not, get sensors from model layout
-			if (deviceData.model && !deviceData.sensors) {
-				const modelSensors = getSensorsForModel(deviceData.model as any)
+			if (deviceData.model && !hasExplicitSensors) {
+				const sensorTemplateError = getSensorTemplateValidationError(
+					deviceData.model,
+					deviceData.sensorTemplates,
+				)
+				if (sensorTemplateError) throw new Error(sensorTemplateError)
+
+				const modelSensors = getSensorsForModel(
+					deviceData.model as any,
+					deviceData.sensorTemplates,
+				)
 
 				if (
 					!Array.isArray(modelSensors) &&
@@ -1111,19 +1128,10 @@ export async function createDevice(deviceData: any, userId: string) {
 					throw new Error(`Unknown model: ${deviceData.model}`)
 				}
 
-				if (
-					Array.isArray(deviceData.sensorTemplates) &&
-					deviceData.sensorTemplates.length > 0
-				) {
-					sensorsToAdd = modelSensors.filter((sensor) =>
-						deviceData.sensorTemplates.includes(sensor.id),
-					)
-				} else {
-					sensorsToAdd = modelSensors
-				}
+				sensorsToAdd = modelSensors
 			}
 
-			if (isCustomDevice && deviceData.sensors) {
+			if (isCustomDevice && hasExplicitSensors) {
 				sensorsToAdd = deviceData.sensors ?? []
 			}
 
@@ -1207,6 +1215,34 @@ export async function createDevice(deviceData: any, userId: string) {
 				sensorsToAdd.length > 0
 			) {
 				for (const [index, sensorData] of sensorsToAdd.entries()) {
+					const existingSensorData =
+						sensorData.data &&
+						typeof sensorData.data === 'object' &&
+						!Array.isArray(sensorData.data)
+							? Object.fromEntries(
+									Object.entries(sensorData.data).filter(
+										([key]) =>
+											key !== 'sensorDefinitionId' &&
+											key !== 'deviceSchemaSensorId',
+									),
+								)
+							: {}
+					const sensorMetadata = storedDeviceSchemaVersion
+						? {
+								...existingSensorData,
+								deviceSchemaSensorId: sensorData.id,
+							}
+						: usesSensorDefinitions
+							? {
+									...existingSensorData,
+									sensorDefinitionId: sensorData.id,
+								}
+							: sensorData.data &&
+								  typeof sensorData.data === 'object' &&
+								  !Array.isArray(sensorData.data)
+								? existingSensorData
+								: sensorData.data
+
 					const [newSensor] = await tx
 						.insert(sensor)
 						.values({
@@ -1218,9 +1254,7 @@ export async function createDevice(deviceData: any, userId: string) {
 							sensorWikiPhenomenon: sensorData.sensorWikiPhenomenon,
 							sensorWikiUnit: sensorData.sensorWikiUnit,
 							deviceId: createdDevice.id,
-							data: storedDeviceSchemaVersion
-								? { deviceSchemaSensorId: sensorData.id }
-								: sensorData.data,
+							data: sensorMetadata,
 							order: sensorData.order ?? index,
 						})
 						.returning()

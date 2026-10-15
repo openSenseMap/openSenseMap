@@ -7,14 +7,20 @@ import { loader } from '~/routes/api.tags'
 import { registerUser } from '~/services/user-service.server'
 
 const TAGS_TEST_USER = generateTestUserCredentials()
+const TEST_TAGS = [
+	`tag-${TAGS_TEST_USER.name}-1`,
+	`tag-${TAGS_TEST_USER.name}-2`,
+	`tag-${TAGS_TEST_USER.name}-3`,
+]
 const TEST_TAG_BOX = {
 	name: `'${TAGS_TEST_USER.name}'s Box`,
 	exposure: 'outdoor',
 	expiresAt: null,
-	tags: ['tag1', 'tag2', 'testgrouptag'],
+	tags: TEST_TAGS,
 	latitude: 0,
 	longitude: 0,
 	model: 'luftdaten.info',
+	sensorTemplates: ['sds011_pm10'],
 	mqttEnabled: false,
 	ttnEnabled: false,
 }
@@ -43,7 +49,7 @@ describe('openSenseMap API Routes: /tags', () => {
 		userId = user.id
 	})
 
-	it('should return empty array of tags when none are there', async () => {
+	it('should not return tags from a device that has not been created', async () => {
 		// Arrange
 		const request = new Request(`${BASE_URL}/tags`, {
 			method: 'GET',
@@ -63,7 +69,7 @@ describe('openSenseMap API Routes: /tags', () => {
 			'application/json; charset=utf-8',
 		)
 		expect(Array.isArray(body.data)).toBe(true)
-		expect(body.data).toHaveLength(0)
+		expect(body.data).not.toEqual(expect.arrayContaining(TEST_TAGS))
 	})
 
 	it('should return distinct grouptags of boxes', async () => {
@@ -88,9 +94,7 @@ describe('openSenseMap API Routes: /tags', () => {
 			'application/json; charset=utf-8',
 		)
 		expect(Array.isArray(body.data)).toBe(true)
-		expect(
-			body.data.filter((t: string) => TEST_TAG_BOX.tags.includes(t)),
-		).toHaveLength(3)
+		expect(body.data).toEqual(expect.arrayContaining(TEST_TAGS))
 	})
 
 	afterAll(async () => {

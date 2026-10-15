@@ -16,10 +16,17 @@ import {
 	hasCurrentElevationConsent,
 } from '~/db/models/elevation-consent.server'
 
-export type NewDeviceActionData = {
-	ok: false
-	error: 'invalid_device_form' | 'device_creation_failed'
-}
+export type NewDeviceActionData =
+	| {
+			ok: false
+			error: 'invalid_device_form' | 'device_creation_failed'
+	  }
+	| {
+			ok: false
+			error: 'integration_creation_failed'
+			deviceId: string
+			failedIntegrations: string[]
+	  }
 
 export async function loader({ request }: Route.LoaderArgs) {
 	const user = await getUser(request)
@@ -131,8 +138,51 @@ export async function action({ request }: Route.ActionArgs) {
 					}
 
 		const newDevice = await createDevice(userId, devicePayload)
+		let integrationResults: Awaited<ReturnType<typeof createDeviceIntegrations>>
 
-		await createDeviceIntegrations(newDevice.id, submission.advanced)
+		try {
+			integrationResults = await createDeviceIntegrations(
+				newDevice.id,
+				submission.advanced,
+			)
+		} catch (error) {
+			console.error(
+				`Error creating integrations for device ${newDevice.id}:`,
+				error,
+			)
+			return responseData<NewDeviceActionData>(
+				{
+					ok: false,
+					error: 'integration_creation_failed',
+					deviceId: newDevice.id,
+					failedIntegrations: [],
+				},
+				{ status: 502 },
+			)
+		}
+
+		const failedIntegrations = integrationResults.filter(
+			(result) => result.status === 'failed',
+		)
+
+		if (failedIntegrations.length > 0) {
+			const failedIntegrationNames = failedIntegrations.map(
+				(result) => result.integration,
+			)
+			console.error(
+				`Failed to create integrations for device ${newDevice.id}:`,
+				failedIntegrationNames,
+			)
+			return responseData<NewDeviceActionData>(
+				{
+					ok: false,
+					error: 'integration_creation_failed',
+					deviceId: newDevice.id,
+					failedIntegrations: failedIntegrationNames,
+				},
+				{ status: 502 },
+			)
+		}
 
 		return redirect('/profile/me')
 	} catch (error) {
