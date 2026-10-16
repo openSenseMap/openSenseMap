@@ -1,4 +1,4 @@
 #!/bin/sh -ex
-
-npx --yes tsx ./scripts/db/migrate.ts
-npm run start
+export NODE_ENV=production
+node build/scripts/migrate.mjs
+exec ./node_modules/.bin/react-router-serve ./build/server/index.js

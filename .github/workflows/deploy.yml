@@ -19,42 +19,44 @@ jobs:
   lint:
     name: ⬣ Lint
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
       - name: ⬇️ Checkout repo
         uses: actions/checkout@v7
-
-      - name: ⎔ Setup node
-        uses: actions/setup-node@v7
         with:
-          cache: npm
-          cache-dependency-path: ./package.json
-          node-version-file: .node-version
+          persist-credentials: false
 
-      - name: 📥 Install deps
-        run: npm install
+      - name: ⎔ Setup Vite+
+        uses: voidzero-dev/setup-vp@v1.21.1
+        with:
+          cache: true
+          node-version-file: .node-version
+          run-install: true
 
       - name: 🔬 Lint
-        run: npm run lint
+        run: vp lint
 
   typecheck:
     name: ʦ TypeScript
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
       - name: ⬇️ Checkout repo
         uses: actions/checkout@v7
-
-      - name: ⎔ Setup node
-        uses: actions/setup-node@v7
         with:
-          cache: npm
-          cache-dependency-path: ./package.json
-          node-version-file: .node-version
+          persist-credentials: false
 
-      - name: 📥 Install deps
-        run: npm install
+      - name: ⎔ Setup Vite+
+        uses: voidzero-dev/setup-vp@v1.21.1
+        with:
+          cache: true
+          node-version-file: .node-version
+          run-install: true
 
       - name: 🔎 Type check
-        run: npm run typecheck --if-present
+        run: vp run typecheck
 
   vitest:
     name: ⚡ Test
@@ -67,26 +69,25 @@ jobs:
     steps:
       - name: ⬇️ Checkout repo
         uses: actions/checkout@v7
+        with:
+          persist-credentials: false
 
       - name: 🏄 Copy test env vars
         run: cp .env.example .env
 
-      - name: ⎔ Setup node
-        uses: actions/setup-node@v7
+      - name: ⎔ Setup Vite+
+        uses: voidzero-dev/setup-vp@v1.21.1
         with:
-          cache: npm
-          cache-dependency-path: ./package.json
+          cache: true
           node-version-file: .node-version
-
-      - name: 📥 Install deps
-        run: npm install
+          run-install: true
 
       - name: 🐳 Docker compose
         # we need a postgres container for runnign the tests
         # the sleep is just there to give time for postgres to get started
         run: docker compose -f docker-compose.ci.yml up -d && sleep 30
         env:
-          DATABASE_URL: 'postgresql://postgres:postgres@localhost:5432/postgres'
+          DATABASE_URL: "postgresql://postgres:postgres@localhost:5432/postgres"
 
       - name: 🛠 Setup Database
         uses: nick-fields/retry@v4.0.0
@@ -95,10 +96,10 @@ jobs:
           max_attempts: 5
           retry_wait_seconds: 45
           retry_on: error
-          command: npm run db:migrate
+          command: vp run db:migrate
 
       - name: ⚡ Run vitest
-        run: npm run test:coverage
+        run: vp run test:coverage
 
       - name: 🧐 Report Coverage
         uses: davelosert/vitest-coverage-report-action@v2

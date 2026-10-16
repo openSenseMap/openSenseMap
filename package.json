@@ -6,10 +6,9 @@
   "scripts": {
     "dev": "react-router dev",
     "build": "run-s build:*",
-    "build:drizzle": "npm run db:generate",
+    "build:drizzle": "vp run db:generate",
     "build:react-router": "react-router build",
     "start": "cross-env NODE_ENV=production react-router-serve ./build/server/index.js",
-    "test": "vp test",
     "test:ui": "vp test --ui",
     "test:coverage": "vp test run --coverage",
     "db:check": "drizzle-kit check",
@@ -17,7 +16,7 @@
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
     "db:studio": "drizzle-kit studio",
-    "db:setup": "npm run db:generate && npm run db:migrate",
+    "db:setup": "vp run db:generate && vp run db:migrate",
     "db:seed": "tsx ./scripts/db/seed.ts",
     "db:seed-integrations": "tsx ./scripts/db/seed-integrations",
     "db:seed-orphan-user": "tsx ./scripts/db/seed-orphan-user",
@@ -26,7 +25,6 @@
     "components": "npx shadcn-ui",
     "format": "vp fmt --write .",
     "format:check": "vp fmt --check .",
-    "lint": "vp lint",
     "lint:fix": "vp lint --fix",
     "typecheck": "react-router typegen && tsc"
   },
