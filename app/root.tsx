@@ -242,6 +242,16 @@ const meta = () => (
 	</>
 )
 
+function EnvScript({ env }: { env: Window['ENV'] }) {
+	return (
+		<script
+			dangerouslySetInnerHTML={{
+				__html: `window.ENV = ${JSON.stringify(env).replaceAll('<', '\\u003c')}`,
+			}}
+		/>
+	)
+}
+
 export default function App({
 	loaderData: { locale, ENV, themePreference, theme, graceTos },
 }: Route.ComponentProps) {
@@ -273,12 +283,8 @@ export default function App({
 				<Toaster />
 
 				<ScrollRestoration />
+				<EnvScript env={ENV} />
 				<Scripts />
-				<script
-					dangerouslySetInnerHTML={{
-						__html: `window.ENV = ${JSON.stringify(ENV)}`,
-					}}
-				/>
 			</body>
 		</html>
 	)
@@ -303,6 +309,7 @@ export function ErrorBoundary() {
 				<div className="flex h-screen w-screen items-center justify-center">
 					<ErrorMessage />
 				</div>
+				<EnvScript env={globalThis.ENV} />
 				<Scripts />
 			</body>
 		</html>

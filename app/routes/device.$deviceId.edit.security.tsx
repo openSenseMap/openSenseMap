@@ -29,6 +29,7 @@ import {
 import { getUserId } from '~/services/session-service.server'
 import { Button } from '~/components/ui/button'
 import { cn } from '~/lib/utils'
+import { logServerError } from '~/lib/sentry.server'
 
 type SecurityAutosaveValues = {
 	authEnabled: boolean
@@ -115,6 +116,9 @@ export async function action({ request, params }: Route.ActionArgs) {
 				{ status: 200 },
 			)
 		} catch (error) {
+			logServerError('Device API key rotation failed', error, {
+				'app.operation': 'device_security.rotate_api_key',
+			})
 			console.error('Failed to generate new device API key:', error)
 
 			return data(
@@ -145,6 +149,10 @@ export async function action({ request, params }: Route.ActionArgs) {
 				{ status: 200 },
 			)
 		} catch (error) {
+			logServerError('Device authentication setting update failed', error, {
+				'app.operation': 'device_security.update_authentication',
+				'device.authentication_enabled': authEnabled,
+			})
 			console.error('Failed to update device security settings:', error)
 
 			return data(

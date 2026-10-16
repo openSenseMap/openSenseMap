@@ -17,6 +17,7 @@ import {
 import { Textarea } from '~/components/ui/textarea'
 import { getDevice } from '~/db/models/device.server'
 import { StandardResponse } from '~/lib/responses'
+import { logServerError } from '~/lib/sentry.server'
 import { postNewMeasurements } from '~/services/measurement-service.server'
 import { getUserId } from '~/services/session-service.server'
 
@@ -89,6 +90,10 @@ export async function action({
 
 		if (err.name === 'UnsupportedMediaTypeError')
 			return StandardResponse.unsupportedMediaType(err.message)
+
+		logServerError('Manual measurement upload failed unexpectedly', err, {
+			'app.operation': 'measurement.manual_upload',
+		})
 
 		return StandardResponse.internalServerError(
 			err.message || 'An unexpected error occurred',

@@ -16,6 +16,7 @@ import { BaseInputTemplate } from '~/components/rjsf/inputTemplate'
 import { toast } from '~/components/ui/use-toast'
 import { integration } from '~/db/schema/integration'
 import { drizzleClient } from '~/db.server'
+import { logServerError } from '~/lib/sentry.server'
 import { getUserId } from '~/services/session-service.server'
 
 // =====================================================
@@ -141,6 +142,10 @@ export async function action({ request, params }: Route.ActionArgs) {
 		)
 
 		if (!deleteRes.ok && deleteRes.status !== 404) {
+			logServerError('Device integration removal failed', deleteRes, {
+				'app.operation': 'integration.delete',
+				'integration.slug': intg.slug,
+			})
 			return data({ error: 'Failed to delete integration' }, { status: 500 })
 		}
 
@@ -157,6 +162,10 @@ export async function action({ request, params }: Route.ActionArgs) {
 	})
 
 	if (!response.ok) {
+		logServerError('Device integration update failed', response, {
+			'app.operation': 'integration.update',
+			'integration.slug': intg.slug,
+		})
 		const error = await response.json()
 		return data(
 			{ error: error.error || error.details || 'Failed to save configuration' },

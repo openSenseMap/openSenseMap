@@ -1,3 +1,5 @@
+# syntax=docker/dockerfile:1
+
 ARG NODE_VERSION=current
 
 # base node image
@@ -31,15 +33,26 @@ FROM base AS build
 
 WORKDIR /myapp
 
+ARG COMMIT_SHA
+ARG SENTRY_ORG
+ARG SENTRY_PROJECT
+
+ENV SENTRY_ORG=$SENTRY_ORG \
+	SENTRY_PROJECT=$SENTRY_PROJECT \
+	SENTRY_RELEASE=$COMMIT_SHA
+
 COPY --from=deps /myapp/node_modules /myapp/node_modules
 ADD . .
 
-RUN npm run build
+RUN --mount=type=secret,id=SENTRY_AUTH_TOKEN,env=SENTRY_AUTH_TOKEN npm run build
 
 # Finally, build the production image with minimal footprint
 FROM base
 
 WORKDIR /myapp
+
+ARG COMMIT_SHA
+ENV SENTRY_RELEASE=$COMMIT_SHA
 
 COPY --from=production-deps /myapp/node_modules /myapp/node_modules
 COPY --from=build /myapp/build /myapp/build

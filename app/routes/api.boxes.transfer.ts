@@ -24,8 +24,9 @@ import {
 } from '~/lib/openapi/errors'
 
 import { parseJsonOrFormRequest } from '~/lib/request-parsing'
-import { User } from '~/db/schema'
+import { type User } from '~/db/schema'
 import { requestContentTypeJsonOrForm } from '~/middleware/content-type-header.server'
+import { logServerError } from '~/lib/sentry.server'
 
 const TransferTokenSchema = z.string().min(1).meta({
 	description: 'Transfer token used to claim or revoke the device transfer.',
@@ -288,7 +289,7 @@ const handleCreateTransfer = async (request: Request, user: User) => {
 
 		return StandardResponse.created(responseParsed.data)
 	} catch (err) {
-		return handleTransferError(err)
+		return handleTransferError(err, 'create')
 	}
 }
 
@@ -307,11 +308,11 @@ const handleRemoveTransfer = async (request: Request, user: User) => {
 
 		return StandardResponse.noContent()
 	} catch (err) {
-		return handleTransferError(err)
+		return handleTransferError(err, 'remove')
 	}
 }
 
-const handleTransferError = (err: unknown) => {
+const handleTransferError = (err: unknown, operation: 'create' | 'remove') => {
 	if (err instanceof Error) {
 		const message = err.message
 
@@ -333,6 +334,10 @@ const handleTransferError = (err: unknown) => {
 		)
 			return StandardResponse.badRequest(message)
 	}
+
+	logServerError('Device transfer operation failed unexpectedly', err, {
+		'app.operation': `device_transfer.${operation}`,
+	})
 
 	return StandardResponse.internalServerError()
 }
