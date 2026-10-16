@@ -1,4 +1,4 @@
-import { eq, sql, inArray, and } from 'drizzle-orm'
+import { eq, sql, inArray, and, asc } from 'drizzle-orm'
 import {
 	type Measurement,
 	sensor,
@@ -30,6 +30,41 @@ export function getSensors(deviceId: Sensor['deviceId']) {
 	// }
 
 	// return sensors;
+}
+
+/**
+ * Load the metadata required for multi-device exports in one query.
+ *
+ * The caller restores the requested device order. Keeping this query independent
+ * of that order avoids interpolating the device IDs into an ORDER BY expression.
+ */
+export type SensorExportMetadata = Pick<
+	Sensor,
+	'id' | 'deviceId' | 'title' | 'unit' | 'order' | 'createdAt'
+>
+
+export async function getSensorsForDevices(
+	deviceIds: Sensor['deviceId'][],
+): Promise<SensorExportMetadata[]> {
+	if (deviceIds.length === 0) return []
+
+	return await drizzleClient
+		.select({
+			id: sensor.id,
+			deviceId: sensor.deviceId,
+			title: sensor.title,
+			unit: sensor.unit,
+			order: sensor.order,
+			createdAt: sensor.createdAt,
+		})
+		.from(sensor)
+		.where(inArray(sensor.deviceId, deviceIds))
+		.orderBy(
+			asc(sensor.deviceId),
+			asc(sensor.order),
+			asc(sensor.createdAt),
+			asc(sensor.id),
+		)
 }
 
 // import jsonstringify from "stringify-stream";
