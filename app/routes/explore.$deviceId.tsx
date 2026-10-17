@@ -4,7 +4,7 @@ import { type Route } from './+types/explore.$deviceId'
 import DeviceDetailBox from '~/components/device-detail/device-detail-box'
 import { HoveredPointContext } from '~/components/map/layers/mobile/mobile-box-layer'
 import MobileOverviewLayer from '~/components/map/layers/mobile/mobile-overview-layer'
-import { getDevice } from '~/db/models/device.server'
+import { getDevice, getDeviceLocations } from '~/db/models/device.server'
 import { getSensorsWithLastMeasurement } from '~/db/models/sensor.server'
 import { categorizeIntoTrips } from '~/lib/mobile-box-helper'
 import { getDeviceImageUrl } from '~/lib/s3.server'
@@ -19,10 +19,16 @@ export async function loader({ context, params, request }: Route.LoaderArgs) {
 		throw new Response('Device not found', { status: 502 })
 	}
 
-	const device = await getDevice({ id: params.deviceId })
-	const sensorsWithLastestMeasurement = await getSensorsWithLastMeasurement(
-		params.deviceId,
+	const loadedDevicePromise = getDevice({ id: params.deviceId })
+	const sensorsPromise = getSensorsWithLastMeasurement(params.deviceId)
+	const locationsPromise = loadedDevicePromise.then((loadedDevice) =>
+		loadedDevice?.exposure === 'mobile'
+			? getDeviceLocations({ id: params.deviceId })
+			: [],
 	)
+	const [loadedDevice, sensorsWithLastestMeasurement, locations] =
+		await Promise.all([loadedDevicePromise, sensorsPromise, locationsPromise])
+	const device = loadedDevice ? { ...loadedDevice, locations } : loadedDevice
 
 	// get only locations from the last 5 trips
 	if (device?.exposure === 'mobile' && device?.locations) {

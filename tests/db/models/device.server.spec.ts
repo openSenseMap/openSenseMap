@@ -1,4 +1,8 @@
-import { createDevice, deleteDevice } from '~/db/models/device.server'
+import {
+	createDevice,
+	deleteDevice,
+	getDevice,
+} from '~/db/models/device.server'
 import { deleteUserByEmail } from '~/db/models/user.server'
 import { type User } from '~/db/schema'
 import { registerUser } from '~/services/user-service.server'
@@ -109,6 +113,24 @@ describe('Device Model: createDevice', () => {
 		expect(result).toHaveProperty('sensors')
 		expect(Array.isArray(result.sensors)).toBe(true)
 		expect(result.sensors).toHaveLength(0)
+	})
+
+	it('does not include location history in the general device query', async () => {
+		const deviceData = {
+			name: 'Device Without Location History',
+			latitude: 52.0,
+			longitude: 8.0,
+			exposure: 'mobile',
+			model: 'custom',
+		}
+
+		const createdDevice = await createDevice(deviceData, userId)
+		createdDeviceIds.push(createdDevice.id)
+
+		const result = await getDevice({ id: createdDevice.id })
+
+		expect(result).toBeDefined()
+		expect(result).not.toHaveProperty('locations')
 	})
 
 	it('should create device with tags/grouptag', async () => {
