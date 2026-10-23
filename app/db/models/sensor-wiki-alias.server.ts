@@ -1,10 +1,7 @@
 import { asc, eq } from 'drizzle-orm'
 import { drizzleClient } from '~/db.server'
 import { sensorWikiAlias } from '~/db/schema'
-import {
-	sensorWikiAliasEntries,
-	type SensorWikiAliasEntry,
-} from '~/lib/device-schemas/sensor-wiki-aliases'
+import { type SensorWikiAliasEntry } from '~/lib/device-schemas/sensor-wiki-aliases'
 
 export async function getSensorWikiAliasesForAdmin() {
 	return drizzleClient
@@ -52,35 +49,6 @@ export async function deleteSensorWikiAlias(id: string) {
 		.delete(sensorWikiAlias)
 		.where(eq(sensorWikiAlias.id, id))
 		.returning()
-}
-
-export async function seedMissingSensorWikiAliasesFromBundledEntries() {
-	let insertedCount = 0
-
-	for (const entry of sensorWikiAliasEntries) {
-		const inserted = await drizzleClient
-			.insert(sensorWikiAlias)
-			.values({
-				sensorWikiPhenomenon: entry.sensorWikiPhenomenon,
-				sensorWikiUnit: entry.sensorWikiUnit ?? null,
-				title: entry.title,
-				unit: entry.unit ?? null,
-				titleAliases: entry.titleAliases,
-				unitAliases: entry.unitAliases ?? [],
-				sensorTypeAliases: entry.sensorTypeAliases ?? [],
-			})
-			.onConflictDoNothing({
-				target: [
-					sensorWikiAlias.sensorWikiPhenomenon,
-					sensorWikiAlias.sensorWikiUnit,
-				],
-			})
-			.returning({ id: sensorWikiAlias.id })
-
-		insertedCount += inserted.length
-	}
-
-	return insertedCount
 }
 
 export async function getActiveSensorWikiAliasEntries(): Promise<

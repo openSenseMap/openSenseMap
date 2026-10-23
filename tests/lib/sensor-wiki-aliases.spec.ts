@@ -4,9 +4,32 @@ import {
 	matchSensorWikiAlias,
 	normalizeSensorWikiAliasValue,
 	parseSensorWikiAliasList,
-	sensorWikiAliasEntries,
 	type SensorWikiAliasEntry,
 } from '~/lib/device-schemas/sensor-wiki-aliases'
+
+const databaseAliasEntries: SensorWikiAliasEntry[] = [
+	{
+		sensorWikiPhenomenon: 'temperature',
+		sensorWikiUnit: 'Cel',
+		title: 'Temperature',
+		unit: '°C',
+		titleAliases: ['temp', 'temperatur', 'temperature'],
+		unitAliases: ['c', 'celsius', '°c'],
+	},
+	{
+		sensorWikiPhenomenon: 'relative_humidity',
+		sensorWikiUnit: '%',
+		title: 'Relative humidity',
+		unit: '%',
+		titleAliases: ['humidity', 'luftfeuchtigkeit', 'relative humidity'],
+		unitAliases: ['%', 'percent'],
+	},
+	{
+		sensorWikiPhenomenon: 'humidity',
+		title: 'Humidity',
+		titleAliases: ['humidity'],
+	},
+]
 
 describe('sensor wiki aliases', () => {
 	it('normalizes punctuation and unit variants', () => {
@@ -24,7 +47,7 @@ describe('sensor wiki aliases', () => {
 					unit: '°C',
 					sensorType: 'BME280',
 				},
-				sensorWikiAliasEntries,
+				databaseAliasEntries,
 			),
 		).toMatchObject({
 			sensorWikiPhenomenon: 'temperature',
@@ -40,7 +63,7 @@ describe('sensor wiki aliases', () => {
 					title: 'Luftfeuchtigkeit',
 					unit: 'unknown',
 				},
-				sensorWikiAliasEntries,
+				databaseAliasEntries,
 			),
 		).toMatchObject({
 			sensorWikiPhenomenon: 'relative_humidity',
@@ -80,8 +103,8 @@ describe('sensor wiki aliases', () => {
 		}
 	})
 
-	it('matches database-ordered bundled aliases by evidence, not row order', () => {
-		const databaseEntries = [...sensorWikiAliasEntries].sort(
+	it('matches database aliases by evidence, not row order', () => {
+		const databaseEntries = [...databaseAliasEntries].sort(
 			(left, right) =>
 				left.sensorWikiPhenomenon.localeCompare(right.sensorWikiPhenomenon) ||
 				(left.sensorWikiUnit ?? '').localeCompare(right.sensorWikiUnit ?? ''),
@@ -175,14 +198,14 @@ describe('sensor wiki aliases', () => {
 		expect(
 			matchSensorWikiAlias(
 				{ title: 'asdasd', unit: 's' },
-				sensorWikiAliasEntries,
+				databaseAliasEntries,
 			),
 		).toBeUndefined()
 	})
 
 	it('returns autocomplete suggestions for partial aliases', () => {
 		expect(
-			getSensorWikiAliasSuggestions({ title: 'temp' }, sensorWikiAliasEntries),
+			getSensorWikiAliasSuggestions({ title: 'temp' }, databaseAliasEntries),
 		).toContainEqual(
 			expect.objectContaining({
 				title: 'Temperature',
@@ -194,7 +217,7 @@ describe('sensor wiki aliases', () => {
 
 	it('does not suggest entries for very short queries', () => {
 		expect(
-			getSensorWikiAliasSuggestions({ title: 't' }, sensorWikiAliasEntries),
+			getSensorWikiAliasSuggestions({ title: 't' }, databaseAliasEntries),
 		).toEqual([])
 	})
 
@@ -204,7 +227,7 @@ describe('sensor wiki aliases', () => {
 		).toEqual(['particle 2,5', 'pm2.5', 'particulate matter'])
 	})
 
-	it('does not activate bundled aliases for an empty runtime configuration', () => {
+	it('does not match aliases with an empty runtime configuration', () => {
 		expect(matchSensorWikiAlias({ title: 'Temperatur', unit: '°C' }, [])).toBe(
 			undefined,
 		)

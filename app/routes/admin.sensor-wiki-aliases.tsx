@@ -9,7 +9,6 @@ import {
 	createSensorWikiAlias,
 	deleteSensorWikiAlias,
 	getSensorWikiAliasesForAdmin,
-	seedMissingSensorWikiAliasesFromBundledEntries,
 	updateSensorWikiAlias,
 } from '~/db/models/sensor-wiki-alias.server'
 import { parseSensorWikiAliasList } from '~/lib/device-schemas/sensor-wiki-aliases'
@@ -35,15 +34,6 @@ export async function action({
 	const intent = getString(formData, '_action')
 
 	switch (intent) {
-		case 'seed': {
-			const insertedCount =
-				await seedMissingSensorWikiAliasesFromBundledEntries()
-			return {
-				error: false,
-				message: `Restored ${insertedCount} missing aliases from the bundled defaults.`,
-			}
-		}
-
 		case 'create': {
 			const parsed = parseAliasFormData(formData)
 			if (parsed.error) return parsed.error
@@ -114,20 +104,13 @@ export default function AdminSensorWikiAliasesRoute({
 				<Link to="/admin" className="text-sm underline underline-offset-2">
 					Back to admin
 				</Link>
-				<div className="mt-4 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
-					<div>
-						<h2 className="text-2xl font-semibold">Sensor-Wiki aliases</h2>
-						<p className="text-muted-foreground mt-1 text-sm">
-							The database migration seeds the bundled defaults. Runtime
-							matching uses this table directly, and the restore action adds
-							back any missing defaults.
-						</p>
-					</div>
-					<Form method="post">
-						<Button type="submit" name="_action" value="seed">
-							Restore missing bundled aliases
-						</Button>
-					</Form>
+				<div className="mt-4">
+					<h2 className="text-2xl font-semibold">Sensor-Wiki aliases</h2>
+					<p className="text-muted-foreground mt-1 text-sm">
+						The database migration creates the initial entries. Runtime matching
+						uses this table directly, and changes made here are the source of
+						truth.
+					</p>
 				</div>
 			</div>
 
@@ -158,8 +141,8 @@ export default function AdminSensorWikiAliasesRoute({
 				{aliases.length === 0 ? (
 					<p className="text-muted-foreground rounded-md border p-4 text-sm">
 						No aliases are configured, so alias suggestions and inferred
-						matching are disabled. The migration normally seeds the bundled
-						defaults; create entries manually or use the restore action.
+						matching are disabled. Create entries manually or restore the
+						database from a known backup.
 					</p>
 				) : (
 					<div className="space-y-4">
