@@ -6,6 +6,7 @@ import { startTransition, StrictMode } from 'react'
 import { hydrateRoot } from 'react-dom/client'
 import { I18nextProvider, initReactI18next } from 'react-i18next'
 import { HydratedRouter } from 'react-router/dom'
+import { sentryPrivacyOptions } from '../sentry-privacy.mjs'
 import { i18nextOptions } from './i18next-config'
 
 if (window.ENV.SENTRY_DSN) {
@@ -13,6 +14,7 @@ if (window.ENV.SENTRY_DSN) {
 		dsn: window.ENV.SENTRY_DSN,
 		environment: window.ENV.SENTRY_ENVIRONMENT,
 		release: window.ENV.SENTRY_RELEASE,
+		...sentryPrivacyOptions,
 		integrations: [
 			Sentry.reactRouterTracingIntegration(),
 			Sentry.consoleLoggingIntegration({ levels: ['error'] }),
