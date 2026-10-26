@@ -1077,6 +1077,31 @@ export async function findDevices(
 	return devices
 }
 
+type SensorRoutingMetadata = {
+	sensorDefinitionId?: string
+	deviceSchemaSensorId?: string
+}
+
+function buildSensorData(
+	data: unknown,
+	routingMetadata: SensorRoutingMetadata = {},
+): unknown {
+	const isRecord =
+		Boolean(data) && typeof data === 'object' && !Array.isArray(data)
+	if (!isRecord && Object.keys(routingMetadata).length === 0) return data
+
+	const existingData = isRecord
+		? Object.fromEntries(
+				Object.entries(data as Record<string, unknown>).filter(
+					([key]) =>
+						key !== 'sensorDefinitionId' && key !== 'deviceSchemaSensorId',
+				),
+			)
+		: {}
+
+	return { ...existingData, ...routingMetadata }
+}
+
 export async function createDevice(deviceData: any, userId: string) {
 	try {
 		const [newDevice, usr] = await drizzleClient.transaction(async (tx) => {
@@ -1116,19 +1141,10 @@ export async function createDevice(deviceData: any, userId: string) {
 				)
 				if (sensorTemplateError) throw new Error(sensorTemplateError)
 
-				const modelSensors = getSensorsForModel(
-					deviceData.model as any,
+				sensorsToAdd = getSensorsForModel(
+					deviceData.model,
 					deviceData.sensorTemplates,
 				)
-
-				if (
-					!Array.isArray(modelSensors) &&
-					deviceData.model?.toLowerCase() !== 'custom'
-				) {
-					throw new Error(`Unknown model: ${deviceData.model}`)
-				}
-
-				sensorsToAdd = modelSensors
 			}
 
 			if (isCustomDevice && hasExplicitSensors) {
@@ -1215,33 +1231,14 @@ export async function createDevice(deviceData: any, userId: string) {
 				sensorsToAdd.length > 0
 			) {
 				for (const [index, sensorData] of sensorsToAdd.entries()) {
-					const existingSensorData =
-						sensorData.data &&
-						typeof sensorData.data === 'object' &&
-						!Array.isArray(sensorData.data)
-							? Object.fromEntries(
-									Object.entries(sensorData.data).filter(
-										([key]) =>
-											key !== 'sensorDefinitionId' &&
-											key !== 'deviceSchemaSensorId',
-									),
-								)
-							: {}
-					const sensorMetadata = storedDeviceSchemaVersion
-						? {
-								...existingSensorData,
-								deviceSchemaSensorId: sensorData.id,
-							}
-						: usesSensorDefinitions
-							? {
-									...existingSensorData,
-									sensorDefinitionId: sensorData.id,
-								}
-							: sensorData.data &&
-								  typeof sensorData.data === 'object' &&
-								  !Array.isArray(sensorData.data)
-								? existingSensorData
-								: sensorData.data
+					const sensorMetadata = buildSensorData(
+						sensorData.data,
+						storedDeviceSchemaVersion
+							? { deviceSchemaSensorId: sensorData.id }
+							: usesSensorDefinitions
+								? { sensorDefinitionId: sensorData.id }
+								: undefined,
+					)
 
 					const [newSensor] = await tx
 						.insert(sensor)
