@@ -1,0 +1,13 @@
+{
+	"title": "Unterstützte Sensor-Zuordnungen",
+	"intro": "Diese Zuordnungen werden für die Sensor-Autovervollständigung von 'custom' Geräten und die Phänomenfilterung auf openSenseMap verwendet.",
+	"catalog_summary": "Katalogversion {{version}} · {{count}} Zuordnungen",
+	"contribute": "Zuordnung beitragen",
+	"view_json": "Katalog als JSON anzeigen",
+	"search_label": "Zuordnungen durchsuchen",
+	"search_placeholder": "Phänomene, Einheiten oder Aliase durchsuchen",
+	"no_results": "Keine Zuordnung entspricht der Suche.",
+	"title_aliases": "Phänomen-Aliase",
+	"unit_aliases": "Einheiten-Aliase",
+	"sensor_type_aliases": "Sensortyp-Aliase"
+}

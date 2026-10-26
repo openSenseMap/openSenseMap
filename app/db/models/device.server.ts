@@ -837,6 +837,8 @@ export async function getDevicesWithSensors(options?: {
 			sensor: {
 				id: sensor.id,
 				title: sensor.title,
+				unit: sensor.unit,
+				sensorType: sensor.sensorType,
 				sensorWikiPhenomenon: sensor.sensorWikiPhenomenon,
 				lastMeasurement: sensor.lastMeasurement,
 			},
@@ -852,7 +854,12 @@ export async function getDevicesWithSensors(options?: {
 
 	type PartialSensor = Pick<
 		Sensor,
-		'id' | 'title' | 'sensorWikiPhenomenon' | 'lastMeasurement'
+		| 'id'
+		| 'title'
+		| 'unit'
+		| 'sensorType'
+		| 'sensorWikiPhenomenon'
+		| 'lastMeasurement'
 	>
 
 	const deviceMap = new Map<

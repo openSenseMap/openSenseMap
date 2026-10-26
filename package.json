@@ -20,7 +20,6 @@
     "db:seed": "tsx ./scripts/db/seed.ts",
     "db:seed-integrations": "tsx ./scripts/db/seed-integrations",
     "db:seed-orphan-user": "tsx ./scripts/db/seed-orphan-user",
-    "device-schemas:alias-candidates": "node --experimental-strip-types ./scripts/device-schemas/generate-sensor-wiki-alias-candidates.ts",
     "email:dev": "email dev",
     "components": "npx shadcn-ui",
     "format": "vp fmt --write .",
