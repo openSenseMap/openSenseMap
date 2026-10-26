@@ -6,8 +6,8 @@ import { Badge } from '~/components/ui/badge'
 import { Button } from '~/components/ui/button'
 import { Input } from '~/components/ui/input'
 import { NavBar } from '~/components/nav-bar'
-import { sensorWikiAliasCatalog } from '~/lib/device-schemas/sensor-wiki-alias-catalog'
-import { normalizeSensorWikiAliasValue } from '~/lib/device-schemas/sensor-wiki-aliases'
+import { sensorWikiAliasCatalog } from '~/lib/sensor-wiki/alias-catalog'
+import { normalizeSensorWikiAliasValue } from '~/lib/sensor-wiki/aliases'
 
 const CONTRIBUTION_GUIDE_URL =
 	'https://github.com/openSenseMap/frontend/blob/dev/app/lib/device-schemas/SENSOR_WIKI_ALIASES.md'
