@@ -12,7 +12,6 @@
         "bodentemperatur 30cm",
         "bodentemperatur_1",
         "bodentemperatur_2",
-        "lufttemperatur",
         "temperatur",
         "temperatur bme280",
         "temperatur dht22",
@@ -174,7 +173,7 @@
       "sensorWikiUnit": "°C",
       "title": "Air temperature",
       "unit": "°C",
-      "titleAliases": ["air temperature"],
+      "titleAliases": ["air temperature, lufttemperatur"],
       "unitAliases": ["°C", "Cel", "Celsius", "degC", "degree Celsius"]
     },
     {
