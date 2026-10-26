@@ -1,17 +1,17 @@
-import { sensorDefinitions } from './sensor-definitions'
+import {
+	sensorCommunityDecoderMappings,
+	sensorCommunitySensorDefinitionIds,
+} from './sensor-community-mappings'
+import {
+	sensorDefinitions,
+	type SensorDefinitionId,
+} from './sensor-definitions'
 
-type SensorKey = keyof typeof sensorDefinitions
+type SensorKey = SensorDefinitionId
 
 type SensorWithDefinitionId = (typeof sensorDefinitions)[SensorKey] & {
 	id: SensorKey
 }
-
-export const luftdatenSensorDefinitionKeys = Object.entries(sensorDefinitions)
-	.filter(([, definition]) => {
-		if (!('decoderMappings' in definition)) return false
-		return Boolean(definition.decoderMappings?.luftdaten?.length)
-	})
-	.map(([id]) => id as SensorKey)
 
 const senseBoxHomeV2: readonly SensorKey[] = [
 	'hdc1080_temperature',
@@ -74,7 +74,7 @@ export const modelDefinitions = {
 		'sps30_pm25',
 	] as const satisfies readonly SensorKey[],
 
-	'luftdaten.info': luftdatenSensorDefinitionKeys,
+	'luftdaten.info': sensorCommunitySensorDefinitionIds,
 	luftdaten_sds011: luftdatenSds011,
 	luftdaten_sds011_dht11: [
 		...luftdatenSds011,
@@ -136,13 +136,13 @@ export const modelDefinitions = {
 	] as const satisfies readonly SensorKey[],
 } as const
 
-export type ModelDefinitionKey = keyof typeof modelDefinitions
+type ModelDefinitionKey = keyof typeof modelDefinitions
 
 export const getSensorsForModel = (
-	model: ModelDefinitionKey,
+	model: string,
 	sensorTemplates?: readonly string[],
 ): SensorWithDefinitionId[] => {
-	const keys = modelDefinitions[model]
+	const keys = modelDefinitions[model as ModelDefinitionKey]
 	if (!keys) return []
 
 	const sensors = keys.map((key) => ({
@@ -194,9 +194,12 @@ export function findSensorTemplateMappingConflict(
 	>()
 
 	for (const sensor of getSensorsForModel('luftdaten.info', sensorTemplates)) {
-		if (!('decoderMappings' in sensor)) continue
+		const mappings =
+			sensorCommunityDecoderMappings[
+				sensor.id as keyof typeof sensorCommunityDecoderMappings
+			] ?? []
 
-		for (const mapping of sensor.decoderMappings?.luftdaten ?? []) {
+		for (const mapping of mappings) {
 			const normalizedValueType = mapping.valueType.toLowerCase()
 			const destination = mappingsByValueType.get(normalizedValueType) ?? {
 				valueType: mapping.valueType,
