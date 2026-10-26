@@ -40,7 +40,7 @@ describe('Luftdaten decoding', () => {
 		expect(measurements[0].createdAt).toBe(measurements[1].createdAt)
 	})
 
-	it('uses substring matching as a legacy fallback', async () => {
+	it('uses a decorated-title match as a legacy fallback', async () => {
 		const measurements = await decodeMeasurements(
 			{ sensordatavalues: [{ value_type: 'SPS30_N1', value: '1.0' }] },
 			{
@@ -56,6 +56,18 @@ describe('Luftdaten decoding', () => {
 		)
 
 		expect(measurements[0].sensor_id).toBe('decorated-nc1-id')
+	})
+
+	it('does not match a shorter alias inside a longer sensor title', async () => {
+		await expect(
+			decodeMeasurements(
+				{ sensordatavalues: [{ value_type: 'SPS30_N1', value: '1.0' }] },
+				{
+					contentType: 'luftdaten',
+					sensors: [nc10],
+				},
+			),
+		).rejects.toThrow('No applicable values found')
 	})
 
 	it('routes catalog sensors by definition ID after their titles are renamed', async () => {
@@ -100,6 +112,30 @@ describe('Luftdaten decoding', () => {
 				},
 			),
 		).rejects.toThrow('No applicable values found')
+	})
+
+	it('title-matches a sensor whose definition has no decoder mapping', async () => {
+		const measurements = await decodeMeasurements(
+			{
+				sensordatavalues: [{ value_type: 'BME680_temperature', value: '21.5' }],
+			},
+			{
+				contentType: 'luftdaten',
+				sensors: [
+					{
+						id: 'temperature-id',
+						title: 'Lufttemperatur',
+						sensorType: 'BME680',
+						data: { sensorDefinitionId: 'bme680_temperature' },
+					},
+				],
+			},
+		)
+
+		expect(measurements[0]).toMatchObject({
+			sensor_id: 'temperature-id',
+			value: 21.5,
+		})
 	})
 
 	it.each([

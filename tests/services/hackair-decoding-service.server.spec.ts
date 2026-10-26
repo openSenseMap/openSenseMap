@@ -2,12 +2,12 @@ import { decodeMeasurements } from '~/services/decoding-service.server'
 
 const payload = { reading: { pm10: '10.1' } }
 const pm10 = { id: 'pm10-id', title: 'PM10' }
-const overlappingTitle = { id: 'pm1-id', title: 'Outdoor PM1 sensor' }
+const decoratedPm10 = { id: 'decorated-pm10-id', title: 'Outdoor PM10 sensor' }
 
 describe('hackAIR decoding', () => {
 	it.each([
-		[overlappingTitle, pm10],
-		[pm10, overlappingTitle],
+		[decoratedPm10, pm10],
+		[pm10, decoratedPm10],
 	])(
 		'prefers exact aliases independently of sensor order',
 		async (...sensors) => {
@@ -53,12 +53,21 @@ describe('hackAIR decoding', () => {
 		).rejects.toThrow('No applicable values found')
 	})
 
-	it('uses a unique substring match as a legacy fallback', async () => {
+	it('uses a unique decorated-title match as a legacy fallback', async () => {
 		const measurements = await decodeMeasurements(payload, {
 			contentType: 'hackair',
-			sensors: [{ id: 'decorated-pm10-id', title: 'Outdoor PM10 sensor' }],
+			sensors: [decoratedPm10],
 		})
 
 		expect(measurements[0].sensor_id).toBe('decorated-pm10-id')
+	})
+
+	it('does not match an alias inside a longer token', async () => {
+		await expect(
+			decodeMeasurements(payload, {
+				contentType: 'hackair',
+				sensors: [{ id: 'pm100-id', title: 'PM100' }],
+			}),
+		).rejects.toThrow('No applicable values found')
 	})
 })
