@@ -1,4 +1,4 @@
-import { sensorWikiAliasCatalog } from '~/lib/device-schemas/sensor-wiki-alias-catalog'
+import { sensorWikiAliasCatalog } from '~/lib/sensor-wiki/alias-catalog'
 
 export function loader() {
 	return Response.json(sensorWikiAliasCatalog, {
