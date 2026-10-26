@@ -3,11 +3,16 @@ import {
 	getSensorWikiAliasSuggestions,
 	matchSensorWikiAlias,
 	normalizeSensorWikiAliasValue,
-	parseSensorWikiAliasList,
 	type SensorWikiAliasEntry,
-} from '~/lib/device-schemas/sensor-wiki-aliases'
+} from '~/lib/sensor-wiki/aliases'
+import {
+	parseSensorWikiAliasCatalog,
+	sensorWikiAliasCatalog,
+	sensorWikiAliasCatalogSchema,
+	sensorWikiAliasEntries,
+} from '~/lib/sensor-wiki/alias-catalog'
 
-const databaseAliasEntries: SensorWikiAliasEntry[] = [
+const aliasEntries: SensorWikiAliasEntry[] = [
 	{
 		sensorWikiPhenomenon: 'temperature',
 		sensorWikiUnit: 'Cel',
@@ -47,7 +52,7 @@ describe('sensor wiki aliases', () => {
 					unit: '°C',
 					sensorType: 'BME280',
 				},
-				databaseAliasEntries,
+				aliasEntries,
 			),
 		).toMatchObject({
 			sensorWikiPhenomenon: 'temperature',
@@ -63,7 +68,7 @@ describe('sensor wiki aliases', () => {
 					title: 'Luftfeuchtigkeit',
 					unit: 'unknown',
 				},
-				databaseAliasEntries,
+				aliasEntries,
 			),
 		).toMatchObject({
 			sensorWikiPhenomenon: 'relative_humidity',
@@ -103,20 +108,19 @@ describe('sensor wiki aliases', () => {
 		}
 	})
 
-	it('matches database aliases by evidence, not row order', () => {
-		const databaseEntries = [...databaseAliasEntries].sort(
+	it('matches catalog aliases by evidence, not row order', () => {
+		const catalogEntries = [...aliasEntries].sort(
 			(left, right) =>
 				left.sensorWikiPhenomenon.localeCompare(right.sensorWikiPhenomenon) ||
 				(left.sensorWikiUnit ?? '').localeCompare(right.sensorWikiUnit ?? ''),
 		)
 
 		expect(
-			matchSensorWikiAlias({ title: 'Humidity', unit: '%' }, databaseEntries),
+			matchSensorWikiAlias({ title: 'Humidity', unit: '%' }, catalogEntries),
 		).toMatchObject({
 			sensorWikiPhenomenon: 'relative_humidity',
 			sensorWikiUnit: '%',
 			confidence: 'high',
-			source: 'database-alias',
 		})
 	})
 
@@ -196,16 +200,13 @@ describe('sensor wiki aliases', () => {
 
 	it('does not invent a match for unknown labels', () => {
 		expect(
-			matchSensorWikiAlias(
-				{ title: 'asdasd', unit: 's' },
-				databaseAliasEntries,
-			),
+			matchSensorWikiAlias({ title: 'asdasd', unit: 's' }, aliasEntries),
 		).toBeUndefined()
 	})
 
 	it('returns autocomplete suggestions for partial aliases', () => {
 		expect(
-			getSensorWikiAliasSuggestions({ title: 'temp' }, databaseAliasEntries),
+			getSensorWikiAliasSuggestions({ title: 'temp' }, aliasEntries),
 		).toContainEqual(
 			expect.objectContaining({
 				title: 'Temperature',
@@ -216,15 +217,61 @@ describe('sensor wiki aliases', () => {
 	})
 
 	it('does not suggest entries for very short queries', () => {
-		expect(
-			getSensorWikiAliasSuggestions({ title: 't' }, databaseAliasEntries),
-		).toEqual([])
+		expect(getSensorWikiAliasSuggestions({ title: 't' }, aliasEntries)).toEqual(
+			[],
+		)
 	})
 
-	it('parses aliases by line while preserving commas', () => {
+	it('loads a valid repository catalog', () => {
+		expect(sensorWikiAliasCatalog.version).toBe(1)
+		expect(sensorWikiAliasEntries.length).toBeGreaterThan(0)
 		expect(
-			parseSensorWikiAliasList('particle 2,5\r\n pm2.5 \n\nparticulate matter'),
-		).toEqual(['particle 2,5', 'pm2.5', 'particulate matter'])
+			sensorWikiAliasCatalogSchema.safeParse(sensorWikiAliasCatalog).success,
+		).toBe(true)
+	})
+
+	it('keeps air temperature distinct from generic temperature', () => {
+		expect(
+			matchSensorWikiAlias(
+				{ title: 'Air temperature', unit: '°C' },
+				sensorWikiAliasEntries,
+			),
+		).toMatchObject({
+			sensorWikiPhenomenon: 'air_temperature',
+			sensorWikiUnit: '°C',
+		})
+		expect(
+			matchSensorWikiAlias(
+				{ title: 'Temperatur', unit: '°C' },
+				sensorWikiAliasEntries,
+			),
+		).toMatchObject({
+			sensorWikiPhenomenon: 'temperature',
+			sensorWikiUnit: 'Cel',
+		})
+	})
+
+	it('rejects duplicate canonical targets', () => {
+		expect(() =>
+			parseSensorWikiAliasCatalog({
+				version: 1,
+				entries: [aliasEntries[0], aliasEntries[0]],
+			}),
+		).toThrow('Duplicate catalog target')
+	})
+
+	it('rejects duplicate normalized aliases through the catalog schema', () => {
+		expect(() =>
+			parseSensorWikiAliasCatalog({
+				version: 1,
+				entries: [
+					{
+						...aliasEntries[0],
+						titleAliases: ['Temperature', ' temperature '],
+					},
+				],
+			}),
+		).toThrow('Duplicate normalized titleAliases value')
 	})
 
 	it('does not match aliases with an empty runtime configuration', () => {
