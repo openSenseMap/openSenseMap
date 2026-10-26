@@ -4,7 +4,7 @@ import { useMatches } from 'react-router'
 import { type MyBadge } from './db/models/badge.server'
 import { type User } from './db/schema/user'
 import { validLngLat } from './lib/location'
-import { type SensorWikiAliasEntry } from './lib/device-schemas/sensor-wiki-aliases'
+import { type SensorWikiAliasEntry } from './lib/sensor-wiki/aliases'
 import { sensorMatchesAnyPhenomenonFilter } from './lib/phenomenon-filter'
 import { validateEmail as validateEmailNew } from './services/user-service'
 
