@@ -8,7 +8,6 @@ export type SensorWikiAliasMatch = {
 	sensorWikiPhenomenon: string
 	sensorWikiUnit?: string
 	confidence: 'high' | 'medium'
-	source: 'database-alias'
 	reasons: string[]
 }
 
@@ -51,13 +50,6 @@ export function normalizeSensorWikiAliasValue(value?: string | null): string {
 	)
 }
 
-export function parseSensorWikiAliasList(value: string) {
-	return value
-		.split(/\r?\n/)
-		.map((alias) => alias.trim())
-		.filter(Boolean)
-}
-
 export function matchSensorWikiAlias(
 	input: SensorWikiAliasInput,
 	entries: SensorWikiAliasEntry[],
@@ -86,7 +78,7 @@ export function matchSensorWikiAlias(
 
 		const unitMatched = Boolean(
 			normalizedUnit &&
-			entry.unitAliases?.some(
+			[entry.unit, ...(entry.unitAliases ?? [])].some(
 				(alias) => normalizeSensorWikiAliasValue(alias) === normalizedUnit,
 			),
 		)
@@ -136,7 +128,6 @@ export function matchSensorWikiAlias(
 			: undefined,
 		confidence:
 			bestMatch.unitMatched || bestMatch.sensorTypeMatched ? 'high' : 'medium',
-		source: 'database-alias',
 		reasons,
 	}
 }
@@ -165,7 +156,7 @@ export function getSensorWikiAliasSuggestions(
 			)
 			const unitMatched =
 				!!normalizedUnit &&
-				entry.unitAliases?.some(
+				[entry.unit, ...(entry.unitAliases ?? [])].some(
 					(alias) => normalizeSensorWikiAliasValue(alias) === normalizedUnit,
 				)
 			const sensorTypeMatched =
@@ -188,7 +179,6 @@ export function getSensorWikiAliasSuggestions(
 					sensorWikiPhenomenon: entry.sensorWikiPhenomenon,
 					sensorWikiUnit: entry.sensorWikiUnit,
 					confidence: unitMatched || sensorTypeMatched ? 'high' : 'medium',
-					source: 'database-alias',
 					reasons,
 					aliases: entry.titleAliases,
 				} satisfies SensorWikiAliasSuggestion,

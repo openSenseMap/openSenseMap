@@ -10,8 +10,8 @@ import {
 	type PhenomenonFilterOption,
 } from '~/lib/phenomenon-filter'
 import { type SensorWikiTranslation } from '~/lib/sensor-wiki'
+import { sensorWikiAliasEntries } from '~/lib/device-schemas/sensor-wiki-alias-catalog'
 import { device, sensor } from '../schema'
-import { getActiveSensorWikiAliasEntries } from './sensor-wiki-alias.server'
 
 export type Phenomenon = {
 	id: number
@@ -58,7 +58,6 @@ export const getPhenomena = async function findPhenomena(): Promise<
 		)
 		.orderBy(asc(sensor.title))
 
-	const sensorWikiAliasEntries = await getActiveSensorWikiAliasEntries()
 	const optionsByValue = new Map<string, PhenomenonFilterOption>()
 	const fallbackOptionsByValue = new Map<
 		string,
