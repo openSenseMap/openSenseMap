@@ -53,6 +53,8 @@
 	"no_selected_sensors": "Noch keine Sensoren ausgewählt.",
 	"selectedSensors_one": "{{count}} Sensor ausgewählt",
 	"selectedSensors_other": "{{count}} Sensoren ausgewählt",
+	"sensor_mapping_conflict_title": "Sensorkombination nicht möglich",
+	"sensor_mapping_conflict_description": "{{sensors}} können nicht gemeinsam ausgewählt werden, weil sie denselben eingehenden Sensor.Community-Wert ({{valueType}}) akzeptieren.",
 	"add_sensor": "Sensor hinzufügen",
 	"device_schema_upload": "Geräteschema hochladen",
 	"device_schema_upload_text": "Importiere ein JSON-Schema, um einen festen Sensorsatz für dieses Gerät zu verwenden.",
