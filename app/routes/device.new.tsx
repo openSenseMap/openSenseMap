@@ -3,7 +3,6 @@ import { type Route } from './+types/device.new'
 import ValidationStepperForm from '~/components/device/new/new-device-stepper'
 import { NavBar } from '~/components/nav-bar'
 import { getIntegrations } from '~/db/models/integration.server'
-import { getActiveSensorWikiAliasEntries } from '~/db/models/sensor-wiki-alias.server'
 import { createDevice } from '~/services/device-service.server'
 import { createDeviceIntegrations } from '~/services/integration-service.server'
 import { getUser, getUserId } from '~/services/session-service.server'
@@ -16,6 +15,7 @@ import {
 	applyElevationConsentChoice,
 	hasCurrentElevationConsent,
 } from '~/db/models/elevation-consent.server'
+import { sensorWikiAliasEntries } from '~/lib/sensor-wiki/alias-catalog'
 
 export type NewDeviceActionData = {
 	ok: false
@@ -27,12 +27,10 @@ export async function loader({ request }: Route.LoaderArgs) {
 	if (!user) {
 		return redirect('/explore/login')
 	}
-	const [integrations, sensorWikiAliasEntries, hasElevationConsent] =
-		await Promise.all([
-			getIntegrations(),
-			getActiveSensorWikiAliasEntries(),
-			hasCurrentElevationConsent(user.id),
-		])
+	const [integrations, hasElevationConsent] = await Promise.all([
+		getIntegrations(),
+		hasCurrentElevationConsent(user.id),
+	])
 
 	return { integrations, sensorWikiAliasEntries, hasElevationConsent }
 }
