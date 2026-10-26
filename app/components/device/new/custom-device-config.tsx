@@ -2,9 +2,14 @@ import { FileJson, Library, Lock, Search, X } from 'lucide-react'
 import { useState, useEffect, useMemo } from 'react'
 import { useFormContext, useWatch } from 'react-hook-form'
 import { useTranslation } from 'react-i18next'
-import { useLoaderData } from 'react-router'
+import { Link, useLoaderData } from 'react-router'
 import { type CustomDeviceSchemaUpload, type Sensor } from './sensors-info'
-import { Alert, AlertDescription, AlertTitle, Callout } from '@/components/ui/alert'
+import {
+	Alert,
+	AlertDescription,
+	AlertTitle,
+	Callout,
+} from '@/components/ui/alert'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
@@ -13,13 +18,9 @@ import { Label } from '@/components/ui/label'
 import { Separator } from '~/components/ui/separator'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '~/components/ui/tabs'
 import { uploadedDeviceSchemaV1 } from '~/lib/device-schemas/device-schema-v1'
-import {
-	getSensorWikiAliasSuggestions,
-	matchSensorWikiAlias,
-	type SensorWikiAliasEntry,
-	type SensorWikiAliasSuggestion,
-} from '~/lib/device-schemas/sensor-wiki-aliases'
+
 import { type loader } from '~/routes/device.new'
+import { getSensorWikiAliasSuggestions, matchSensorWikiAlias, SensorWikiAliasEntry, SensorWikiAliasSuggestion } from '~/lib/sensor-wiki/aliases'
 
 type RegistryDeviceSchema = {
 	id: string
@@ -88,6 +89,16 @@ export function CustomDeviceConfig() {
 	})
 	const [isSuggestionListOpen, setIsSuggestionListOpen] = useState(false)
 	const { t } = useTranslation('newdevice')
+	const { t: translatePhenomenon } = useTranslation('phenomena')
+	const getPhenomenonLabel = (phenomenon: string, fallback?: string) =>
+		translatePhenomenon(phenomenon, {
+			defaultValue:
+				fallback ??
+				sensorWikiAliasEntries.find(
+					(entry) => entry.sensorWikiPhenomenon === phenomenon,
+				)?.title ??
+				phenomenon,
+		})
 
 	const sensorSuggestions = useMemo(
 		() => getSensorWikiAliasSuggestions(newSensor, sensorWikiAliasEntries, 5),
@@ -422,9 +433,17 @@ export function CustomDeviceConfig() {
 					)}
 
 					<div>
-							<Callout variant="tip">
-								{t('manual_sensors_sensor_wiki_hint')}
-							</Callout>
+						<Callout variant="tip">
+							{t('manual_sensors_sensor_wiki_hint')}{' '}
+							<Link
+								to="/sensor-wiki-aliases"
+								target="_blank"
+								rel="noreferrer"
+								className="font-medium underline underline-offset-2"
+							>
+								{t('manual_sensors_alias_catalog_link')}
+							</Link>
+						</Callout>
 						<div className="mb-4 grid grid-cols-1 gap-4 md:grid-cols-3">
 							<div>
 								<Label htmlFor="phenomenon">{t('phenomenon')}</Label>
@@ -465,12 +484,18 @@ export function CustomDeviceConfig() {
 													}}
 												>
 													<span className="font-medium">
-														{suggestion.title}
+														{getPhenomenonLabel(
+															suggestion.sensorWikiPhenomenon,
+															suggestion.title,
+														)}
 													</span>
 													<span className="text-muted-foreground flex flex-wrap items-center gap-2 text-xs">
 														<span>
 															{t('device_schema_sensor_wiki_match', {
-																phenomenon: suggestion.sensorWikiPhenomenon,
+																phenomenon: getPhenomenonLabel(
+																	suggestion.sensorWikiPhenomenon,
+																	suggestion.title,
+																),
 															})}
 														</span>
 														{suggestion.unit && <span>{suggestion.unit}</span>}
@@ -524,7 +549,9 @@ export function CustomDeviceConfig() {
 										</Badge>
 										<span className="text-muted-foreground">
 											{t('manual_sensor_wiki_matched', {
-												phenomenon: sensorWikiMatch.sensorWikiPhenomenon,
+												phenomenon: getPhenomenonLabel(
+													sensorWikiMatch.sensorWikiPhenomenon,
+												),
 											})}
 										</span>
 									</>
@@ -535,7 +562,10 @@ export function CustomDeviceConfig() {
 										</Badge>
 										<span className="text-muted-foreground">
 											{t('manual_sensor_wiki_suggestion_available', {
-												phenomenon: firstSensorSuggestion.sensorWikiPhenomenon,
+												phenomenon: getPhenomenonLabel(
+													firstSensorSuggestion.sensorWikiPhenomenon,
+													firstSensorSuggestion.title,
+												),
 											})}
 										</span>
 									</>

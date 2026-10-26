@@ -3,7 +3,7 @@ import {
 	normalizeSensorWikiAliasValue,
 	type SensorWikiAliasInput,
 	type SensorWikiAliasEntry,
-} from '~/lib/device-schemas/sensor-wiki-aliases'
+} from '~/lib/sensor-wiki/aliases'
 
 const SENSOR_WIKI_FILTER_PREFIX = 'sensor-wiki:'
 const TITLE_FILTER_PREFIX = 'title:'
@@ -148,7 +148,10 @@ function titleSimilarity(left: string, right: string) {
 	)
 }
 
-function aliasIncludesValue(aliases: string[] | undefined, value: string) {
+function aliasIncludesValue(
+	aliases: Array<string | undefined> | undefined,
+	value: string,
+) {
 	if (!value) return false
 
 	return !!aliases?.some(
@@ -180,7 +183,10 @@ export function getFuzzySensorWikiPhenomenonMatch(
 					),
 				0,
 			)
-			const unitMatched = aliasIncludesValue(entry.unitAliases, normalizedUnit)
+			const unitMatched = aliasIncludesValue(
+				[entry.unit, ...(entry.unitAliases ?? [])],
+				normalizedUnit,
+			)
 			const sensorTypeMatched = aliasIncludesValue(
 				entry.sensorTypeAliases,
 				normalizedSensorType,
