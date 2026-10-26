@@ -173,7 +173,7 @@
       "sensorWikiUnit": "°C",
       "title": "Air temperature",
       "unit": "°C",
-      "titleAliases": ["air temperature, lufttemperatur"],
+      "titleAliases": ["air temperature", "lufttemperatur"],
       "unitAliases": ["°C", "Cel", "Celsius", "degC", "degree Celsius"]
     },
     {
