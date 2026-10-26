@@ -72,6 +72,7 @@
 	"device_schema_alias_confidence_high": "hohe Trefferquote",
 	"device_schema_alias_confidence_medium": "Vorschlag",
 	"manual_sensors_sensor_wiki_hint": "Sensornamen werden mit bekannten Sensor-Wiki-Phänomenen abgeglichen. Wenn du einen Vorschlag auswählst, können gleichartige Messungen einem einheitlichen Phänomen zugeordnet werden.",
+	"manual_sensors_alias_catalog_link": "Unterstützte Zuordnungen anzeigen.",
 	"manual_sensor_wiki_matched": "Dieser Sensor wird dem einheitlichen Phänomen {{phenomenon}} zugeordnet.",
 	"manual_sensor_wiki_suggestion_available": "Ein möglicher einheitlicher Treffer ist verfügbar: {{phenomenon}}. Wähle den Vorschlag aus, um ihn zu übernehmen.",
 	"manual_sensor_wiki_unmatched": "Kein Treffer",
