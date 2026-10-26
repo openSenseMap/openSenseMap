@@ -10,7 +10,7 @@ import {
 	type PhenomenonFilterOption,
 } from '~/lib/phenomenon-filter'
 import { type SensorWikiTranslation } from '~/lib/sensor-wiki'
-import { sensorWikiAliasEntries } from '~/lib/device-schemas/sensor-wiki-alias-catalog'
+import { sensorWikiAliasEntries } from '~/lib/sensor-wiki/alias-catalog'
 import { device, sensor } from '../schema'
 
 export type Phenomenon = {

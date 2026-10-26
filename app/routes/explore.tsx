@@ -64,7 +64,7 @@ import { getTags } from '~/services/device-service.server'
 import { getPhenomena } from '~/db/models/phenomena.server'
 import { DOWNLOAD_FILTER_KEYS } from '~/components/header/download'
 import { sensorMatchesAnyPhenomenonFilter } from '~/lib/phenomenon-filter'
-import { sensorWikiAliasEntries } from '~/lib/device-schemas/sensor-wiki-alias-catalog'
+import { sensorWikiAliasEntries } from '~/lib/sensor-wiki/alias-catalog'
 
 const INITIAL_VIEW_STATE = {
 	zoom: 2,
