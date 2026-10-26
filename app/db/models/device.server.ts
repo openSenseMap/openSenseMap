@@ -37,7 +37,10 @@ import { messages as NewLufdatenDeviceMessages } from '~/emails/new-device-luftd
 import { messages as NewSenseboxDeviceMessages } from '~/emails/new-device-sensebox'
 import { createDeviceApiKey } from '~/lib/jwt'
 import { sendMail } from '~/lib/mail.server'
-import { getSensorsForModel } from '~/lib/model-definitions'
+import {
+	getSensorsForModel,
+	getSensorTemplateValidationError,
+} from '~/lib/model-definitions'
 import {
 	createOrReusePrivateDeviceSchemaVersionFromUpload,
 	getVisibleDeviceSchemaVersionForCreation,
@@ -181,6 +184,7 @@ export function getDeviceForMeasurementWrite({ id }: Pick<Device, 'id'>) {
 					id: true,
 					title: true,
 					sensorType: true,
+					data: true,
 				},
 			},
 		},
@@ -1073,6 +1077,31 @@ export async function findDevices(
 	return devices
 }
 
+type SensorRoutingMetadata = {
+	sensorDefinitionId?: string
+	deviceSchemaSensorId?: string
+}
+
+function buildSensorData(
+	data: unknown,
+	routingMetadata: SensorRoutingMetadata = {},
+): unknown {
+	const isRecord =
+		Boolean(data) && typeof data === 'object' && !Array.isArray(data)
+	if (!isRecord && Object.keys(routingMetadata).length === 0) return data
+
+	const existingData = isRecord
+		? Object.fromEntries(
+				Object.entries(data as Record<string, unknown>).filter(
+					([key]) =>
+						key !== 'sensorDefinitionId' && key !== 'deviceSchemaSensorId',
+				),
+			)
+		: {}
+
+	return { ...existingData, ...routingMetadata }
+}
+
 export async function createDevice(deviceData: any, userId: string) {
 	try {
 		const [newDevice, usr] = await drizzleClient.transaction(async (tx) => {
@@ -1088,11 +1117,15 @@ export async function createDevice(deviceData: any, userId: string) {
 			let storedDeviceSchemaVersion = null
 			const isCustomDevice =
 				!deviceData.model || deviceData.model?.toLowerCase() === 'custom'
+			const hasExplicitSensors =
+				Array.isArray(deviceData.sensors) && deviceData.sensors.length > 0
+			const usesSensorDefinitions =
+				Boolean(deviceData.model) && !isCustomDevice && !hasExplicitSensors
 
 			// If model and sensors are both specified, reject (backwards compatibility)
 			if (
 				deviceData.model &&
-				deviceData.sensors &&
+				hasExplicitSensors &&
 				deviceData.model.toLowerCase() !== 'custom'
 			) {
 				throw new Error(
@@ -1101,29 +1134,20 @@ export async function createDevice(deviceData: any, userId: string) {
 			}
 
 			// If model is specified but sensors are not, get sensors from model layout
-			if (deviceData.model && !deviceData.sensors) {
-				const modelSensors = getSensorsForModel(deviceData.model as any)
+			if (deviceData.model && !hasExplicitSensors) {
+				const sensorTemplateError = getSensorTemplateValidationError(
+					deviceData.model,
+					deviceData.sensorTemplates,
+				)
+				if (sensorTemplateError) throw new Error(sensorTemplateError)
 
-				if (
-					!Array.isArray(modelSensors) &&
-					deviceData.model?.toLowerCase() !== 'custom'
-				) {
-					throw new Error(`Unknown model: ${deviceData.model}`)
-				}
-
-				if (
-					Array.isArray(deviceData.sensorTemplates) &&
-					deviceData.sensorTemplates.length > 0
-				) {
-					sensorsToAdd = modelSensors.filter((sensor) =>
-						deviceData.sensorTemplates.includes(sensor.id),
-					)
-				} else {
-					sensorsToAdd = modelSensors
-				}
+				sensorsToAdd = getSensorsForModel(
+					deviceData.model,
+					deviceData.sensorTemplates,
+				)
 			}
 
-			if (isCustomDevice && deviceData.sensors) {
+			if (isCustomDevice && hasExplicitSensors) {
 				sensorsToAdd = deviceData.sensors ?? []
 			}
 
@@ -1207,6 +1231,15 @@ export async function createDevice(deviceData: any, userId: string) {
 				sensorsToAdd.length > 0
 			) {
 				for (const [index, sensorData] of sensorsToAdd.entries()) {
+					const sensorMetadata = buildSensorData(
+						sensorData.data,
+						storedDeviceSchemaVersion
+							? { deviceSchemaSensorId: sensorData.id }
+							: usesSensorDefinitions
+								? { sensorDefinitionId: sensorData.id }
+								: undefined,
+					)
+
 					const [newSensor] = await tx
 						.insert(sensor)
 						.values({
@@ -1218,9 +1251,7 @@ export async function createDevice(deviceData: any, userId: string) {
 							sensorWikiPhenomenon: sensorData.sensorWikiPhenomenon,
 							sensorWikiUnit: sensorData.sensorWikiUnit,
 							deviceId: createdDevice.id,
-							data: storedDeviceSchemaVersion
-								? { deviceSchemaSensorId: sensorData.id }
-								: sensorData.data,
+							data: sensorMetadata,
 							order: sensorData.order ?? index,
 						})
 						.returning()

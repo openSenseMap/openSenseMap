@@ -53,6 +53,8 @@
 	"no_selected_sensors": "No sensors selected yet.",
 	"selectedSensors_one": "{{count}} sensor selected",
 	"selectedSensors_other": "{{count}} sensors selected",
+	"sensor_mapping_conflict_title": "Sensor combination not possible",
+	"sensor_mapping_conflict_description": "{{sensors}} cannot be selected together because they accept the same incoming Sensor.Community value ({{valueType}}).",
 	"add_sensor": "Add Sensor",
 	"device_schema_upload": "Upload device schema",
 	"device_schema_upload_text": "Import a JSON schema to use a fixed set of sensors for this device.",

@@ -1,5 +1,5 @@
 import { Cpu } from 'lucide-react'
-import { useState, useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { useFormContext } from 'react-hook-form'
 import { useTranslation } from 'react-i18next'
 import { CustomDeviceConfig } from './custom-device-config'
@@ -12,7 +12,11 @@ import {
 import { Badge } from '~/components/ui/badge'
 import { Checkbox } from '~/components/ui/checkbox'
 import { Label } from '~/components/ui/label'
-import { getSensorsForModel } from '~/lib/model-definitions'
+import { useToast } from '~/components/ui/use-toast'
+import {
+	findSensorTemplateMappingConflict,
+	getSensorsForModel,
+} from '~/lib/model-definitions'
 import { cn } from '~/lib/utils'
 import { type Sensor } from '~/lib/new-device-form'
 
@@ -28,6 +32,7 @@ export function SensorSelectionStep() {
 	const { watch, setValue } = useFormContext()
 	const selectedDevice = watch('model')
 	const { t } = useTranslation('newdevice')
+	const { toast } = useToast()
 	const [selectedDeviceModel, setSelectedDeviceModel] = useState<string | null>(
 		null,
 	)
@@ -79,9 +84,7 @@ export function SensorSelectionStep() {
 	const sensorGroups = groupSensorsByType(sensors)
 
 	const isSensorSelected = (sensor: Sensor) =>
-		selectedSensors.some(
-			(s) => s.title === sensor.title && s.sensorType === sensor.sensorType,
-		)
+		selectedSensors.some((selected) => selected.id === sensor.id)
 
 	const isGroupFullySelected = (group: SensorGroup) =>
 		group.sensors.every((sensor) => isSensorSelected(sensor))
@@ -93,18 +96,49 @@ export function SensorSelectionStep() {
 	const getSelectedCountForGroup = (group: SensorGroup) =>
 		group.sensors.filter((sensor) => isSensorSelected(sensor)).length
 
+	const getSensorLabels = (sensorDefinitionIds: string[]) =>
+		sensorDefinitionIds.map((sensorDefinitionId) => {
+			const sensor = sensors.find(
+				(candidate) => candidate.id === sensorDefinitionId,
+			)
+			return sensor
+				? `${sensor.sensorType}: ${sensor.title}`
+				: sensorDefinitionId
+		})
+
+	const updateSelectedSensors = (updatedSensors: Sensor[]) => {
+		const sensorDefinitionIds = updatedSensors.flatMap((sensor) =>
+			sensor.id ? [sensor.id] : [],
+		)
+		const conflict = findSensorTemplateMappingConflict(
+			selectedDevice,
+			sensorDefinitionIds,
+		)
+
+		if (conflict) {
+			toast({
+				title: t('sensor_mapping_conflict_title'),
+				description: t('sensor_mapping_conflict_description', {
+					sensors: getSensorLabels(conflict.sensorDefinitionIds).join(', '),
+					valueType: conflict.valueType,
+				}),
+				variant: 'destructive',
+			})
+			return
+		}
+
+		setSelectedSensors(updatedSensors)
+		setValue('selectedSensors', updatedSensors)
+	}
+
 	const handleSensorToggle = (sensor: Sensor) => {
 		const isAlreadySelected = isSensorSelected(sensor)
 
 		const updatedSensors = isAlreadySelected
-			? selectedSensors.filter(
-					(s) =>
-						!(s.title === sensor.title && s.sensorType === sensor.sensorType),
-				)
+			? selectedSensors.filter((selected) => selected.id !== sensor.id)
 			: [...selectedSensors, sensor]
 
-		setSelectedSensors(updatedSensors)
-		setValue('selectedSensors', updatedSensors)
+		updateSelectedSensors(updatedSensors)
 	}
 
 	const handleGroupToggle = (group: SensorGroup) => {
@@ -112,19 +146,18 @@ export function SensorSelectionStep() {
 
 		const updatedSensors = isFullySelected
 			? selectedSensors.filter(
-					(s) =>
-						!group.sensors.some(
-							(sensor) =>
-								s.title === sensor.title && s.sensorType === sensor.sensorType,
-						),
+					(selected) =>
+						!group.sensors.some((sensor) => selected.id === sensor.id),
 				)
 			: [
-					...selectedSensors,
-					...group.sensors.filter((sensor) => !isSensorSelected(sensor)),
+					...selectedSensors.filter(
+						(selected) =>
+							!group.sensors.some((sensor) => selected.id === sensor.id),
+					),
+					...group.sensors,
 				]
 
-		setSelectedSensors(updatedSensors)
-		setValue('selectedSensors', updatedSensors)
+		updateSelectedSensors(updatedSensors)
 	}
 
 	if (!selectedDevice) {
@@ -148,8 +181,7 @@ export function SensorSelectionStep() {
 						type="button"
 						className="text-destructive text-sm hover:underline"
 						onClick={() => {
-							setSelectedSensors([])
-							setValue('selectedSensors', [])
+							updateSelectedSensors([])
 						}}
 					>
 						{t('clear_all')}
@@ -230,11 +262,11 @@ export function SensorSelectionStep() {
 										<div className="border-muted ml-2 space-y-2 border-l-2 pl-4">
 											{group.sensors.map((sensor) => {
 												const isSelected = isSensorSelected(sensor)
-												const sensorId = `sensor-${group.sensorType}-${sensor.title}`
+												const sensorId = `sensor-${sensor.id}`
 
 												return (
 													<div
-														key={sensor.title}
+														key={sensor.id}
 														className={cn(
 															'flex items-center space-x-3 rounded-md p-2 transition-colors',
 															isSelected
