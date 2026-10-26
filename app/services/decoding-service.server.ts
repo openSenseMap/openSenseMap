@@ -1,7 +1,7 @@
 import {
 	type DecoderValueMapping,
-	sensorDefinitions,
-} from '~/lib/sensor-definitions'
+	sensorCommunityDecoderMappings,
+} from '~/lib/sensor-community-mappings'
 
 type SensorLike = {
 	id: string
@@ -50,6 +50,59 @@ function getSensorDefinitionId(sensor: SensorLike): string | undefined {
 	return typeof sensorDefinitionId === 'string' ? sensorDefinitionId : undefined
 }
 
+function matchesDecoratedTitle(title: string, alias: string): boolean {
+	// Preserve legacy compound words such as "Lufttemperatur", while keeping
+	// numeric aliases such as NC1 from matching longer values such as NC10.
+	if (!/\d/.test(alias)) return title.includes(alias)
+
+	const escapedAlias = alias.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+	return new RegExp(
+		`(?:^|[^\\p{L}\\p{N}.])${escapedAlias}(?=$|[^\\p{L}\\p{N}.])`,
+		'u',
+	).test(title)
+}
+
+function findUniqueSensorIdByTitle(
+	sensors: SensorLike[],
+	exactAliases: readonly string[],
+	decoratedAliases: readonly string[],
+	ambiguityWarning: string,
+): string | undefined {
+	const normalizedExactAliases = new Set(
+		exactAliases.map((alias) => alias.toLowerCase()),
+	)
+	const normalizedDecoratedAliases = Array.from(
+		new Set(decoratedAliases.map((alias) => alias.toLowerCase())),
+	)
+	const titledSensors = sensors.filter(
+		(sensor): sensor is SensorLike & { title: string } =>
+			Boolean(sensor.id) && Boolean(sensor.title),
+	)
+	const exactMatches = titledSensors.filter((sensor) =>
+		normalizedExactAliases.has(sensor.title.toLowerCase()),
+	)
+
+	if (exactMatches.length > 1) {
+		console.warn(ambiguityWarning)
+		return undefined
+	}
+	if (exactMatches.length === 1) return exactMatches[0].id
+
+	const decoratedMatches = titledSensors.filter((sensor) => {
+		const title = sensor.title.toLowerCase()
+		return normalizedDecoratedAliases.some((alias) =>
+			matchesDecoratedTitle(title, alias),
+		)
+	})
+
+	if (decoratedMatches.length > 1) {
+		console.warn(ambiguityWarning)
+		return undefined
+	}
+
+	return decoratedMatches[0]?.id
+}
+
 function findLuftdatenSensorIdByTitle(
 	sensors: SensorLike[],
 	value_type: string,
@@ -95,32 +148,12 @@ function findLuftdatenSensorIdByTitle(
 		return sensor.sensorType.toLowerCase().startsWith(vt_sensortype)
 	})
 
-	const exactMatches = compatibleSensors.filter((sensor) => {
-		const title = sensor.title!.toLowerCase()
-		return title === vt_phenomenon || aliases.includes(title)
-	})
-
-	if (exactMatches.length > 1) {
-		console.warn(
-			`Ambiguous Luftdaten sensor mapping for value type ${value_type}`,
-		)
-		return undefined
-	}
-	if (exactMatches.length === 1) return exactMatches[0].id
-
-	const substringMatches = compatibleSensors.filter((sensor) => {
-		const title = sensor.title!.toLowerCase()
-		return aliases.some((alias) => title.includes(alias))
-	})
-
-	if (substringMatches.length > 1) {
-		console.warn(
-			`Ambiguous Luftdaten sensor mapping for value type ${value_type}`,
-		)
-		return undefined
-	}
-
-	return substringMatches[0]?.id
+	return findUniqueSensorIdByTitle(
+		compatibleSensors,
+		[vt_phenomenon, ...aliases],
+		aliases,
+		`Ambiguous Luftdaten sensor mapping for value type ${value_type}`,
+	)
 }
 
 type LuftdatenSensorMapping = {
@@ -128,30 +161,50 @@ type LuftdatenSensorMapping = {
 	mapping: DecoderValueMapping
 }
 
+type LuftdatenRouteIndex = {
+	definitionRoutes: Map<string, LuftdatenSensorMapping[]>
+	legacySensors: SensorLike[]
+}
+
+function buildLuftdatenRouteIndex(sensors: SensorLike[]): LuftdatenRouteIndex {
+	const definitionRoutes = new Map<string, LuftdatenSensorMapping[]>()
+	const legacySensors: SensorLike[] = []
+	const decoderMappings = sensorCommunityDecoderMappings as Record<
+		string,
+		readonly DecoderValueMapping[] | undefined
+	>
+
+	for (const sensor of sensors) {
+		const definitionId = getSensorDefinitionId(sensor)
+		const hasAuthoritativeMapping =
+			definitionId !== undefined &&
+			Object.prototype.hasOwnProperty.call(decoderMappings, definitionId)
+
+		if (!definitionId || !hasAuthoritativeMapping) {
+			legacySensors.push(sensor)
+			continue
+		}
+
+		for (const mapping of decoderMappings[definitionId] ?? []) {
+			const normalizedValueType = mapping.valueType.toLowerCase()
+			const routes = definitionRoutes.get(normalizedValueType) ?? []
+			routes.push({ sensorId: sensor.id, mapping })
+			definitionRoutes.set(normalizedValueType, routes)
+		}
+	}
+
+	return { definitionRoutes, legacySensors }
+}
+
 function findLuftdatenSensorMapping(
-	sensors: SensorLike[],
+	routeIndex: LuftdatenRouteIndex,
 	valueType: string,
 ): LuftdatenSensorMapping | undefined {
 	const normalizedValueType = valueType?.toLowerCase()
 	if (!normalizedValueType) return undefined
 
-	const definitionMatches = sensors.flatMap<LuftdatenSensorMapping>(
-		(sensor) => {
-			const definitionId = getSensorDefinitionId(sensor)
-			if (!definitionId || !(definitionId in sensorDefinitions)) return []
-
-			const definition =
-				sensorDefinitions[definitionId as keyof typeof sensorDefinitions]
-			if (!('decoderMappings' in definition)) return []
-
-			const mapping = definition.decoderMappings.luftdaten?.find(
-				(candidate) =>
-					candidate.valueType.toLowerCase() === normalizedValueType,
-			)
-
-			return mapping ? [{ sensorId: sensor.id, mapping }] : []
-		},
-	)
+	const definitionMatches =
+		routeIndex.definitionRoutes.get(normalizedValueType) ?? []
 
 	if (definitionMatches.length > 1) {
 		console.warn(
@@ -161,10 +214,10 @@ function findLuftdatenSensorMapping(
 	}
 	if (definitionMatches.length === 1) return definitionMatches[0]
 
-	const legacySensors = sensors.filter(
-		(sensor) => getSensorDefinitionId(sensor) === undefined,
+	const legacySensorId = findLuftdatenSensorIdByTitle(
+		routeIndex.legacySensors,
+		valueType,
 	)
-	const legacySensorId = findLuftdatenSensorIdByTitle(legacySensors, valueType)
 	return legacySensorId
 		? { sensorId: legacySensorId, mapping: { valueType } }
 		: undefined
@@ -188,32 +241,12 @@ function findHackairSensorId(
 
 	if (!hackairMatchings[vt_sensortype]) return undefined
 
-	const aliases = hackairMatchings[vt_sensortype]
-	const titledSensors = sensors.filter(
-		(sensor) => Boolean(sensor?.id) && Boolean(sensor.title),
+	return findUniqueSensorIdByTitle(
+		sensors,
+		[vt_sensortype, ...hackairMatchings[vt_sensortype]],
+		hackairMatchings[vt_sensortype],
+		`Ambiguous hackAIR sensor mapping for key ${readingKey}`,
 	)
-	const exactMatches = titledSensors.filter((sensor) => {
-		const title = sensor.title!.toLowerCase()
-		return title === vt_sensortype || aliases.includes(title)
-	})
-
-	if (exactMatches.length > 1) {
-		console.warn(`Ambiguous hackAIR sensor mapping for key ${readingKey}`)
-		return undefined
-	}
-	if (exactMatches.length === 1) return exactMatches[0].id
-
-	const substringMatches = titledSensors.filter((sensor) => {
-		const title = sensor.title!.toLowerCase()
-		return aliases.some((alias) => title.includes(alias))
-	})
-
-	if (substringMatches.length > 1) {
-		console.warn(`Ambiguous hackAIR sensor mapping for key ${readingKey}`)
-		return undefined
-	}
-
-	return substringMatches[0]?.id
 }
 
 function parseLocation(
@@ -356,10 +389,11 @@ const decodeHandlers: {
 
 			const createdAt = new Date()
 			const destinationSensorIds = new Set<string>()
+			const routeIndex = buildLuftdatenRouteIndex(sensors)
 			const out = []
 
 			for (const sdv of body.sensordatavalues) {
-				const resolved = findLuftdatenSensorMapping(sensors, sdv.value_type)
+				const resolved = findLuftdatenSensorMapping(routeIndex, sdv.value_type)
 				if (!resolved) continue
 
 				const rawValue = parseFloat(sdv.value)
