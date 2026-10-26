@@ -8,10 +8,7 @@ export type DecoderValueMapping = {
 /**
  * Maps stable sensor-definition IDs to values emitted by the
  * Sensor.Community (formerly Luftdaten) payload format.
- *
- * This is intentionally separate from the presentation-oriented sensor
- * catalog: adding a sensor definition must not expose it through the generic
- * Sensor.Community model or make it eligible for decoder routing by accident.
+ * (https://github.com/opendata-stuttgart/sensors-software/blob/e43cf8fde5b60c555c143ec358aee884418ff82e/airrohr-firmware/airrohr-firmware.ino)
  */
 export const sensorCommunityDecoderMappings = {
 	dht22_temperature: [
@@ -47,6 +44,10 @@ export const sensorCommunityDecoderMappings = {
 	sps30_nc25: [{ valueType: 'SPS30_N25' }],
 	sps30_nc4: [{ valueType: 'SPS30_N4' }],
 	sps30_nc10: [{ valueType: 'SPS30_N10' }],
+	// The Leusden SEN55 firmware defaults to emulating PM/NC values as SPS30
+	// and temperature/humidity values as SHT3X for openSenseMap and
+	// Sensor.Community compatibility. 
+	// https://github.com/FijnStofGroep/sensors-software-Leusden
 	sen55_pm1: [
 		{ valueType: 'SPS30_P0' },
 		{ valueType: 'SEN5X_P0' },
@@ -119,7 +120,7 @@ export const sensorCommunityDecoderMappings = {
 	],
 	dht11_humidity: [{ valueType: 'humidity' }, { valueType: 'DHT11_humidity' }],
 	pms3003_pm10: [{ valueType: 'PMS_P1' }],
-	dnms_la_eq: [{ valueType: 'DNMS_noise_LAeq' }],
+	dnms_la_eq: [{ valueType: 'DNMS_noise_LAeq' }], 
 } as const satisfies Partial<
 	Record<SensorDefinitionId, readonly DecoderValueMapping[]>
 >
