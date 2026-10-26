@@ -65,16 +65,10 @@ export async function loader({ request, params }: Route.LoaderArgs) {
 
 		const schemaData = await schemaRes.json()
 
-		if (!integrationRes.ok && integrationRes.status !== 404) {
-			throw new Response(
-				`Failed to load ${intg.name} integration (upstream status ${integrationRes.status})`,
-				{ status: 502 },
-			)
+		let existingIntegration = null
+		if (integrationRes.ok) {
+			existingIntegration = await integrationRes.json()
 		}
-
-		const existingIntegration = integrationRes.ok
-			? await integrationRes.json()
-			: null
 
 		return {
 			intg: {
@@ -88,8 +82,6 @@ export async function loader({ request, params }: Route.LoaderArgs) {
 		}
 	} catch (error) {
 		console.error(`Error loading ${intg.name} integration:`, error)
-		if (error instanceof Response) throw error
-
 		throw new Response(`Failed to load ${intg.name} integration`, {
 			status: 500,
 		})

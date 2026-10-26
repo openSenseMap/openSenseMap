@@ -6,7 +6,6 @@ import { type FieldErrors, FormProvider, useForm } from 'react-hook-form'
 import { useTranslation } from 'react-i18next'
 import {
 	Form,
-	Link,
 	useActionData,
 	useLoaderData,
 	useNavigation,
@@ -129,8 +128,6 @@ export default function NewDeviceStepper() {
 	const navigation = useNavigation()
 	const actionData = useActionData<typeof action>()
 	const isSubmitting = navigation.state !== 'idle'
-	const integrationCreationFailed =
-		actionData?.error === 'integration_creation_failed'
 
 	useEffect(() => {
 		setIsFirst(stepper.isFirst)
@@ -140,23 +137,8 @@ export default function NewDeviceStepper() {
 		if (!actionData || actionData.ok) return
 
 		toast({
-			title: t(
-				actionData.error === 'integration_creation_failed'
-					? 'integration_creation_error'
-					: 'device_creation_error',
-			),
-			description: t(
-				actionData.error === 'integration_creation_failed' &&
-					actionData.failedIntegrations.length === 0
-					? 'integration_creation_failed_unknown'
-					: actionData.error,
-				{
-					integrations:
-						actionData.error === 'integration_creation_failed'
-							? actionData.failedIntegrations.join(', ')
-							: undefined,
-				},
-			),
+			title: t('device_creation_error'),
+			description: t(actionData.error),
 			variant: 'destructive',
 		})
 	}, [actionData, t, toast])
@@ -306,19 +288,13 @@ export default function NewDeviceStepper() {
 						>
 							{t('back')}
 						</Button>
-						{integrationCreationFailed ? (
-							<Button asChild>
-								<Link to="/profile/me">{t('go_to_profile')}</Link>
-							</Button>
-						) : (
-							<Button type="submit" disabled={isSubmitting}>
-								{isSubmitting
-									? t('submitting')
-									: stepper.isLast
-										? t('complete')
-										: t('next')}
-							</Button>
-						)}
+						<Button type="submit" disabled={isSubmitting}>
+							{isSubmitting
+								? t('submitting')
+								: stepper.isLast
+									? t('complete')
+									: t('next')}
+						</Button>
 					</div>
 				</Form>
 			</FormProvider>
