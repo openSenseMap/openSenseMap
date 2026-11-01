@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Outlet, useLoaderData, useMatches } from 'react-router'
+import { Outlet, useMatches } from 'react-router'
 import { type Route } from './+types/explore.$deviceId'
 import DeviceDetailBox from '~/components/device-detail/device-detail-box'
 import { HoveredPointContext } from '~/components/map/layers/mobile/mobile-box-layer'
@@ -78,9 +78,7 @@ export async function loader({ context, params, request }: Route.LoaderArgs) {
 }
 
 // Defining the component that will render the page
-export default function DeviceId() {
-	// Retrieving the data returned by the loader using the useLoaderData hook
-	const data = useLoaderData<typeof loader>()
+export default function DeviceId({ loaderData: data }: Route.ComponentProps) {
 	const matches = useMatches()
 	const isSensorView = matches[matches.length - 1].params.sensorId
 		? true

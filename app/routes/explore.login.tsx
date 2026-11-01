@@ -5,10 +5,8 @@ import {
 	redirect,
 	Form,
 	Link,
-	useActionData,
 	useNavigation,
 	useSearchParams,
-	useLoaderData,
 } from 'react-router'
 import { type Route } from './+types/explore.login'
 import { Input } from '@/components/ui/input'
@@ -110,10 +108,11 @@ export async function action({ request }: Route.ActionArgs) {
 	})
 }
 
-export default function LoginPage() {
+export default function LoginPage({
+	loaderData,
+	actionData,
+}: Route.ComponentProps) {
 	const [searchParams] = useSearchParams()
-	const loaderData = useLoaderData<typeof loader>()
-	const actionData = useActionData<typeof action>()
 	const identifierRef = React.useRef<HTMLInputElement>(null)
 	const passwordRef = React.useRef<HTMLInputElement>(null)
 
