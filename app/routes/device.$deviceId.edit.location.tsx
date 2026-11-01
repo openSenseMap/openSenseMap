@@ -29,6 +29,7 @@ import {
 	AUTOSAVE_DELAY_MS,
 } from '~/hooks/use-autosave-fetcher'
 import { AutosaveStatusText } from '~/components/autosave-status.text'
+import { UnsavedChangesBlocker } from '~/components/unsaved-changes-blocker'
 import Spinner from '~/components/spinner'
 import { useTerrainElevation } from '~/hooks/use-terrain-elevation'
 import {
@@ -455,6 +456,7 @@ export default function EditLocation() {
 
 	return (
 		<div className="grid grid-rows-1">
+			<UnsavedChangesBlocker when={autosave.shouldBlockNavigation} />
 			<div className="flex min-h-full items-center justify-center">
 				<div className="font-helvetica mx-auto w-full text-[14px]">
 					<div>
