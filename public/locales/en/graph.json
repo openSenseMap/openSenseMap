@@ -12,6 +12,7 @@
 	"reset_zoom": "Reset zoom",
 	"connect_points": "Connect points",
 	"disconnect_points": "Show points",
+	"loading_graph": "Loading graph…",
 	"dateRanges": {
 		"last-30-minutes": "Last 30 minutes",
 		"last-1-hour": "Last 1 hour",

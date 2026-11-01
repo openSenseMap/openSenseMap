@@ -1,6 +1,7 @@
 {
 	"reset": "Reset",
 	"apply": "Apply",
+	"applying_filters": "Applying filters…",
 	"date_and_time": "Date & time",
 	"date": "Date",
 	"timespan": "Time range",

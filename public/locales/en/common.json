@@ -11,5 +11,7 @@
 	"go_back": "Go back",
 	"go_home": "Go home",
 	"try_again": "Try again",
-	"map_cluster_marker_label": "Zoom into a cluster of {{total}} devices: {{active}} active, {{inactive}} inactive, {{old}} old."
+	"map_cluster_marker_label": "Zoom into a cluster of {{total}} devices: {{active}} active, {{inactive}} inactive, {{old}} old.",
+	"loading_device": "Loading device…",
+	"updating_map_results": "Updating map results…"
 }

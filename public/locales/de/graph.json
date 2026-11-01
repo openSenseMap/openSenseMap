@@ -12,6 +12,7 @@
 	"reset_zoom": "Zoom zurücksetzen",
 	"connect_points": "Punkte verbinden",
 	"disconnect_points": "Punkte anzeigen",
+	"loading_graph": "Diagramm wird geladen…",
 	"dateRanges": {
 		"last-30-minutes": "Letzte 30 Minuten",
 		"last-1-hour": "Letzte Stunde",
