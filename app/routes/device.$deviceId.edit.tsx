@@ -11,8 +11,15 @@ import {
 	ArrowLeft,
 	NotepadText,
 } from 'lucide-react'
-import { useState } from 'react'
-import { redirect, Link, Outlet, useParams, useLoaderData } from 'react-router'
+import { useState, ViewTransition } from 'react'
+import {
+	redirect,
+	Link,
+	Outlet,
+	useParams,
+	useLoaderData,
+	useLocation,
+} from 'react-router'
 import { type Route } from './+types/device.$deviceId.edit'
 import { EditDeviceSidebarNav } from '~/components/mydevices/edit-device/edit-device-sidebar-nav'
 import { NavBar } from '~/components/nav-bar'
@@ -42,6 +49,7 @@ export async function action() {
 export default function EditBox() {
 	const [toastOpen, setToastOpen] = useState(false)
 	const { t } = useTranslation('device-overview')
+	const { pathname } = useLocation()
 
 	const { integrations } = useLoaderData<typeof loader>()
 
@@ -181,9 +189,16 @@ export default function EditBox() {
 					<EditDeviceSidebarNav items={sidebarNavItems} />
 				</aside>
 
-				<main className="min-w-0 flex-1">
-					<Outlet context={[setToastOpen]} />
-				</main>
+				<ViewTransition
+					key={pathname}
+					default="none"
+					enter="nested-route-section"
+					exit="nested-route-section"
+				>
+					<main className="min-w-0 flex-1">
+						<Outlet context={[setToastOpen]} />
+					</main>
+				</ViewTransition>
 			</div>
 		</div>
 	)

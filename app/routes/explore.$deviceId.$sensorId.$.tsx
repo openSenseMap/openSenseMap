@@ -1,4 +1,5 @@
 import { addDays } from 'date-fns'
+import { ViewTransition } from 'react'
 import { redirect, useLoaderData } from 'react-router'
 import { type Route } from './+types/explore.$deviceId.$sensorId.$'
 import Graph from '~/components/device-detail/graph'
@@ -215,12 +216,18 @@ export default function SensorView() {
 
 	return (
 		<>
-			<Graph
-				aggregation={loaderData.aggregation}
-				sensors={loaderData.sensors}
-				startDate={loaderData.startDate ?? undefined}
-				endDate={loaderData.endDate ?? undefined}
-			/>
+			<ViewTransition
+				default="none"
+				enter="explore-graph-panel"
+				exit="explore-graph-panel"
+			>
+				<Graph
+					aggregation={loaderData.aggregation}
+					sensors={loaderData.sensors}
+					startDate={loaderData.startDate ?? undefined}
+					endDate={loaderData.endDate ?? undefined}
+				/>
+			</ViewTransition>
 			{loaderData.device?.exposure === 'mobile' && (
 				<MobileBoxView sensors={loaderData.sensors} />
 			)}
