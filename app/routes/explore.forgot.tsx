@@ -101,7 +101,7 @@ export default function ForgotPasswordPage() {
 					<div className="w-full max-w-md rounded-md bg-white p-6 text-center shadow-lg">
 						<h2 className="mb-4 text-2xl font-bold">{t('request_sent')}</h2>
 						<p className="mb-6">{t('request_sent_description')}</p>
-						<Link to="/explore/login">
+						<Link to="/explore/login" prefetch="intent">
 							<Button className="bg-light-blue w-full">
 								{t('back_to_login')}
 							</Button>
@@ -150,6 +150,7 @@ export default function ForgotPasswordPage() {
 											pathname: '/explore/login',
 											search: searchParams.toString(),
 										}}
+										prefetch="intent"
 									>
 										{t('login_label')}
 									</Link>

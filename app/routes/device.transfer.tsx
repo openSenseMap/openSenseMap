@@ -64,7 +64,9 @@ export default function DeviceTransfer() {
 			<div className="font-helvetica mx-auto max-w-5xl space-y-6 p-4 pb-14 sm:p-6 sm:pb-14 lg:p-10 lg:pb-14">
 				<div className="rounded text-[#676767]">
 					<ArrowLeft className="mr-2 inline h-5 w-5" />
-					<Link to="/profile/me">{t('back_to_dashboard')}</Link>
+					<Link to="/profile/me" prefetch="intent">
+						{t('back_to_dashboard')}
+					</Link>
 				</div>
 
 				<div className="space-y-0.5">
