@@ -1,4 +1,5 @@
 import { useTranslation } from 'react-i18next'
+import { ViewTransition } from 'react'
 import { Link, Outlet, useLocation } from 'react-router'
 import { NavBar } from '~/components/nav-bar'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '~/components/ui/tabs'
@@ -39,9 +40,16 @@ export default function SettingsLayoutPage() {
 								</TabsTrigger>
 							</TabsList>
 						</div>
-						<TabsContent className="mt-6" value={currentTab}>
-							<Outlet />
-						</TabsContent>
+						<ViewTransition
+							key={currentTab}
+							default="none"
+							enter="nested-route-section"
+							exit="nested-route-section"
+						>
+							<TabsContent className="mt-6" value={currentTab}>
+								<Outlet />
+							</TabsContent>
+						</ViewTransition>
 					</Tabs>
 				</div>
 			</div>

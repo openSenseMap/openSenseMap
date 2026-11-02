@@ -5,6 +5,44 @@
 
 @custom-variant dark (&:where(.dark, .dark *));
 
+@keyframes nested-route-section-out {
+	from {
+		opacity: 1;
+		transform: translateY(0);
+	}
+	to {
+		opacity: 0;
+		transform: translateY(-0.25rem);
+	}
+}
+
+@keyframes nested-route-section-in {
+	from {
+		opacity: 0;
+		transform: translateY(0.25rem);
+	}
+	to {
+		opacity: 1;
+		transform: translateY(0);
+	}
+}
+
+::view-transition-old(.nested-route-section) {
+	animation: 120ms ease-in both nested-route-section-out;
+}
+
+::view-transition-new(.nested-route-section) {
+	animation: 180ms ease-out both nested-route-section-in;
+}
+
+@media (prefers-reduced-motion: reduce) {
+	::view-transition-group(.nested-route-section),
+	::view-transition-old(.nested-route-section),
+	::view-transition-new(.nested-route-section) {
+		animation: none !important;
+	}
+}
+
 @utility container {
 	margin-inline: auto;
 	padding-inline: 2rem;
