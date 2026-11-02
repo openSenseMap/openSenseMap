@@ -18,13 +18,16 @@ import { PasswordInput } from '@/components/ui/password-input'
 import Spinner from '~/components/spinner'
 import { Button } from '~/components/ui/button'
 import {
-	Card,
 	CardContent,
 	CardDescription,
 	CardFooter,
 	CardHeader,
 	CardTitle,
 } from '~/components/ui/card'
+import {
+	ExploreAuthOverlayBackdrop,
+	ExploreAuthOverlayCard,
+} from '~/components/explore-auth-overlay'
 import { getCurrentEffectiveTos } from '~/db/models/tos.server'
 import { getUserByEmail, getUserByUsername } from '~/db/models/user.server'
 import { getLocale } from '~/middleware/i18next'
@@ -248,15 +251,13 @@ export default function RegisterDialog() {
 	) {
 		return (
 			<div className="relative flex h-full w-full items-start justify-center overflow-y-auto p-4 sm:items-center">
-				<Link
+				<ExploreAuthOverlayBackdrop
 					to={{
 						pathname: '/explore',
 						search: searchParams.toString(),
 					}}
-				>
-					<div className="absolute inset-0 z-40 h-full w-full bg-black opacity-25" />
-				</Link>
-				<Card className="relative z-50 my-auto w-full max-w-md min-w-0">
+				/>
+				<ExploreAuthOverlayCard className="relative z-50 my-auto w-full max-w-md min-w-0">
 					<CardHeader>
 						<CardTitle className="text-2xl font-bold">
 							{t('account_created')}
@@ -272,22 +273,20 @@ export default function RegisterDialog() {
 							</Button>
 						</Link>
 					</CardFooter>
-				</Card>
+				</ExploreAuthOverlayCard>
 			</div>
 		)
 	}
 
 	return (
 		<div className="relative flex h-full w-full items-start justify-center overflow-y-auto p-4 sm:items-center">
-			<Link
+			<ExploreAuthOverlayBackdrop
 				to={{
 					pathname: '/explore',
 					search: searchParams.toString(),
 				}}
-			>
-				<div className="absolute inset-0 z-40 h-full w-full bg-black opacity-25" />
-			</Link>
-			<Card className="relative z-50 my-auto w-full max-w-md min-w-0">
+			/>
+			<ExploreAuthOverlayCard className="relative z-50 my-auto w-full max-w-md min-w-0">
 				{navigation.state === 'loading' && (
 					<div className="absolute inset-0 z-50 flex items-center justify-center bg-white/30 backdrop-blur-xs dark:bg-zinc-800/30">
 						<Spinner />
@@ -428,7 +427,7 @@ export default function RegisterDialog() {
 						</div>
 					</CardFooter>
 				</Form>
-			</Card>
+			</ExploreAuthOverlayCard>
 		</div>
 	)
 }

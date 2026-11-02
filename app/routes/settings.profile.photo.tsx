@@ -139,6 +139,10 @@ export default function PhotoChooserModal() {
 				onEscapeKeyDown={dismissModal}
 				onPointerDownOutside={dismissModal}
 				className="dark:border-dark-border dark:bg-dark-background dark:text-dark-text"
+				viewTransitionClasses={{
+					content: 'profile-photo-dialog',
+					overlay: 'profile-photo-dialog-backdrop',
+				}}
 			>
 				<DialogHeader>
 					<DialogTitle>{t('profile_photo')}</DialogTitle>

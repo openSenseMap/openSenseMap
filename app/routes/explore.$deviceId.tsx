@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, ViewTransition } from 'react'
 import { Outlet, useLoaderData, useMatches } from 'react-router'
 import { type Route } from './+types/explore.$deviceId'
 import DeviceDetailBox from '~/components/device-detail/device-detail-box'
@@ -106,7 +106,14 @@ export default function DeviceId() {
 							}))}
 						/>
 					)}
-				<DeviceDetailBox />
+				<ViewTransition
+					key={data.device?.id}
+					default="none"
+					enter="explore-device-panel"
+					exit="explore-device-panel"
+				>
+					<DeviceDetailBox />
+				</ViewTransition>
 				<Outlet />
 			</HoveredPointContext.Provider>
 		</>

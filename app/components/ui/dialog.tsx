@@ -41,28 +41,73 @@ const DialogContent = React.forwardRef<
 	React.ElementRef<typeof DialogPrimitive.Content>,
 	React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content> & {
 		hideClose?: boolean
+		viewTransitionClasses?: {
+			content: string
+			overlay?: string
+		}
 	}
->(({ className, children, hideClose, ...props }, ref) => (
-	<DialogPortal>
-		<DialogOverlay />
-		<DialogPrimitive.Content
-			ref={ref}
-			className={cn(
-				'bg-background animate-in data-[state=open]:fade-in-90 data-[state=open]:slide-in-from-bottom-10 sm:zoom-in-90 sm:data-[state=open]:slide-in-from-bottom-0 fixed z-50 grid max-h-[calc(100dvh-2rem)] w-[calc(100%-2rem)] gap-4 overflow-y-auto overscroll-contain rounded-lg border p-6 shadow-lg sm:max-w-lg',
-				className,
-			)}
-			{...props}
-		>
-			{children}
-			{!hideClose && (
-				<DialogPrimitive.Close className="ring-offset-background focus:ring-ring data-[state=open]:bg-accent data-[state=open]:text-muted-foreground absolute top-1 right-1 inline-flex size-11 touch-manipulation items-center justify-center rounded-sm opacity-70 transition-opacity hover:opacity-100 focus:ring-2 focus:ring-offset-2 focus:outline-hidden disabled:pointer-events-none">
-					<X className="h-4 w-4" />
-					<span className="sr-only">Close</span>
-				</DialogPrimitive.Close>
-			)}
-		</DialogPrimitive.Content>
-	</DialogPortal>
-))
+>(
+	(
+		{ className, children, hideClose, style, viewTransitionClasses, ...props },
+		ref,
+	) => {
+		const overlay = (
+			<DialogOverlay
+				style={
+					viewTransitionClasses?.overlay
+						? { animation: 'none', transition: 'none' }
+						: undefined
+				}
+			/>
+		)
+		const content = (
+			<DialogPrimitive.Content
+				ref={ref}
+				className={cn(
+					'bg-background animate-in data-[state=open]:fade-in-90 data-[state=open]:slide-in-from-bottom-10 sm:zoom-in-90 sm:data-[state=open]:slide-in-from-bottom-0 fixed z-50 grid max-h-[calc(100dvh-2rem)] w-[calc(100%-2rem)] gap-4 overflow-y-auto overscroll-contain rounded-lg border p-6 shadow-lg sm:max-w-lg',
+					className,
+				)}
+				style={viewTransitionClasses ? { ...style, animation: 'none' } : style}
+				{...props}
+			>
+				{children}
+				{!hideClose && (
+					<DialogPrimitive.Close className="ring-offset-background focus:ring-ring data-[state=open]:bg-accent data-[state=open]:text-muted-foreground absolute top-1 right-1 inline-flex size-11 touch-manipulation items-center justify-center rounded-sm opacity-70 transition-opacity hover:opacity-100 focus:ring-2 focus:ring-offset-2 focus:outline-hidden disabled:pointer-events-none">
+						<X className="h-4 w-4" />
+						<span className="sr-only">Close</span>
+					</DialogPrimitive.Close>
+				)}
+			</DialogPrimitive.Content>
+		)
+
+		return (
+			<DialogPortal>
+				{viewTransitionClasses?.overlay ? (
+					<React.ViewTransition
+						default="none"
+						enter={viewTransitionClasses.overlay}
+						exit={viewTransitionClasses.overlay}
+					>
+						{overlay}
+					</React.ViewTransition>
+				) : (
+					overlay
+				)}
+				{viewTransitionClasses ? (
+					<React.ViewTransition
+						default="none"
+						enter={viewTransitionClasses.content}
+						exit={viewTransitionClasses.content}
+					>
+						{content}
+					</React.ViewTransition>
+				) : (
+					content
+				)}
+			</DialogPortal>
+		)
+	},
+)
 DialogContent.displayName = DialogPrimitive.Content.displayName
 
 const DialogHeader = ({
