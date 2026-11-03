@@ -11,7 +11,10 @@ describe('Sentry privacy controls', () => {
 		expect(sentryPrivacyOptions.dataCollection).toMatchObject({
 			userInfo: false,
 			cookies: false,
-			httpHeaders: false,
+			httpHeaders: {
+				request: { allow: ['accept', 'content-type'] },
+				response: { allow: ['content-type', 'content-length'] },
+			},
 			httpBodies: [],
 			urlQueryParams: false,
 			graphQL: { document: false, variables: false },
@@ -24,27 +27,29 @@ describe('Sentry privacy controls', () => {
 		expect(sentryPrivacyOptions.maxBreadcrumbs).toBe(0)
 	})
 
-	test('keeps useful error details while removing request and stack data', () => {
+	test('redacts error text and stack filenames without removing SDK-managed context', () => {
 		const event = sanitizeSentryEvent({
 			message: 'Failure for person@example.org',
-			user: { id: 'user-123', email: 'person@example.org' },
+			user: { id: 'user-123' },
 			request: {
 				method: 'post',
-				url: 'https://example.org/device/secret?token=secret',
-				headers: { authorization: 'Bearer secret' },
-				data: { email: 'person@example.org' },
+				url: 'https://example.org/device/device-123',
+				headers: { accept: 'application/json' },
 			},
-			extra: { token: 'secret' },
+			extra: { retryCount: 2 },
+			breadcrumbs: [{ message: 'Opened settings' }],
 			exception: {
 				values: [
 					{
 						value: 'Could not save person@example.org',
+						mechanism: { data: { source: 'react-router' } },
 						stacktrace: {
 							frames: [
 								{
-									filename: 'app.js?token=secret',
+									filename: 'app.js?token=secret#source',
 									abs_path: '/home/private/app.js',
-									vars: { token: 'secret' },
+									context_line: 'throw new Error()',
+									vars: { attempt: 2 },
 								},
 							],
 						},
@@ -53,19 +58,30 @@ describe('Sentry privacy controls', () => {
 			},
 		})
 
-		expect(event.request).toEqual({ method: 'POST' })
+		expect(event.request).toEqual({
+			method: 'post',
+			url: 'https://example.org/device/device-123',
+			headers: { accept: 'application/json' },
+		})
 		expect(event.message).toBe('Failure for [Filtered email]')
 		expect(event.exception?.values?.[0]?.value).toBe(
 			'Could not save [Filtered email]',
 		)
+		expect(event.exception?.values?.[0]?.mechanism).toEqual({
+			data: { source: 'react-router' },
+		})
 		expect(event.exception?.values?.[0]?.stacktrace?.frames?.[0]).toEqual({
 			filename: 'app.js',
+			abs_path: '/home/private/app.js',
+			context_line: 'throw new Error()',
+			vars: { attempt: 2 },
 		})
-		expect(event).not.toHaveProperty('user')
-		expect(event).not.toHaveProperty('extra')
+		expect(event.user).toEqual({ id: 'user-123' })
+		expect(event.extra).toEqual({ retryCount: 2 })
+		expect(event.breadcrumbs).toEqual([{ message: 'Opened settings' }])
 	})
 
-	test('keeps new structured logs without maintaining message allowlists', () => {
+	test('filters sensitive values while retaining operational attributes', () => {
 		expect(
 			sanitizeSentryLog({
 				level: 'error',
@@ -74,6 +90,11 @@ describe('Sentry privacy controls', () => {
 					'app.operation': 'device.archive',
 					'http.response.status_code': 503,
 					'user.id': 'user-123',
+					'device.id': 'device-123',
+					'device.latitude': 51.96,
+					'email.has_attachments': true,
+					'diagnostic.steps': ['load', 'validate'],
+					email: 'person@example.org',
 				},
 			}),
 		).toEqual({
@@ -82,6 +103,11 @@ describe('Sentry privacy controls', () => {
 			attributes: {
 				'app.operation': 'device.archive',
 				'http.response.status_code': 503,
+				'user.id': 'user-123',
+				'device.id': 'device-123',
+				'device.latitude': 51.96,
+				'email.has_attachments': true,
+				'diagnostic.steps': ['load', 'validate'],
 			},
 		})
 	})
@@ -106,22 +132,43 @@ describe('Sentry privacy controls', () => {
 		})
 	})
 
-	test('removes sensitive span attributes and normalizes identifiers', () => {
+	test('keeps useful span attributes and removes query data from the span name', () => {
 		const span = sanitizeSentrySpan({
-			name: 'GET /device/507f1f77bcf86cd799439011?token=secret',
+			name: 'GET /device/507f1f77bcf86cd799439011?token=secret#details',
 			attributes: {
 				'sentry.op': 'http.server',
 				'http.response.status_code': 200,
-				'url.full':
-					'https://example.org/device/507f1f77bcf86cd799439011?token=secret',
+				'url.full': 'https://example.org/device/507f1f77bcf86cd799439011',
 				'user.id': 'user-123',
 			},
 		})
 
-		expect(span.name).toBe('GET /device/:id')
+		expect(span.name).toBe('GET /device/507f1f77bcf86cd799439011')
 		expect(span.attributes).toEqual({
 			'sentry.op': 'http.server',
 			'http.response.status_code': 200,
+			'url.full': 'https://example.org/device/507f1f77bcf86cd799439011',
+			'user.id': 'user-123',
+		})
+	})
+
+	test('does not truncate log or error messages', () => {
+		const message = 'x'.repeat(2_500)
+
+		expect(sanitizeSentryLog({ message }).message).toBe(message)
+		expect(sanitizeSentryEvent({ message }).message).toBe(message)
+	})
+
+	test('does not treat arbitrary UUID and hexadecimal identifiers as PII', () => {
+		expect(
+			sanitizeSentryLog({
+				level: 'error',
+				message:
+					'Device 507f1f77bcf86cd799439011 request 550e8400-e29b-41d4-a716-446655440000 failed',
+			}),
+		).toMatchObject({
+			message:
+				'Device 507f1f77bcf86cd799439011 request 550e8400-e29b-41d4-a716-446655440000 failed',
 		})
 	})
 })
