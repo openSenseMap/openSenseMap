@@ -250,7 +250,7 @@ export default function RegisterDialog() {
 		actionData.emailDeliveryFailed
 	) {
 		return (
-			<div className="relative flex h-full w-full items-start justify-center overflow-y-auto p-4 sm:items-center">
+			<>
 				<ExploreAuthOverlayBackdrop
 					to={{
 						pathname: '/explore',
@@ -274,12 +274,12 @@ export default function RegisterDialog() {
 						</Link>
 					</CardFooter>
 				</ExploreAuthOverlayCard>
-			</div>
+			</>
 		)
 	}
 
 	return (
-		<div className="relative flex h-full w-full items-start justify-center overflow-y-auto p-4 sm:items-center">
+		<>
 			<ExploreAuthOverlayBackdrop
 				to={{
 					pathname: '/explore',
@@ -428,6 +428,6 @@ export default function RegisterDialog() {
 					</CardFooter>
 				</Form>
 			</ExploreAuthOverlayCard>
-		</div>
+		</>
 	)
 }

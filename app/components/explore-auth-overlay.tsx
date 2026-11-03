@@ -1,6 +1,7 @@
 import { type ComponentProps, ViewTransition } from 'react'
 import { Link } from 'react-router'
 import { Card } from '~/components/ui/card'
+import { cn } from '~/lib/utils'
 
 type ExploreAuthOverlayBackdropProps = {
 	to: ComponentProps<typeof Link>['to']
@@ -10,22 +11,25 @@ export function ExploreAuthOverlayBackdrop({
 	to,
 }: ExploreAuthOverlayBackdropProps) {
 	return (
-		<Link to={to}>
-			<ViewTransition
-				name="explore-auth-backdrop"
-				default="none"
-				enter="explore-overlay-backdrop"
-				exit="explore-overlay-backdrop"
-				share="none"
-			>
-				<div className="absolute inset-0 z-40 h-full w-full bg-black opacity-25" />
-			</ViewTransition>
-		</Link>
+		<ViewTransition
+			name="explore-auth-backdrop"
+			default="none"
+			enter="explore-overlay-backdrop"
+			exit="explore-overlay-backdrop"
+			share="none"
+		>
+			<Link
+				to={to}
+				aria-label="Close"
+				className="absolute inset-0 z-40 h-full w-full bg-black opacity-25"
+			/>
+		</ViewTransition>
 	)
 }
 
 export function ExploreAuthOverlayCard({
 	children,
+	className,
 	...props
 }: ComponentProps<typeof Card>) {
 	return (
@@ -36,7 +40,11 @@ export function ExploreAuthOverlayCard({
 			exit="explore-auth-dialog"
 			share="explore-auth-dialog"
 		>
-			<Card {...props}>{children}</Card>
+			<div className="pointer-events-none absolute inset-0 z-50 flex h-full w-full items-start justify-center overflow-y-auto p-4 sm:items-center">
+				<Card className={cn('pointer-events-auto', className)} {...props}>
+					{children}
+				</Card>
+			</div>
 		</ViewTransition>
 	)
 }

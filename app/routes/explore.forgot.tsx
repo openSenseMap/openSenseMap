@@ -85,7 +85,7 @@ export default function ForgotPasswordPage() {
 	}, [actionData])
 
 	return (
-		<div className="relative flex h-full w-full items-start justify-center overflow-y-auto p-4 sm:items-center">
+		<>
 			<ExploreAuthOverlayBackdrop
 				to={{
 					pathname: '/explore',
@@ -160,6 +160,6 @@ export default function ForgotPasswordPage() {
 					</>
 				)}
 			</ExploreAuthOverlayCard>
-		</div>
+		</>
 	)
 }

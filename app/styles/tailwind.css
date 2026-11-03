@@ -169,6 +169,17 @@
 	animation: 160ms ease-out both overlay-backdrop-in;
 }
 
+@supports (view-transition-name: none) {
+	.view-transition-dialog-content,
+	.view-transition-dialog-overlay {
+		animation: none;
+	}
+
+	.view-transition-dialog-overlay {
+		transition: none;
+	}
+}
+
 @media (prefers-reduced-motion: reduce) {
 	::view-transition-group(*),
 	::view-transition-old(*),

@@ -10,14 +10,18 @@ const Dialog = DialogPrimitive.Root
 
 const DialogTrigger = DialogPrimitive.Trigger
 
+const DialogPositioner = ({ children }: React.PropsWithChildren) => (
+	<div className="pointer-events-none fixed inset-0 z-50 flex items-start justify-center sm:items-center">
+		{children}
+	</div>
+)
+
 const DialogPortal = ({
 	children,
 	...props
 }: DialogPrimitive.DialogPortalProps) => (
 	<DialogPrimitive.Portal {...props}>
-		<div className="fixed inset-0 z-50 flex items-start justify-center sm:items-center">
-			{children}
-		</div>
+		<DialogPositioner>{children}</DialogPositioner>
 	</DialogPrimitive.Portal>
 )
 DialogPortal.displayName = DialogPrimitive.Portal.displayName
@@ -53,21 +57,21 @@ const DialogContent = React.forwardRef<
 	) => {
 		const overlay = (
 			<DialogOverlay
-				style={
-					viewTransitionClasses?.overlay
-						? { animation: 'none', transition: 'none' }
-						: undefined
-				}
+				className={cn(
+					'pointer-events-auto',
+					viewTransitionClasses?.overlay && 'view-transition-dialog-overlay',
+				)}
 			/>
 		)
 		const content = (
 			<DialogPrimitive.Content
 				ref={ref}
 				className={cn(
-					'bg-background animate-in data-[state=open]:fade-in-90 data-[state=open]:slide-in-from-bottom-10 sm:zoom-in-90 sm:data-[state=open]:slide-in-from-bottom-0 fixed z-50 grid max-h-[calc(100dvh-2rem)] w-[calc(100%-2rem)] gap-4 overflow-y-auto overscroll-contain rounded-lg border p-6 shadow-lg sm:max-w-lg',
+					'bg-background animate-in data-[state=open]:fade-in-90 data-[state=open]:slide-in-from-bottom-10 sm:zoom-in-90 sm:data-[state=open]:slide-in-from-bottom-0 pointer-events-auto fixed z-50 grid max-h-[calc(100dvh-2rem)] w-[calc(100%-2rem)] gap-4 overflow-y-auto overscroll-contain rounded-lg border p-6 shadow-lg sm:max-w-lg',
+					viewTransitionClasses && 'view-transition-dialog-content',
 					className,
 				)}
-				style={viewTransitionClasses ? { ...style, animation: 'none' } : style}
+				style={style}
 				{...props}
 			>
 				{children}
@@ -80,30 +84,35 @@ const DialogContent = React.forwardRef<
 			</DialogPrimitive.Content>
 		)
 
-		return (
-			<DialogPortal>
-				{viewTransitionClasses?.overlay ? (
-					<React.ViewTransition
-						default="none"
-						enter={viewTransitionClasses.overlay}
-						exit={viewTransitionClasses.overlay}
-					>
-						{overlay}
-					</React.ViewTransition>
-				) : (
-					overlay
-				)}
-				{viewTransitionClasses ? (
+		if (viewTransitionClasses) {
+			return (
+				<>
+					{viewTransitionClasses.overlay ? (
+						<React.ViewTransition
+							default="none"
+							enter={viewTransitionClasses.overlay}
+							exit={viewTransitionClasses.overlay}
+						>
+							<DialogPrimitive.Portal>{overlay}</DialogPrimitive.Portal>
+						</React.ViewTransition>
+					) : (
+						<DialogPrimitive.Portal>{overlay}</DialogPrimitive.Portal>
+					)}
 					<React.ViewTransition
 						default="none"
 						enter={viewTransitionClasses.content}
 						exit={viewTransitionClasses.content}
 					>
-						{content}
+						<DialogPortal>{content}</DialogPortal>
 					</React.ViewTransition>
-				) : (
-					content
-				)}
+				</>
+			)
+		}
+
+		return (
+			<DialogPortal>
+				{overlay}
+				{content}
 			</DialogPortal>
 		)
 	},
