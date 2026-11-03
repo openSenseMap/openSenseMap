@@ -11,5 +11,15 @@
 	"go_back": "Zurück",
 	"go_home": "Zur Startseite",
 	"try_again": "Erneut versuchen",
-	"map_cluster_marker_label": "In eine Gruppe von {{total}} Geräten hineinzoomen: {{active}} aktiv, {{inactive}} inaktiv, {{old}} alt."
+	"map_cluster_marker_label": "In eine Gruppe von {{total}} Geräten hineinzoomen: {{active}} aktiv, {{inactive}} inaktiv, {{old}} alt.",
+	"sentry_performance_consent_title": "Hilf uns, openSenseMap zu verbessern",
+	"sentry_performance_consent_description": "Erlaube, dass Leistungsmessungen wie Lade- und Navigationszeiten an Sentry gesendet werden. Du kannst diese Auswahl später ändern.",
+	"sentry_performance_consent_accept": "Leistungsmessungen erlauben",
+	"sentry_performance_consent_reject": "Nicht erlauben",
+	"sentry_performance_consent_privacy_link": "Datenschutzerklärung",
+	"sentry_performance_consent_error": "Deine Auswahl konnte nicht gespeichert werden. Bitte versuche es erneut.",
+	"sentry_performance_consent_settings_title": "Leistungsdiagnose",
+	"sentry_performance_consent_status_granted": "Leistungsmessungen sind derzeit erlaubt.",
+	"sentry_performance_consent_status_denied": "Leistungsmessungen sind derzeit deaktiviert.",
+	"sentry_performance_consent_status_undecided": "Du hast noch nicht entschieden, ob Leistungsmessungen verwendet werden dürfen."
 }

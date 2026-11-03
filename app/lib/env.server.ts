@@ -61,7 +61,11 @@ function getSentryTracesSampleRate() {
 		: 0
 }
 
-export function getEnv() {
+export function getEnv({
+	sentryPerformanceTracingEnabled = false,
+}: {
+	sentryPerformanceTracingEnabled?: boolean
+} = {}) {
 	return {
 		NOMINATIM_SEARCH_API: process.env.NOMINATIM_SEARCH_API,
 		OSEM_GITHUB_URL: process.env.OSEM_API_URL,
@@ -75,6 +79,7 @@ export function getEnv() {
 		SENTRY_ENVIRONMENT: process.env.SENTRY_ENVIRONMENT ?? process.env.NODE_ENV,
 		SENTRY_RELEASE: process.env.SENTRY_RELEASE,
 		SENTRY_TRACES_SAMPLE_RATE: getSentryTracesSampleRate(),
+		SENTRY_PERFORMANCE_TRACING_ENABLED: sentryPerformanceTracingEnabled,
 	}
 }
 

@@ -15,6 +15,7 @@ import invariant from 'tiny-invariant'
 import { type Route } from './+types/root'
 import ErrorMessage from './components/error-message'
 import { TosGraceDialog } from './components/tos-grace-dialog'
+import { SentryPerformanceConsentBanner } from './components/sentry-performance-consent'
 import { Toaster } from './components/ui/toaster'
 import { getTosRequirementForUser } from './db/models/tos.server'
 import { updateUserPreferencesById } from './db/models/user.server'
@@ -31,6 +32,7 @@ import {
 	getThemePreference,
 	themeCookie,
 } from './services/theme-service.server'
+import { getSentryPerformanceConsent } from './services/sentry-consent.server'
 import { PreventFlashOnWrongTheme } from './components/prevent-theme-flash'
 import { TooltipProvider } from './components/ui/tooltip'
 
@@ -115,6 +117,7 @@ export async function loader({ context, request }: Route.LoaderArgs) {
 		: cookieThemePreference
 
 	const theme = getServerTheme(themePreference)
+	const sentryPerformanceConsent = await getSentryPerformanceConsent(request)
 
 	const headers = new Headers()
 
@@ -134,7 +137,10 @@ export async function loader({ context, request }: Route.LoaderArgs) {
 			locale,
 			themePreference,
 			theme,
-			ENV: getEnv(),
+			sentryPerformanceConsent,
+			ENV: getEnv({
+				sentryPerformanceTracingEnabled: sentryPerformanceConsent === 'granted',
+			}),
 		},
 		{ headers },
 	)
@@ -253,7 +259,14 @@ function EnvScript({ env }: { env: Window['ENV'] }) {
 }
 
 export default function App({
-	loaderData: { locale, ENV, themePreference, theme, graceTos },
+	loaderData: {
+		locale,
+		ENV,
+		themePreference,
+		theme,
+		graceTos,
+		sentryPerformanceConsent,
+	},
 }: Route.ComponentProps) {
 	const { i18n } = useTranslation()
 	useEffect(() => {
@@ -280,6 +293,10 @@ export default function App({
 					<Outlet />
 				</TooltipProvider>
 				{graceTos && <TosGraceDialog key={graceTos.id} tos={graceTos} />}
+				<SentryPerformanceConsentBanner
+					consent={sentryPerformanceConsent}
+					sentryEnabled={Boolean(ENV.SENTRY_DSN)}
+				/>
 				<Toaster />
 
 				<ScrollRestoration />

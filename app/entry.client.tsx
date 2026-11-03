@@ -9,6 +9,10 @@ import { HydratedRouter } from 'react-router/dom'
 import { sentryPrivacyOptions } from '../sentry-privacy.mjs'
 import { i18nextOptions } from './i18next-config'
 
+const sentryPerformanceTracingEnabled = Boolean(
+	window.ENV.SENTRY_DSN && window.ENV.SENTRY_PERFORMANCE_TRACING_ENABLED,
+)
+
 if (window.ENV.SENTRY_DSN) {
 	Sentry.init({
 		dsn: window.ENV.SENTRY_DSN,
@@ -16,16 +20,20 @@ if (window.ENV.SENTRY_DSN) {
 		release: window.ENV.SENTRY_RELEASE,
 		...sentryPrivacyOptions,
 		integrations: [
-			Sentry.reactRouterTracingIntegration(),
+			...(sentryPerformanceTracingEnabled
+				? [Sentry.reactRouterTracingIntegration()]
+				: []),
 			Sentry.consoleLoggingIntegration({ levels: ['error'] }),
 		],
-		tracesSampleRate: window.ENV.SENTRY_TRACES_SAMPLE_RATE,
+		tracesSampleRate: sentryPerformanceTracingEnabled
+			? window.ENV.SENTRY_TRACES_SAMPLE_RATE
+			: 0,
 	})
 }
 
-const sentryInstrumentation = Sentry.createSentryClientInstrumentation({
-	captureErrors: false,
-})
+const sentryInstrumentations = sentryPerformanceTracingEnabled
+	? [Sentry.createSentryClientInstrumentation({ captureErrors: false })]
+	: []
 
 const hydrate = async () => {
 	await i18next
@@ -50,7 +58,7 @@ const hydrate = async () => {
 			<I18nextProvider i18n={i18next}>
 				<StrictMode>
 					<HydratedRouter
-						instrumentations={[sentryInstrumentation]}
+						instrumentations={sentryInstrumentations}
 						onError={Sentry.sentryOnError}
 					/>
 				</StrictMode>
