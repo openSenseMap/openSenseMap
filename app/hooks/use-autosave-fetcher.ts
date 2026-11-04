@@ -70,6 +70,7 @@ export function useAutosaveFetcher<TValues, TData>({
 		hasChanges,
 		saveCount,
 	})
+	const shouldBlockNavigation = hasChanges || isSaving || status === 'error'
 
 	const submit = useCallback(
 		(nextValues: TValues) => {
@@ -161,6 +162,7 @@ export function useAutosaveFetcher<TValues, TData>({
 		status,
 		isSaving,
 		hasChanges,
+		shouldBlockNavigation,
 		resetLastSaved,
 		lastSavedRef,
 	}

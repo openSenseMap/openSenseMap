@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { useLoaderData } from 'react-router'
 import { type Route } from './+types/settings.preferences'
 import { AutosaveStatusText } from '~/components/autosave-status.text'
+import { UnsavedChangesBlocker } from '~/components/unsaved-changes-blocker'
 import { LanguageSelect } from '~/components/language-select'
 import { ThemeSelect } from '~/components/theme-select'
 import { Button } from '~/components/ui/button'
@@ -539,6 +540,12 @@ export default function PreferencesSettingsPage() {
 
 	return (
 		<Card className="border-border bg-card text-card-foreground">
+			<UnsavedChangesBlocker
+				when={
+					mapAutosave.shouldBlockNavigation ||
+					newsletterAutosave.shouldBlockNavigation
+				}
+			/>
 			<CardHeader>
 				<CardTitle>{t('preferences')}</CardTitle>
 				<AutosaveStatusText status={mapAutosave.status} namespace="settings" />
