@@ -25,14 +25,13 @@ import {
 	useLoaderData,
 	useMatches,
 	useNavigate,
-	useNavigation,
 	useParams,
 	useSearchParams,
 	Link,
+	NavLink,
 } from 'react-router'
 import { MarkdownContent } from '../markdown-content'
 import SensorIcon from '../sensor-icon'
-import Spinner from '../spinner'
 import {
 	Accordion,
 	AccordionContent,
@@ -87,7 +86,6 @@ export interface MeasurementProps {
 }
 
 export default function DeviceDetailBox() {
-	const navigation = useNavigation()
 	const navigate = useNavigate()
 	const matches = useMatches()
 	const { toast } = useToast()
@@ -214,11 +212,6 @@ export default function DeviceDetailBox() {
 								'relative float-left flex h-full max-h-[calc(100dvh-4rem)] w-full min-w-0 flex-col gap-4 rounded-xl bg-white px-4 py-2 text-sm font-medium text-zinc-800 shadow-lg ring-1 shadow-zinc-800/5 ring-zinc-900/5 lg:max-h-[calc(100dvh-8rem)] dark:bg-zinc-800 dark:text-zinc-200 dark:opacity-95 dark:ring-white dark:backdrop-blur-xs'
 							}
 						>
-							{navigation.state === 'loading' && (
-								<div className="absolute inset-0 z-50 flex items-center justify-center bg-white/30 backdrop-blur-xs dark:bg-zinc-800/30">
-									<Spinner />
-								</div>
-							)}
 							<div
 								id="deviceDetailBoxTop"
 								className="flex w-full cursor-move items-center gap-3 py-2"
@@ -480,13 +473,7 @@ export default function DeviceDetailBox() {
 											{t('sensors')}
 										</AccordionTrigger>
 										<AccordionContent>
-											<div
-												className={
-													navigation.state === 'loading'
-														? 'pointer-events-none'
-														: ''
-												}
-											>
+											<div>
 												{isOwner && (
 													<Alert className="mb-4 py-3">
 														<AlertDescription className="text-xs">
@@ -592,10 +579,15 @@ export default function DeviceDetailBox() {
 																	)
 																}
 																return (
-																	<Link
+																	<NavLink
 																		key={sensor.id}
 																		to={sensorLink}
-																		className="h-full"
+																		className={({ isPending }) =>
+																			clsx(
+																				'h-full transition-opacity',
+																				isPending && 'pointer-events-none opacity-50',
+																			)
+																		}
 																	>
 																		<Card
 																			key={sensor.id}
@@ -673,7 +665,7 @@ export default function DeviceDetailBox() {
 																				</CardFooter>
 																			</label>
 																		</Card>
-																	</Link>
+																	</NavLink>
 																)
 															},
 														)}
