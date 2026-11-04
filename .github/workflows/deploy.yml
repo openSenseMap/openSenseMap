@@ -60,13 +60,11 @@ jobs:
       - name: 🔎 Type check
         run: vp run typecheck
 
-  vitest:
+  test:
     name: ⚡ Test
     runs-on: ubuntu-latest
     permissions:
-      # Required to checkout the code
       contents: read
-      # Required to put a comment into the pull-request
       pull-requests: write
     steps:
       - name: ⬇️ Checkout repo
@@ -101,8 +99,8 @@ jobs:
           retry_on: error
           command: vp run db:migrate
 
-      - name: ⚡ Run vitest
-        run: vp run test:coverage
+      - name: ⚡ Run tests
+        run: vp test --coverage
 
       - name: 🧐 Report Coverage
         uses: davelosert/vitest-coverage-report-action@v2
