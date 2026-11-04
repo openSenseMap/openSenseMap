@@ -12,6 +12,9 @@ export default function AdminIndexRoute() {
 				<div className="rounded border p-4">
 					<Link to="/admin/devices">Edit devices</Link>
 				</div>
+				<div className="rounded border p-4">
+					<Link to="/admin/integrations">Integration services</Link>
+				</div>
 			</div>
 		</div>
 	)

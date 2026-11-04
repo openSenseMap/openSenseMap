@@ -6,6 +6,111 @@ interface IntegrationResult {
 	error?: string
 }
 
+export interface IntegrationServiceMetadata {
+	service: string
+	revision: string
+}
+
+export type IntegrationServiceState =
+	| 'available'
+	| 'misconfigured'
+	| 'unauthorized'
+	| 'unsupported'
+	| 'unreachable'
+	| 'invalid_response'
+	| 'service_error'
+
+export interface IntegrationServiceStatus {
+	id: string
+	name: string
+	slug: string
+	serviceUrl: string
+	state: IntegrationServiceState
+	metadata?: IntegrationServiceMetadata
+}
+
+function isIntegrationServiceMetadata(
+	value: unknown,
+): value is IntegrationServiceMetadata {
+	if (!value || typeof value !== 'object') return false
+
+	const metadata = value as Record<string, unknown>
+	const isNonEmptyString = (entry: unknown): entry is string =>
+		typeof entry === 'string' && entry.trim().length > 0
+
+	return (
+		isNonEmptyString(metadata.service) && isNonEmptyString(metadata.revision)
+	)
+}
+
+/**
+ * Returns deployment metadata for every configured integration microservice.
+ * Requests happen server-side so service keys are never exposed to the browser.
+ */
+export async function getIntegrationServiceStatuses(): Promise<
+	IntegrationServiceStatus[]
+> {
+	const integrations = await getIntegrations()
+
+	return Promise.all(
+		integrations.map(async (intg): Promise<IntegrationServiceStatus> => {
+			const summary = {
+				id: intg.id,
+				name: intg.name,
+				slug: intg.slug,
+				serviceUrl: intg.serviceUrl,
+			}
+			const serviceKey = process.env[intg.serviceKey]
+
+			if (!serviceKey) {
+				return { ...summary, state: 'misconfigured' }
+			}
+
+			try {
+				const response = await fetch(
+					`${intg.serviceUrl.replace(/\/+$/, '')}/meta`,
+					{
+						method: 'GET',
+						redirect: 'error',
+						headers: {
+							Accept: 'application/json',
+							'x-service-key': serviceKey,
+						},
+						signal: AbortSignal.timeout(2000),
+					},
+				)
+
+				if (response.status === 401 || response.status === 403) {
+					return { ...summary, state: 'unauthorized' }
+				}
+
+				if (response.status === 404) {
+					return { ...summary, state: 'unsupported' }
+				}
+
+				if (!response.ok) {
+					return { ...summary, state: 'service_error' }
+				}
+
+				let metadata: unknown
+				try {
+					metadata = await response.json()
+				} catch {
+					return { ...summary, state: 'invalid_response' }
+				}
+
+				if (!isIntegrationServiceMetadata(metadata)) {
+					return { ...summary, state: 'invalid_response' }
+				}
+
+				return { ...summary, state: 'available', metadata }
+			} catch {
+				return { ...summary, state: 'unreachable' }
+			}
+		}),
+	)
+}
+
 /**
  * Creates integrations for a device based on the provided config.
  * Iterates over all registered integrations and calls their respective

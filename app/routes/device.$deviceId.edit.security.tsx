@@ -261,10 +261,12 @@ export default function EditBoxSecurity() {
 	const disableKeyActions = !authEnabled || !key
 
 	return (
-		<div className="font-helvetica text-[14px]">
-			<div className="mt-2 flex justify-between">
-				<div>
-					<h1 className="text-4xl">{t('device_security.page_title')}</h1>
+		<div className="font-helvetica min-w-0 text-[14px]">
+			<div className="mt-2 flex min-w-0 justify-between">
+				<div className="min-w-0">
+					<h1 className="text-3xl wrap-anywhere sm:text-4xl">
+						{t('device_security.page_title')}
+					</h1>
 
 					<AutosaveStatusText status={autosave.status} namespace="settings" />
 				</div>
@@ -313,8 +315,8 @@ export default function EditBoxSecurity() {
 					{t('device_security.api_key_label')}
 				</Label>
 
-				<div className="mt-1 flex">
-					<span>
+				<div className="mt-1 flex min-w-0">
+					<span className="shrink-0">
 						<button
 							className="btn btn-default w-12 rounded-tr-none rounded-br-none disabled:opacity-40"
 							onClick={() => setKeyVisible((visible) => !visible)}
@@ -332,13 +334,13 @@ export default function EditBoxSecurity() {
 					<input
 						name="api-key"
 						value={key ?? ''}
-						className="form-control border-[#ccc;] rounded-none"
+						className="form-control min-w-0 flex-1 rounded-none border-[#ccc]"
 						type={keyVisible ? 'text' : 'password'}
 						disabled
 						readOnly
 					/>
 
-					<span>
+					<span className="shrink-0">
 						<button
 							className="btn btn-default relative h-full w-12 rounded-tl-none rounded-bl-none disabled:opacity-40"
 							onClick={() => copyKeyToClipboard()}

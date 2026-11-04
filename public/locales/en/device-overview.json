@@ -13,6 +13,15 @@
 	"api_key_label": "API Key",
 	"device_settings": "Device settings",
 	"manage_device_data": "Manage your device data.",
+	"sidebar": {
+		"general": "General",
+		"sensors": "Sensors",
+		"location": "Location",
+		"logs": "Logs",
+		"security": "Security",
+		"script": "Script",
+		"transfer": "Transfer"
+	},
 	"show_on_map": "Show on map",
 	"device_updated": "Device successfully updated",
 	"view": "View"

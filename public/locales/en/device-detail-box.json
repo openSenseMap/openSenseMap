@@ -12,5 +12,29 @@
 	"sensor_order_hint_link": "sensor settings",
 	"compare_devices": "Compare devices",
 	"choose_device_for_comparison": "Choose a device on the map to compare with.",
-	"open_device_details": "Open device details"
+	"open_device_details": "Open device details",
+	"device_image": "Device image",
+	"exposure": "Exposure",
+	"exposure_values": {
+		"indoor": "Indoor",
+		"outdoor": "Outdoor",
+		"mobile": "Mobile"
+	},
+	"unknown": "Unknown",
+	"height_above_sea_level": "Height above sea level",
+	"sensor_model": "Sensor model",
+	"last_updated": "Last updated",
+	"created_at": "Created at",
+	"expires_at": "Expires at",
+	"tags": "Tags",
+	"sensor_limit_title": "Can't select more than 2 sensors",
+	"sensor_limit_description": "Deselect one sensor to select another",
+	"no_recent_data": "No recent data",
+	"logs": "Logs",
+	"show_all_logs": "Show all logs.",
+	"device_logs": "Device logs",
+	"logs_owner_hint": "If this is your device, you can make changes in your device settings.",
+	"copied_to_clipboard": "Copied to clipboard",
+	"share_link_hint": "Go ahead and share your link! 🎉",
+	"copy": "Copy"
 }

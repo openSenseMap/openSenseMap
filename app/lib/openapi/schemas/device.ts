@@ -1,5 +1,12 @@
 import * as z from 'zod/v4'
-import { GeoJsonPointSchema, TimestampedGeoJsonPointSchema } from './location'
+import { IsoDateTimeSchema } from './common'
+import {
+	GeoJsonPointSchema,
+	HeightSchema,
+	LatitudeSchema,
+	LongitudeSchema,
+	TimestampedGeoJsonPointSchema,
+} from './location'
 
 export const ApiSensorSchema = z
 	.looseObject({
@@ -25,7 +32,7 @@ export const ApiSensorSchema = z
 		}),
 		lastMeasurement: z
 			.object({
-				createdAt: z.iso.datetime().optional().meta({
+				createdAt: IsoDateTimeSchema.optional().meta({
 					example: '2023-01-01T00:00:00.000Z',
 				}),
 				value: z.union([z.string(), z.number()]).nullable().optional().meta({
@@ -51,18 +58,27 @@ export const DeviceSensorUpdateSchema = z
 				'Existing sensor id. `_id` is used by the legacy API and is preferred for backwards compatibility.',
 			example: '60a13611a877b3001b8ffd59',
 		}),
-		new: z.union([z.literal(true), z.literal('true')]).optional().meta({
-			description: 'Whether this sensor should be created as new.',
-			example: true,
-		}),
-		edited: z.union([z.literal(true), z.literal('true')]).optional().meta({
-			description: 'Whether this sensor should be created or updated.',
-			example: true,
-		}),
-		deleted: z.union([z.literal(true), z.literal('true')]).optional().meta({
-			description: 'Whether this sensor should be deleted.',
-			example: true,
-		}),
+		new: z
+			.union([z.literal(true), z.literal('true')])
+			.optional()
+			.meta({
+				description: 'Whether this sensor should be created as new.',
+				example: true,
+			}),
+		edited: z
+			.union([z.literal(true), z.literal('true')])
+			.optional()
+			.meta({
+				description: 'Whether this sensor should be created or updated.',
+				example: true,
+			}),
+		deleted: z
+			.union([z.literal(true), z.literal('true')])
+			.optional()
+			.meta({
+				description: 'Whether this sensor should be deleted.',
+				example: true,
+			}),
 		title: z.string().optional().meta({
 			example: 'PM10',
 		}),
@@ -79,7 +95,7 @@ export const DeviceSensorUpdateSchema = z
 	})
 	.transform(({ id, ...sensor }) => ({
 		...sensor,
-		...(sensor._id ?? id ? { _id: sensor._id ?? id } : {}),
+		...((sensor._id ?? id) ? { _id: sensor._id ?? id } : {}),
 	}))
 	.meta({
 		id: 'DeviceSensorUpdate',
@@ -87,6 +103,17 @@ export const DeviceSensorUpdateSchema = z
 	})
 
 export type DeviceSensorUpdate = z.infer<typeof DeviceSensorUpdateSchema>
+
+const ApiDeviceLocationFeatureSchema = z
+	.object({
+		type: z.literal('Feature'),
+		geometry: TimestampedGeoJsonPointSchema,
+	})
+	.meta({
+		id: 'ApiDeviceLocationFeature',
+		description:
+			'Device location feature whose coordinates are [longitude, latitude, height?].',
+	})
 
 export const DeviceAddonsUpdateSchema = z
 	.object({
@@ -142,13 +169,38 @@ export const ApiDeviceSchema = z
 			description: 'Device model',
 			example: 'homeV2Wifi',
 		}),
-		latitude: z.number().nullable().optional().meta({
+		latitude: LatitudeSchema.nullable().optional().meta({
 			description: 'Device latitude',
 			example: 52.520008,
 		}),
-		longitude: z.number().nullable().optional().meta({
+		longitude: LongitudeSchema.nullable().optional().meta({
 			description: 'Device longitude',
 			example: 13.404954,
+		}),
+		height: HeightSchema.nullable().optional().meta({
+			description:
+				'Device height above sea level in meters. Kept as a legacy alias for heightAboveSeaLevel.',
+			example: 66.6,
+		}),
+		heightAboveGround: HeightSchema.nullable().optional().meta({
+			description:
+				'User-provided device height above the local ground surface in meters.',
+			example: 3.5,
+		}),
+		heightAboveSeaLevel: HeightSchema.nullable().optional().meta({
+			description:
+				'Device height above sea level in meters, calculated from terrainElevation and heightAboveGround. Null when either source value is unavailable.',
+			example: 66.6,
+		}),
+		terrainElevation: HeightSchema.nullable().optional().meta({
+			description:
+				'Terrain elevation in meters returned by the elevation service.',
+			example: 63.1,
+		}),
+		terrainElevationDataset: z.string().nullable().optional().meta({
+			description:
+				'GPXZ data source identifier from which terrainElevation was retrieved. Null when no terrain elevation is available.',
+			example: 'germany_nrw_1m_dtm',
 		}),
 		useAuth: z.boolean().optional().meta({
 			description: 'Whether the device requires authentication',
@@ -162,15 +214,15 @@ export const ApiDeviceSchema = z
 			description: 'Device status',
 			example: 'inactive',
 		}),
-		createdAt: z.iso.datetime().optional().meta({
+		createdAt: IsoDateTimeSchema.optional().meta({
 			description: 'Device creation timestamp',
 			example: '2024-01-15T10:30:00.000Z',
 		}),
-		updatedAt: z.iso.datetime().optional().meta({
+		updatedAt: IsoDateTimeSchema.optional().meta({
 			description: 'Device last update timestamp',
 			example: '2024-01-15T10:30:00.000Z',
 		}),
-		expiresAt: z.iso.datetime().nullable().optional().meta({
+		expiresAt: IsoDateTimeSchema.nullable().optional().meta({
 			description: 'Device expiration date',
 			example: '2024-12-31T23:59:59.000Z',
 		}),
@@ -185,11 +237,11 @@ export const ApiDeviceSchema = z
 		currentLocation: TimestampedGeoJsonPointSchema.optional().meta({
 			description: 'Current location as GeoJSON Point-like object',
 		}),
-		lastMeasurementAt: z.iso.datetime().nullable().optional().meta({
+		lastMeasurementAt: IsoDateTimeSchema.nullable().optional().meta({
 			description: 'Last measurement timestamp',
 			example: '2023-01-01T00:00:00.000Z',
 		}),
-		loc: z.array(z.looseObject({})).optional().meta({
+		loc: z.array(ApiDeviceLocationFeatureSchema).optional().meta({
 			description: 'Location history as GeoJSON features',
 		}),
 		integrations: z
@@ -240,7 +292,7 @@ export const DevicesGeoJsonResponseSchema = z
 					type: 'Feature',
 					geometry: {
 						type: 'Point',
-						coordinates: [13.404954, 52.520008],
+						coordinates: [13.404954, 52.520008, 66.6],
 					},
 					properties: {
 						id: 'clx1234567890abcdef',

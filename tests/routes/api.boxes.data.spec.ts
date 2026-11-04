@@ -1,6 +1,6 @@
 import { eq } from 'drizzle-orm'
 import { generateTestUserCredentials } from 'tests/data/generate_test_user'
-import { describe, it, expect, beforeAll } from 'vitest'
+import { describe, it, expect, beforeAll } from 'vite-plus/test'
 import { type Route } from '../../.react-router/types/app/routes/+types/api.boxes.data'
 import { BASE_URL } from '../../vitest.setup'
 import { createDevice, deleteDevice } from '~/db/models/device.server'

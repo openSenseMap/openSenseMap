@@ -1,7 +1,19 @@
 import { type Device, type Sensor } from '~/db/schema'
+import { type DeviceStatusType } from '~/lib/device-enums'
+import { calculateHeightAboveSeaLevel } from '~/lib/elevation'
 import { toIsoString } from '~/utils'
 
-export type DeviceWithSensors = Device & {
+const ACTIVE_THRESHOLD_MS = 7 * 24 * 60 * 60 * 1000
+const INACTIVE_THRESHOLD_MS = 30 * 24 * 60 * 60 * 1000
+
+export type DeviceWithSensors = Omit<
+	Device,
+	'heightAboveGround' | 'terrainElevation' | 'terrainElevationDataset'
+> & {
+	heightAboveGround?: number | null
+	terrainElevation?: number | null
+	terrainElevationDataset?: string | null
+	heightAboveSeaLevel?: number | null
 	sensors: Sensor[]
 }
 
@@ -17,6 +29,12 @@ export type TransformedDevice = {
 	model: string | null
 	latitude: number
 	longitude: number
+	heightAboveGround?: number | null
+	heightAboveSeaLevel: number | null
+	terrainElevation?: number | null
+	terrainElevationDataset?: string | null
+	/** Legacy alias for heightAboveSeaLevel. */
+	height: number | null
 	useAuth: boolean | null
 	access_token: string | null
 	public: boolean | null
@@ -67,14 +85,34 @@ export type TransformedDevice = {
 export function transformDeviceToApiFormat(
 	box: DeviceWithSensors,
 ): TransformedDevice {
-	const { id, tags, sensors, apiKey, ...rest } = box
+	const {
+		id,
+		tags,
+		sensors,
+		apiKey,
+		heightAboveSeaLevel: selectedHeightAboveSeaLevel,
+		...rest
+	} = box
 	const timestamp = box.updatedAt.toISOString()
-	const coordinates = [box.longitude, box.latitude]
+	const heightAboveSeaLevel =
+		selectedHeightAboveSeaLevel !== undefined
+			? selectedHeightAboveSeaLevel
+			: calculateHeightAboveSeaLevel(
+					box.terrainElevation,
+					box.heightAboveGround,
+				)
+	const coordinates =
+		heightAboveSeaLevel === null
+			? [box.longitude, box.latitude]
+			: [box.longitude, box.latitude, heightAboveSeaLevel]
 
 	return {
 		_id: id,
 		grouptag: tags || [],
 		...rest,
+		heightAboveSeaLevel,
+		height: heightAboveSeaLevel,
+		status: deriveDeviceStatus(sensors),
 		createdAt: toIsoString(box.createdAt)!,
 		updatedAt: toIsoString(box.updatedAt)!,
 		expiresAt: toIsoString(box.expiresAt),
@@ -111,4 +149,30 @@ export function transformDeviceToApiFormat(
 					: null,
 			})) || [],
 	}
+}
+
+export function deriveDeviceStatus(
+	sensors: Sensor[] | null | undefined,
+	now = Date.now(),
+): DeviceStatusType {
+	let latestMeasurementAt: number | null = null
+
+	for (const sensor of sensors ?? []) {
+		const createdAt = sensor.lastMeasurement?.createdAt
+		if (!createdAt) continue
+
+		const timestamp = Date.parse(createdAt)
+		if (!Number.isFinite(timestamp)) continue
+
+		if (latestMeasurementAt === null || timestamp > latestMeasurementAt) {
+			latestMeasurementAt = timestamp
+		}
+	}
+
+	if (latestMeasurementAt === null) return 'old'
+
+	const age = now - latestMeasurementAt
+	if (age < ACTIVE_THRESHOLD_MS) return 'active'
+	if (age < INACTIVE_THRESHOLD_MS) return 'inactive'
+	return 'old'
 }

@@ -1,8 +1,12 @@
 {
 	"tos_update": "Änderung der Nutzungsbedingungen",
 	"must_accept": "Sie müssen die aktuellen Nutzungsbedingungen akzeptieren, um die App weiterhin nutzen zu können.",
+	"grace_description": "Wir haben unsere Nutzungsbedingungen aktualisiert. Bitte prüfen und akzeptieren Sie sie bis zum {{date}}.",
+	"grace_action_error": "Die Zustimmung zu den Nutzungsbedingungen konnte nicht gespeichert werden. Bitte versuchen Sie es erneut.",
 	"tos_agree": "Ich stimme den <termsLink> Nutzungsbedingungen </termsLink> zu.",
 	"delete_account": "Sie können ihr <deleteLink>Konto weiterhin löschen </deleteLink>.",
+	"accept_now": "Akzeptieren und fortfahren",
+	"remind_later": "Später erinnern",
 	"continue": "Weiter",
 	"not_configured": "Nutzungsbedingungen wurden nicht konfiguriert."
 }

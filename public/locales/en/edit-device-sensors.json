@@ -14,5 +14,13 @@
 	"fill_required_fields": "Please fill out all required fields.",
 	"cancel": "Cancel",
 	"save": "Save",
-	"add": "Add"
+	"add": "Add",
+	"save_failed": "Could not save sensors",
+	"edit_icon": "Edit icon",
+	"schema_detach": "Detach from schema",
+	"schema_detach_confirm": "Detach this device from its schema? Afterwards sensor names, units, and types can be edited manually.",
+	"schema_notice_title": "This device uses schema {{name}} v{{version}}.",
+	"schema_notice_text": "Phenomenon, unit, and type are locked to keep measurements comparable. You can still reorder sensors and change their icons.",
+	"schema_fields_locked": "This sensor is defined by the device schema. Phenomenon, unit, and type are locked; only the icon can be changed here.",
+	"schema_out_of_sync": "The current sensors no longer match this schema. Detach the device from the schema before editing sensors."
 }

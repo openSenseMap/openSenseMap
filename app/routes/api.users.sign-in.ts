@@ -138,8 +138,7 @@ export const action = async ({ request }: Route.ActionArgs) => {
 			token: jwt,
 			refreshToken,
 		})
-		if (!responseParsed.success)
-			return StandardResponse.internalServerError()
+		if (!responseParsed.success) return StandardResponse.internalServerError()
 
 		return StandardResponse.ok(responseParsed.data)
 	} catch {

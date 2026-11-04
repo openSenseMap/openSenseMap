@@ -171,7 +171,9 @@ describe('measurement server helper', () => {
 		locationIds.push(insertedId)
 
 		// Call function
-		const result = await findOrCreateLocations(getLocationUpdates(MEASUREMENTS))
+		const result = await drizzleClient.transaction((tx) =>
+			findOrCreateLocations(getLocationUpdates(MEASUREMENTS), tx),
+		)
 		foundOrCreatedLocations = result
 
 		// Check locations
@@ -245,10 +247,13 @@ describe('measurement server helper', () => {
 	})
 
 	it('should add location updates', async () => {
-		await addLocationUpdates(
-			getLocationUpdates(MEASUREMENTS),
-			deviceId,
-			foundOrCreatedLocations,
+		await drizzleClient.transaction((tx) =>
+			addLocationUpdates(
+				getLocationUpdates(MEASUREMENTS),
+				deviceId,
+				foundOrCreatedLocations,
+				tx,
+			),
 		)
 
 		const inserted = await drizzleClient

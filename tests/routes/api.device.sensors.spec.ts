@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll, afterAll } from 'vitest'
+import { describe, it, expect, beforeAll, afterAll } from 'vite-plus/test'
 import { type Route } from '../../.react-router/types/app/routes/+types/api.boxes.$deviceId'
 import { BASE_URL } from '../../vitest.setup'
 import {
@@ -11,12 +11,9 @@ import { type User, type Device } from '~/db/schema'
 import { createToken } from '~/lib/jwt'
 import { action as deviceUpdateAction } from '~/routes/api.boxes.$deviceId'
 import { registerUser } from '~/services/user-service.server'
+import { generateTestUserCredentials } from 'tests/data/generate_test_user'
 
-const DEVICE_TEST_USER = {
-	name: 'deviceUpdateDeviceSensorsTest123',
-	email: 'test@deviceSensorsTest123.endpoint',
-	password: 'highlySecurePasswordForTesting',
-}
+const DEVICE_TEST_USER = generateTestUserCredentials()
 
 let user: User
 let jwt: string
@@ -39,8 +36,6 @@ describe('Device Sensors API: updating sensors', () => {
 			'en_US',
 			true,
 		)
-
-		expect(registration.ok).toBe(true)
 
 		if (!registration.ok) {
 			throw new Error(

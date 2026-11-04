@@ -46,11 +46,10 @@ type DownloadActionData =
 
 type DeviceFeature = {
 	geometry?: {
-		coordinates?: [number, number]
+		coordinates?: number[]
 	}
 	properties?: {
 		id?: string | number
-		[key: string]: unknown
 	}
 }
 
@@ -69,6 +68,7 @@ type DownloadFields = {
 	unit: boolean
 	value: boolean
 	timestamp: boolean
+	coordinates: boolean
 }
 
 const DEFAULT_FIELDS: DownloadFields = {
@@ -76,6 +76,7 @@ const DEFAULT_FIELDS: DownloadFields = {
 	unit: true,
 	value: true,
 	timestamp: true,
+	coordinates: true,
 }
 
 export const DOWNLOAD_FILTER_KEYS = new Set([
@@ -187,7 +188,7 @@ export default function Download({
 	const closeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
 	const [format, setFormat] = useState('csv')
-	const [aggregate, setAggregate] = useState('10m')
+	const [aggregate, setAggregate] = useState('raw')
 	const [fields, setFields] = useState<DownloadFields>(DEFAULT_FIELDS)
 
 	const [isDownloadReady, setIsDownloadReady] = useState(false)
@@ -234,6 +235,10 @@ export default function Download({
 
 	const handleAggregateChange = (value: string) => {
 		setAggregate(value)
+		setFields((currentFields) => ({
+			...currentFields,
+			coordinates: value === 'raw',
+		}))
 		resetResultState()
 	}
 
@@ -304,7 +309,7 @@ export default function Download({
 
 	return (
 		<Dialog open={open} onOpenChange={handleDialogOpenChange}>
-			<DialogContent className="max-h-screen overflow-y-auto sm:max-w-xl">
+			<DialogContent className="p-4 sm:max-w-xl sm:p-6">
 				<DialogHeader>
 					<DialogTitle>{t('downloadOptions')}</DialogTitle>
 					<DialogDescription>{t('downloadDescription')}</DialogDescription>
@@ -326,7 +331,7 @@ export default function Download({
 					))}
 
 					<div className="grid gap-3">
-						<div className="flex items-center justify-between">
+						<div className="flex flex-wrap items-center justify-between gap-2">
 							<Label htmlFor="devices">{t('devices')}</Label>
 
 							<span className="text-sm font-medium text-blue-600">
@@ -404,29 +409,40 @@ export default function Download({
 							{t('fieldsToInclude')}
 						</legend>
 
-						{Object.entries(fields).map(([field, checked]) => (
-							<div key={field} className="flex items-center space-x-2">
-								<Checkbox
-									id={field}
-									name={field}
-									value="on"
-									checked={checked}
-									onCheckedChange={(nextChecked) =>
-										handleFieldChange(
-											field as keyof DownloadFields,
-											nextChecked,
-										)
-									}
-								/>
+						{Object.entries(fields).map(([field, checked]) => {
+							const isCoordinateField = field === 'coordinates'
 
-								<Label htmlFor={field} className="cursor-pointer">
-									{t(field)}
-								</Label>
-							</div>
-						))}
+							return (
+								<div key={field} className="flex items-center space-x-2">
+									<Checkbox
+										id={field}
+										name={field}
+										value="on"
+										checked={checked}
+										disabled={isCoordinateField && aggregate !== 'raw'}
+										onCheckedChange={(nextChecked) =>
+											handleFieldChange(
+												field as keyof DownloadFields,
+												nextChecked,
+											)
+										}
+									/>
+
+									<Label htmlFor={field} className="cursor-pointer">
+										{t(field)}
+									</Label>
+								</div>
+							)
+						})}
 					</fieldset>
 
-					<div className="flex h-16 items-center justify-center">
+					{aggregate !== 'raw' && (
+						<p className="text-muted-foreground text-sm">
+							{t('coordinatesRawOnly')}
+						</p>
+					)}
+
+					<div className="flex min-h-16 items-center justify-center text-center">
 						{isBusy ? (
 							<PulsingDownloadAnimation />
 						) : showReadyAnimation ? (
@@ -435,10 +451,10 @@ export default function Download({
 					</div>
 
 					{errorMessage && (
-						<div className="flex items-center gap-3 rounded-md border border-red-300 bg-red-100 p-3 text-red-700">
+						<div className="flex min-w-0 items-center gap-3 rounded-md border border-red-300 bg-red-100 p-3 text-red-700">
 							<AlertTriangle className="h-8 w-8 shrink-0 animate-pulse text-red-500" />
 
-							<p className="text-sm">
+							<p className="min-w-0 text-sm wrap-break-word">
 								{t('error')}{' '}
 								{actionData && 'link' in actionData && actionData.link ? (
 									<>
@@ -467,10 +483,10 @@ export default function Download({
 					)}
 
 					<DialogFooter>
-						<div className="flex w-full items-center justify-center gap-4">
+						<div className="flex w-full flex-col items-stretch justify-center gap-2 sm:flex-row sm:items-center sm:gap-4">
 							<Button
 								type="submit"
-								className="text-dark bg-blue-100 transition-colors hover:bg-blue-200"
+								className="text-dark w-full bg-blue-100 transition-colors hover:bg-blue-200 sm:w-auto"
 								disabled={
 									isBusy || deviceIds.length === 0 || !hasSelectedFields
 								}
@@ -485,7 +501,7 @@ export default function Download({
 								<a
 									href={actionData.href}
 									download={actionData.download}
-									className={`text-dark flex items-center rounded px-4 py-2 transition-colors ${
+									className={`text-dark flex min-h-10 w-full items-center justify-center rounded px-4 py-2 text-center transition-colors sm:w-auto ${
 										downloadStarted
 											? 'animate-pulse bg-blue-300'
 											: 'bg-green-100 hover:bg-green-400'

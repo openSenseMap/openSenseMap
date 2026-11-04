@@ -49,7 +49,8 @@ export async function updateProfile(
 	}
 
 	if ('homeLatitude' in values) updateValues.homeLatitude = values.homeLatitude
-	if ('homeLongitude' in values) updateValues.homeLongitude = values.homeLongitude
+	if ('homeLongitude' in values)
+		updateValues.homeLongitude = values.homeLongitude
 	if ('homeZoom' in values) updateValues.homeZoom = values.homeZoom
 
 	const [updatedProfile] = await drizzleClient

@@ -11,8 +11,8 @@ import {
 	CardHeader,
 	CardTitle,
 } from '~/components/ui/card'
-import { Input } from '~/components/ui/input'
 import { Label } from '~/components/ui/label'
+import { PasswordInput } from '~/components/ui/password-input'
 import { useToast } from '~/components/ui/use-toast'
 import {
 	deleteUserByEmail,
@@ -99,10 +99,9 @@ export default function EditUserProfilePage() {
 				<CardContent className="grid gap-4">
 					<div className="grid gap-2">
 						<Label htmlFor="passwordDelete">{t('confirm_password')}</Label>
-						<Input
+						<PasswordInput
 							placeholder={t('enter_password')}
 							required
-							type="password"
 							id="passwordDelete"
 							name="passwordDelete"
 							ref={passwordDelRef}

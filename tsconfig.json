@@ -2,14 +2,14 @@
 	"exclude": [],
 	"include": [
 		"app/env.ts",
-		"app/env.env.d.ts",
+		"app/types.d.ts",
 		"**/*.ts",
 		"**/*.tsx",
 		".react-router/types/**/*"
 	],
 	"compilerOptions": {
 		"lib": ["DOM", "DOM.Iterable", "ES2022"],
-		"types": ["node", "@react-router/node", "vite/client", "vitest/globals"],
+		"types": ["node", "@react-router/node", "vite/client", "vite-plus/test/globals"],
 		"isolatedModules": true,
 		"esModuleInterop": true,
 		"jsx": "react-jsx",

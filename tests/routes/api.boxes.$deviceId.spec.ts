@@ -2,7 +2,11 @@ import { generateTestUserCredentials } from 'tests/data/generate_test_user'
 import invariant from 'tiny-invariant'
 import { type Route } from '../../.react-router/types/app/routes/+types/api.boxes.$deviceId'
 import { BASE_URL } from '../../vitest.setup'
-import { createDevice, deleteDevice } from '~/db/models/device.server'
+import {
+	createDevice,
+	deleteDevice,
+	updateDeviceLocation,
+} from '~/db/models/device.server'
 import { deleteUserByEmail } from '~/db/models/user.server'
 import { type User, type Device } from '~/db/schema'
 import { createToken } from '~/lib/jwt'
@@ -11,6 +15,32 @@ import {
 	action as deviceAction,
 } from '~/routes/api.boxes.$deviceId'
 import { registerUser } from '~/services/user-service.server'
+import { getTerrainElevation } from '~/services/elevation-service.server'
+import { applyElevationConsentChoice } from '~/db/models/elevation-consent.server'
+
+const TEST_TERRAIN_ELEVATION = vi.hoisted(() => 250)
+const TEST_ELEVATION_DATASET = vi.hoisted(() => 'eudem25m')
+
+vi.mock('~/db/models/elevation-consent.server', () => ({
+	applyElevationConsentChoice: vi.fn(async () => true),
+}))
+
+vi.mock('~/services/elevation-service.server', async (importOriginal) => {
+	const actual =
+		await importOriginal<typeof import('~/services/elevation-service.server')>()
+
+	return {
+		...actual,
+		getTerrainElevation: vi.fn(async (latitude: number, longitude: number) => ({
+			elevation: TEST_TERRAIN_ELEVATION,
+			dataset: TEST_ELEVATION_DATASET,
+			datum: null,
+			attribution: null,
+			latitude,
+			longitude,
+		})),
+	}
+})
 
 const DEVICE_TEST_USER = generateTestUserCredentials()
 
@@ -53,8 +83,8 @@ describe('openSenseMap API Routes: /boxes/:deviceId', () => {
 		queryableDevice = await createDevice(
 			{
 				...generateMinimalDevice(),
-				latitude: 123,
-				longitude: 12,
+				latitude: 12,
+				longitude: 123,
 				tags: ['testgroup'],
 				useAuth: false,
 			},
@@ -127,7 +157,7 @@ describe('openSenseMap API Routes: /boxes/:deviceId', () => {
 				exposure: 'indoor',
 				grouptag: 'testgroup',
 				description: 'total neue beschreibung',
-				location: { lat: 54.2, lng: 21.1 },
+				location: { lat: 54.2, lng: 21.1, height: 45.75 },
 				weblink: 'http://www.google.de',
 				useAuth: true,
 				image:
@@ -148,6 +178,8 @@ describe('openSenseMap API Routes: /boxes/:deviceId', () => {
 				params: { deviceId: queryableDevice?.id },
 			} as Route.ActionArgs as Route.ActionArgs)
 			const data = await response.json()
+			const expectedHeight =
+				TEST_TERRAIN_ELEVATION + update_payload.location.height
 
 			expect(response.status).toBe(200)
 			expect(data.name).toBe(update_payload.name)
@@ -156,9 +188,18 @@ describe('openSenseMap API Routes: /boxes/:deviceId', () => {
 			expect(data.grouptag).toContain(update_payload.grouptag)
 			expect(data.description).toBe(update_payload.description)
 			expect(data.access_token).not.toBeNull()
+			expect(data.height).toBe(expectedHeight)
+			expect(data.heightAboveGround).toBe(update_payload.location.height)
+			expect(data.heightAboveSeaLevel).toBe(expectedHeight)
+			expect(data.terrainElevation).toBe(TEST_TERRAIN_ELEVATION)
+			expect(data.terrainElevationDataset).toBe(TEST_ELEVATION_DATASET)
 			expect(data.currentLocation).toEqual({
 				type: 'Point',
-				coordinates: [update_payload.location.lng, update_payload.location.lat],
+				coordinates: [
+					update_payload.location.lng,
+					update_payload.location.lat,
+					expectedHeight,
+				],
 				timestamp: expect.any(String),
 			})
 
@@ -170,6 +211,7 @@ describe('openSenseMap API Routes: /boxes/:deviceId', () => {
 						coordinates: [
 							update_payload.location.lng,
 							update_payload.location.lat,
+							expectedHeight,
 						],
 						timestamp: expect.any(String),
 					},
@@ -177,7 +219,16 @@ describe('openSenseMap API Routes: /boxes/:deviceId', () => {
 			])
 		})
 
-		it('should allow to update the device via PUT with array as grouptags', async () => {
+		it('should preserve above-ground height and recalculate sea-level height when coordinates change', async () => {
+			await updateDeviceLocation({
+				id: queryableDevice.id,
+				latitude: queryableDevice.latitude,
+				longitude: queryableDevice.longitude,
+				heightAboveGround: 7.5,
+				terrainElevation: 25,
+				terrainElevationDataset: 'mapzen',
+			})
+
 			const update_payload = {
 				name: 'neuername',
 				exposure: 'outdoor',
@@ -213,13 +264,21 @@ describe('openSenseMap API Routes: /boxes/:deviceId', () => {
 			expect(data.grouptag).toEqual(update_payload.grouptag)
 
 			expect(data.description).toBe(update_payload.description)
+			const expectedHeight = TEST_TERRAIN_ELEVATION + 7.5
+			expect(data.heightAboveGround).toBe(7.5)
+			expect(data.heightAboveSeaLevel).toBe(expectedHeight)
+			expect(data.terrainElevation).toBe(TEST_TERRAIN_ELEVATION)
+			expect(data.terrainElevationDataset).toBe(TEST_ELEVATION_DATASET)
+			expect(data.height).toBe(expectedHeight)
 			expect(data.currentLocation.coordinates).toEqual([
 				update_payload.location.lng,
 				update_payload.location.lat,
+				expectedHeight,
 			])
 			expect(data.loc[0].geometry.coordinates).toEqual([
 				update_payload.location.lng,
 				update_payload.location.lat,
+				expectedHeight,
 			])
 
 			//TODO: this fails, check if we actually need timestamps in images
@@ -228,6 +287,124 @@ describe('openSenseMap API Routes: /boxes/:deviceId', () => {
 			// const tsMs = parseInt(ts36, 36) * 1000
 			// expect(Date.now() - tsMs).toBeLessThan(1000)
 		})
+
+		it('should convert a zero above-ground height via PUT', async () => {
+			const updatePayload = {
+				location: { lat: 52.52, lng: 13.405, height: 0 },
+			}
+
+			const request = new Request(`${BASE_URL}/${queryableDevice.id}`, {
+				method: 'PUT',
+				headers: {
+					'Content-Type': 'application/json',
+					Authorization: `Bearer ${jwt}`,
+				},
+				body: JSON.stringify(updatePayload),
+			})
+
+			const response = await deviceAction({
+				request,
+				params: { deviceId: queryableDevice.id },
+			} as Route.ActionArgs)
+			const data = await response.json()
+
+			expect(response.status).toBe(200)
+			expect(data.height).toBe(TEST_TERRAIN_ELEVATION)
+			expect(data.heightAboveGround).toBe(0)
+			expect(data.heightAboveSeaLevel).toBe(TEST_TERRAIN_ELEVATION)
+			expect(data.terrainElevation).toBe(TEST_TERRAIN_ELEVATION)
+			expect(data.terrainElevationDataset).toBe(TEST_ELEVATION_DATASET)
+			expect(data.currentLocation.coordinates).toEqual([
+				13.405,
+				52.52,
+				TEST_TERRAIN_ELEVATION,
+			])
+			expect(data.loc[0].geometry.coordinates).toEqual([
+				13.405,
+				52.52,
+				TEST_TERRAIN_ELEVATION,
+			])
+
+			const getResponse = (await deviceLoader({
+				params: { deviceId: queryableDevice.id },
+			} as Route.LoaderArgs)) as Response
+			const persisted = await getResponse.json()
+
+			expect(getResponse.status).toBe(200)
+			expect(persisted.height).toBe(TEST_TERRAIN_ELEVATION)
+			expect(persisted.heightAboveGround).toBe(0)
+			expect(persisted.heightAboveSeaLevel).toBe(TEST_TERRAIN_ELEVATION)
+			expect(persisted.terrainElevation).toBe(TEST_TERRAIN_ELEVATION)
+			expect(persisted.terrainElevationDataset).toBe(TEST_ELEVATION_DATASET)
+			expect(persisted.currentLocation.coordinates).toEqual([
+				13.405,
+				52.52,
+				TEST_TERRAIN_ELEVATION,
+			])
+		})
+
+		it('should retain height above ground when elevation lookup fails', async () => {
+			vi.mocked(getTerrainElevation).mockRejectedValueOnce(
+				new Error('Elevation unavailable'),
+			)
+			const updatePayload = {
+				location: { lat: 54.18, lng: 7.89, height: 5 },
+			}
+			const request = new Request(`${BASE_URL}/${queryableDevice.id}`, {
+				method: 'PUT',
+				headers: {
+					'Content-Type': 'application/json',
+					Authorization: `Bearer ${jwt}`,
+				},
+				body: JSON.stringify(updatePayload),
+			})
+
+			const response = await deviceAction({
+				request,
+				params: { deviceId: queryableDevice.id },
+			} as Route.ActionArgs)
+			const responseData = await response.json()
+
+			expect(response.status).toBe(200)
+			expect(responseData.heightAboveGround).toBe(5)
+			expect(responseData.heightAboveSeaLevel).toBeNull()
+			expect(responseData.terrainElevation).toBeNull()
+			expect(responseData.terrainElevationDataset).toBeNull()
+			expect(responseData.height).toBeNull()
+			expect(responseData.currentLocation.coordinates).toEqual([7.89, 54.18])
+		})
+
+		it('should not request elevation without consent', async () => {
+			vi.mocked(applyElevationConsentChoice).mockResolvedValueOnce(false)
+			const elevationLookup = vi.mocked(getTerrainElevation)
+			elevationLookup.mockClear()
+			const updatePayload = {
+				location: { lat: 54.18, lng: 7.89, height: 5 },
+				elevationLookupConsent: false,
+			}
+			const request = new Request(`${BASE_URL}/${queryableDevice.id}`, {
+				method: 'PUT',
+				headers: {
+					'Content-Type': 'application/json',
+					Authorization: `Bearer ${jwt}`,
+				},
+				body: JSON.stringify(updatePayload),
+			})
+
+			const response = await deviceAction({
+				request,
+				params: { deviceId: queryableDevice.id },
+			} as Route.ActionArgs)
+			const responseData = await response.json()
+
+			expect(response.status).toBe(200)
+			expect(elevationLookup).not.toHaveBeenCalled()
+			expect(responseData.heightAboveGround).toBe(5)
+			expect(responseData.heightAboveSeaLevel).toBeNull()
+			expect(responseData.terrainElevation).toBeNull()
+			expect(responseData.terrainElevationDataset).toBeNull()
+		})
+
 		it('should remove image when deleteImage=true', async () => {
 			const update_payload = {
 				deleteImage: true,

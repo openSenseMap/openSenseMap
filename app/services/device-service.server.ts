@@ -10,6 +10,7 @@ import {
 } from '~/db/models/device.server'
 import { verifyLogin } from '~/db/models/user.server'
 import { type Device, type User } from '~/db/schema'
+import { uploadedDeviceSchemaV1 } from '~/lib/device-schemas/device-schema-v1'
 import { deleteDeviceImage } from '~/lib/s3.server'
 
 export const CreateDeviceServiceSchema = z
@@ -28,6 +29,9 @@ export const CreateDeviceServiceSchema = z
 		tags: z.array(z.string()).optional().default([]),
 		latitude: z.number(),
 		longitude: z.number(),
+		heightAboveGround: z.number().optional().nullable(),
+		terrainElevation: z.number().optional().nullable(),
+		terrainElevationDataset: z.string().optional().nullable(),
 		model: z
 			.enum([
 				'homeV2Lora',
@@ -49,6 +53,8 @@ export const CreateDeviceServiceSchema = z
 				}),
 			)
 			.optional(),
+		deviceSchema: uploadedDeviceSchemaV1.optional(),
+		deviceSchemaVersionId: z.string().optional(),
 	})
 	.refine((data) => !(data.model && data.sensors && data.model !== 'custom'), {
 		message: 'Model and sensors cannot be specified at the same time.',

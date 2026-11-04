@@ -5,7 +5,11 @@ import { Save } from 'lucide-react'
 import React from 'react'
 import { data, redirect, useFetcher, useLoaderData } from 'react-router'
 import { type Route } from './+types/device.$deviceId.edit.$integrationSlug'
-import { ArrayFieldTemplate } from '~/components/rjsf/arrayFieldTemplate'
+import {
+	ArrayFieldItemTemplate,
+	ArrayFieldRemoveButton,
+	ArrayFieldTemplate,
+} from '~/components/rjsf/arrayFieldTemplate'
 import { CheckboxWidget } from '~/components/rjsf/checkboxWidget'
 import { FieldTemplate } from '~/components/rjsf/fieldTemplate'
 import { BaseInputTemplate } from '~/components/rjsf/inputTemplate'
@@ -193,7 +197,7 @@ export default function EditIntegration() {
 			<h1 className="mb-4 text-4xl">{intg.name}</h1>
 
 			{intg.description && (
-				<p className="mb-6 text-gray-600">{intg.description}</p>
+				<p className="text-muted-foreground mb-6">{intg.description}</p>
 			)}
 
 			<Form
@@ -202,7 +206,13 @@ export default function EditIntegration() {
 				uiSchema={uiSchema}
 				formData={formData}
 				validator={validator}
-				templates={{ FieldTemplate, ArrayFieldTemplate, BaseInputTemplate }}
+				templates={{
+					FieldTemplate,
+					ArrayFieldTemplate,
+					ArrayFieldItemTemplate,
+					BaseInputTemplate,
+					ButtonTemplates: { RemoveButton: ArrayFieldRemoveButton },
+				}}
 				onChange={(e: any) => setFormData(e.formData)}
 				onSubmit={handleSubmit}
 				omitExtraData

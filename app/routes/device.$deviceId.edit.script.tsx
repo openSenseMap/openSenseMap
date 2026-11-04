@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { redirect, useLoaderData } from 'react-router'
 import { type Route } from './+types/device.$deviceId.edit.script'
 import { Button } from '~/components/ui/button'
+import { PasswordInput } from '~/components/ui/password-input'
 import { Textarea } from '~/components/ui/textarea'
 import { getDeviceWithoutSensors } from '~/db/models/device.server'
 import { getSensorsFromDevice } from '~/db/models/sensor.server'
@@ -258,14 +259,13 @@ export default function EditBoxSensors() {
 										</label>
 
 										<div className="mt-1">
-											<input
+											<PasswordInput
 												id="password"
 												required
 												autoFocus={true}
 												name="password"
-												type="password"
 												aria-describedby="name-error"
-												className="w-full rounded border border-gray-200 px-2 py-1 text-base"
+												className="text-base"
 											/>
 										</div>
 									</div>

@@ -2,7 +2,7 @@ import { format, Locale } from 'date-fns'
 import { de, enGB } from 'date-fns/locale'
 import { CalendarIcon } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
-import { type DateRange } from 'react-day-picker'
+import { type DateRange } from '@daypicker/react'
 import { useLoaderData, useSearchParams } from 'react-router'
 
 import { Badge } from './ui/badge'

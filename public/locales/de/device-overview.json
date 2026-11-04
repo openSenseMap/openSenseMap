@@ -13,6 +13,15 @@
 	"api_key_label": "API Key",
 	"device_settings": "Gerätseinstellungen",
 	"manage_device_data": "Verwalte die Daten deines Geräts.",
+	"sidebar": {
+		"general": "Allgemein",
+		"sensors": "Sensoren",
+		"location": "Standort",
+		"logs": "Protokolle",
+		"security": "Sicherheit",
+		"script": "Skript",
+		"transfer": "Übertragen"
+	},
 	"show_on_map": "Auf der Karte anzeigen",
 	"device_updated": "Gerät erfolgreich aktualisiert",
 	"view": "Ansicht"

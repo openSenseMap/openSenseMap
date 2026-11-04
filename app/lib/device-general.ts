@@ -5,7 +5,8 @@ export const generalInfoSchema = z.object({
 		.string()
 		.trim()
 		.min(1, 'Name is required')
-		.min(2, 'Name must be at least 2 characters'),
+		.min(2, 'Name must be at least 2 characters')
+		.max(100, 'Name must not exceed 100 characters'),
 
 	description: z
 		.string()
@@ -48,6 +49,3 @@ export type GeneralInfoErrors = {
 	temporaryExpirationDate?: string
 	tags?: string
 }
-
-
-

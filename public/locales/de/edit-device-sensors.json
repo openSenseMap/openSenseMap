@@ -14,5 +14,13 @@
 	"fill_required_fields": "Bitte alle erforderlichen Felder ausfüllen.",
 	"cancel": "Abbrechen",
 	"save": "Speichern",
-	"add": "Hinzufügen"
+	"add": "Hinzufügen",
+	"save_failed": "Sensoren konnten nicht gespeichert werden",
+	"edit_icon": "Icon bearbeiten",
+	"schema_detach": "Vom Schema lösen",
+	"schema_detach_confirm": "Dieses Gerät vom Schema lösen? Danach können Sensornamen, Einheiten und Typen manuell bearbeitet werden.",
+	"schema_notice_title": "Dieses Gerät verwendet das Schema {{name}} v{{version}}.",
+	"schema_notice_text": "Phänomen, Einheit und Typ sind gesperrt, damit Messungen vergleichbar bleiben. Du kannst Sensoren weiterhin sortieren und ihre Icons ändern.",
+	"schema_fields_locked": "Dieser Sensor ist durch das Geräteschema definiert. Phänomen, Einheit und Typ sind gesperrt; hier kann nur das Icon geändert werden.",
+	"schema_out_of_sync": "Die aktuellen Sensoren passen nicht mehr zu diesem Schema. Löse das Gerät vom Schema, bevor du Sensoren bearbeitest."
 }

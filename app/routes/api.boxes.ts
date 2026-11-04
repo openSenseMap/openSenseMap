@@ -4,7 +4,7 @@ import {
 	findDevices,
 	type FindDevicesOptions,
 } from '~/db/models/device.server'
-import { type Device, type User } from '~/db/schema'
+import { type User } from '~/db/schema'
 import { transformDeviceToApiFormat } from '~/lib/device-transform'
 import { StandardResponse } from '~/lib/responses'
 
@@ -31,6 +31,11 @@ import {
 	DevicesQuerySchema,
 	CreateDeviceSchema,
 } from '~/lib/api-schemas/devices'
+import {
+	ElevationLookupError,
+	getTerrainElevation,
+} from '~/services/elevation-service.server'
+import { applyElevationConsentChoice } from '~/db/models/elevation-consent.server'
 
 const DevicesQueryParamsSchema = DevicesQuerySchema.meta({
 	id: 'DevicesQueryParams',
@@ -88,7 +93,8 @@ export const openapi: ZodOpenApiPathItemObject = {
 	post: {
 		tags: ['Devices'],
 		summary: 'Create a new device',
-		description: 'Creates a new device with optional sensors.',
+		description:
+			'Creates a new device with optional sensors. An optional location height is interpreted and stored as height above ground. Coordinates are sent to GPXZ and height above sea level is calculated only when the authenticated user has granted the current elevation lookup consent. A missing consent or lookup failure does not fail device creation.',
 		security: [{ bearerAuth: [] }],
 
 		requestBody: {
@@ -167,14 +173,18 @@ export async function loader({ request }: Route.LoaderArgs) {
 	if (params.format === 'geojson') {
 		const geojson = {
 			type: 'FeatureCollection',
-			features: devices.map((device: Device) => ({
+			features: devices.map((device) => ({
 				type: 'Feature',
 				geometry: {
 					type: 'Point',
-					coordinates: [device.longitude, device.latitude],
+					coordinates:
+						device.heightAboveSeaLevel === null
+							? [device.longitude, device.latitude]
+							: [device.longitude, device.latitude, device.heightAboveSeaLevel],
 				},
 				properties: {
 					...device,
+					height: device.heightAboveSeaLevel,
 				},
 			})),
 		}
@@ -185,11 +195,17 @@ export async function loader({ request }: Route.LoaderArgs) {
 			},
 		})
 	}
-	return Response.json(devices, {
-		headers: {
-			'Content-Type': 'application/json; charset=utf-8',
+	return Response.json(
+		devices.map((device) => ({
+			...device,
+			height: device.heightAboveSeaLevel,
+		})),
+		{
+			headers: {
+				'Content-Type': 'application/json; charset=utf-8',
+			},
 		},
-	})
+	)
 }
 
 export const action = async ({ request }: Route.ActionArgs) => {
@@ -226,8 +242,29 @@ async function post(request: Request, user: User) {
 
 		const validatedData = validationResult.data
 		const sensorsProvided = validatedData.sensors?.length > 0
-		// Extract longitude and latitude from location array [longitude, latitude]
-		const [longitude, latitude] = validatedData.location
+		// Request height is relative to ground; sea-level height is best-effort.
+		const [longitude, latitude, heightAboveGround] = validatedData.location
+		let terrainElevation: number | null = null
+		let terrainElevationDataset: string | null = null
+		const mayLookupElevation = await applyElevationConsentChoice(
+			user.id,
+			validatedData.elevationLookupConsent,
+		)
+
+		if (heightAboveGround !== undefined && mayLookupElevation) {
+			try {
+				const elevationResult = await getTerrainElevation(latitude, longitude)
+				terrainElevation = elevationResult.elevation
+				terrainElevationDataset = elevationResult.dataset
+			} catch (error) {
+				console.warn('POST /boxes terrain elevation lookup failed', {
+					error: error instanceof ElevationLookupError ? error.code : error,
+					latitude,
+					longitude,
+				})
+			}
+		}
+
 		const newDevice = await createDevice(
 			{
 				name: validatedData.name,
@@ -235,6 +272,9 @@ async function post(request: Request, user: User) {
 				model: sensorsProvided ? undefined : validatedData.model,
 				latitude: latitude,
 				longitude: longitude,
+				heightAboveGround: heightAboveGround ?? null,
+				terrainElevation,
+				terrainElevationDataset,
 				tags: validatedData.grouptag,
 				sensors: sensorsProvided
 					? validatedData.sensors.map((s) => ({

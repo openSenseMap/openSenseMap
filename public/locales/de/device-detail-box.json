@@ -12,5 +12,29 @@
 	"sensor_order_hint_link": "Sensoreinstellungen",
 	"compare_devices": "Geräte vergleichen",
 	"choose_device_for_comparison": "Wähle ein Gerät auf der Karte für den Vergleich.",
-	"open_device_details": "Öffne Gerätedetails"
+	"open_device_details": "Gerätedetails öffnen",
+	"device_image": "Gerätebild",
+	"exposure": "Standort",
+	"exposure_values": {
+		"indoor": "Drinnen",
+		"outdoor": "Draußen",
+		"mobile": "Mobil"
+	},
+	"unknown": "Unbekannt",
+	"height_above_sea_level": "Höhe über dem Meeresspiegel",
+	"sensor_model": "Sensormodell",
+	"last_updated": "Zuletzt aktualisiert",
+	"created_at": "Erstellt am",
+	"expires_at": "Läuft ab am",
+	"tags": "Tags",
+	"sensor_limit_title": "Es können höchstens zwei Sensoren ausgewählt werden",
+	"sensor_limit_description": "Hebe die Auswahl eines Sensors auf, um einen anderen auszuwählen",
+	"no_recent_data": "Keine aktuellen Daten",
+	"logs": "Protokoll",
+	"show_all_logs": "Alle Protokolleinträge anzeigen.",
+	"device_logs": "Geräteprotokoll",
+	"logs_owner_hint": "Wenn dies dein Gerät ist, kannst du Änderungen in den Geräteeinstellungen vornehmen.",
+	"copied_to_clipboard": "In die Zwischenablage kopiert",
+	"share_link_hint": "Jetzt kannst du deinen Link teilen! 🎉",
+	"copy": "Kopieren"
 }

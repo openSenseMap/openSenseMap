@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll, afterAll } from 'vitest'
+import { describe, it, expect, beforeAll, afterAll } from 'vite-plus/test'
 import { type Route } from '../../.react-router/types/app/routes/+types/api.boxes.$deviceId'
 import { BASE_URL } from '../../vitest.setup'
 import {

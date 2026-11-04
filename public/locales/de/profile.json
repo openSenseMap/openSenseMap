@@ -4,6 +4,8 @@
 	"devices": "Geräte",
 	"sensors": "Sensoren",
 	"measurements": "Messungen",
+	"device_schemas": "Geräteschemas",
+	"download": "Herunterladen",
 	"badges": "Badges",
 	"take_over_device": "Gerät übernehmen",
 	"transfer_device": "Gerät übertragen",

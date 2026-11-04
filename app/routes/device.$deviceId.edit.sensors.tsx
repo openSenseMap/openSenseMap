@@ -18,6 +18,7 @@ import {
 	useLoaderData,
 	useNavigation,
 	useOutletContext,
+	useSubmit,
 } from 'react-router'
 import invariant from 'tiny-invariant'
 import { type Route } from './+types/device.$deviceId.edit.sensors'
@@ -35,6 +36,11 @@ import {
 	getSensorsFromDevice,
 	updateSensor,
 } from '~/db/models/sensor.server'
+import {
+	detachDeviceSchema,
+	getDeviceWithoutSensors,
+} from '~/db/models/device.server'
+import { getSharedDeviceSchemaVersion } from '~/db/models/device-schema.server'
 import { assignIcon, getIcon, iconsList } from '~/lib/sensoricons'
 import { getUserId } from '~/services/session-service.server'
 import { useCopyToClipboard } from '@/hooks/use-copy-to-clipboard'
@@ -44,6 +50,17 @@ import { Button } from '~/components/ui/button'
 import { Callout } from '~/components/ui/alert'
 import { Input } from '~/components/ui/input'
 import { Label } from '~/components/ui/label'
+import {
+	AlertDialog,
+	AlertDialogAction,
+	AlertDialogCancel,
+	AlertDialogContent,
+	AlertDialogDescription,
+	AlertDialogFooter,
+	AlertDialogHeader,
+	AlertDialogTitle,
+	AlertDialogTrigger,
+} from '~/components/ui/alert-dialog'
 
 //*****************************************************
 export async function loader({ request, params }: Route.LoaderArgs) {
@@ -55,9 +72,29 @@ export async function loader({ request, params }: Route.LoaderArgs) {
 	if (typeof deviceID !== 'string') {
 		return 'deviceID not found'
 	}
-	const rawSensorsData = await getSensorsFromDevice(deviceID)
+	const device = await getDeviceWithoutSensors({ id: deviceID })
 
-	return rawSensorsData as any
+	if (!device || device.userId !== userId) {
+		return redirect('/')
+	}
+
+	const [rawSensorsData, deviceSchema] = await Promise.all([
+		getSensorsFromDevice(deviceID),
+		device.deviceSchemaVersionId
+			? getSharedDeviceSchemaVersion(device.deviceSchemaVersionId, userId)
+			: Promise.resolve(undefined),
+	])
+
+	return {
+		sensors: rawSensorsData,
+		deviceSchema: deviceSchema
+			? {
+					name: deviceSchema.name,
+					version: deviceSchema.version,
+					sensors: deviceSchema.content.sensors,
+				}
+			: null,
+	} as any
 }
 
 //*****************************************************
@@ -66,16 +103,109 @@ export async function action({ request, params }: Route.ActionArgs) {
 	if (!userId) return redirect('/')
 
 	const formData = await request.formData()
-	const { updatedSensorsData } = Object.fromEntries(formData)
-
-	if (typeof updatedSensorsData !== 'string') {
-		return { isUpdated: false }
-	}
+	const { intent, updatedSensorsData } = Object.fromEntries(formData)
 
 	const deviceId = params.deviceId
 	invariant(deviceId, 'deviceID not found!')
 
+	const device = await getDeviceWithoutSensors({ id: deviceId })
+	if (!device || device.userId !== userId) return redirect('/')
+
+	if (intent === 'detach-schema') {
+		await detachDeviceSchema({ id: deviceId, userId })
+		return { isUpdated: true, isDetached: true }
+	}
+
+	if (typeof updatedSensorsData !== 'string') {
+		return { isUpdated: false, message: 'No sensor data submitted.' }
+	}
+
 	const updatedSensorsDataJson = JSON.parse(updatedSensorsData)
+	const currentSensors = await getSensorsFromDevice(deviceId)
+	const currentSensorsById = new Map(
+		currentSensors.map((sensor) => [sensor.id, sensor]),
+	)
+	const deviceSchema = device.deviceSchemaVersionId
+		? await getSharedDeviceSchemaVersion(device.deviceSchemaVersionId, userId)
+		: null
+
+	if (deviceSchema) {
+		if (currentSensors.length !== deviceSchema.content.sensors.length) {
+			return {
+				isUpdated: false,
+				message:
+					'This device no longer matches its schema. Detach it from the schema before editing sensors.',
+			}
+		}
+
+		const schemaSensorsById = new Map(
+			deviceSchema.content.sensors.map((schemaSensor) => [
+				schemaSensor.id,
+				schemaSensor,
+			]),
+		)
+		const schemaSensorsByExistingSensorId = new Map(
+			currentSensors.map((sensor, index) => {
+				const schemaSensorId =
+					sensor.data &&
+					typeof sensor.data === 'object' &&
+					!Array.isArray(sensor.data)
+						? (sensor.data as { deviceSchemaSensorId?: unknown })
+								.deviceSchemaSensorId
+						: null
+
+				return [
+					sensor.id,
+					typeof schemaSensorId === 'string'
+						? (schemaSensorsById.get(schemaSensorId) ??
+							deviceSchema.content.sensors[index])
+						: deviceSchema.content.sensors[index],
+				]
+			}),
+		)
+
+		for (const [index, submittedSensor] of updatedSensorsDataJson.entries()) {
+			const sensorId = submittedSensor?.id
+			const existingSensor =
+				typeof sensorId === 'string' ? currentSensorsById.get(sensorId) : null
+			const schemaSensor =
+				typeof sensorId === 'string'
+					? schemaSensorsByExistingSensorId.get(sensorId)
+					: null
+
+			if (
+				submittedSensor?.new === true ||
+				submittedSensor?.deleted === true ||
+				!existingSensor ||
+				!schemaSensor
+			) {
+				return {
+					isUpdated: false,
+					message:
+						'Schema-backed sensors cannot be added or deleted. Detach the device from its schema first.',
+				}
+			}
+
+			await updateSensor({
+				id: existingSensor.id,
+				title: schemaSensor.title,
+				unit: schemaSensor.unit,
+				sensorType: schemaSensor.sensorType,
+				icon: submittedSensor.icon ?? existingSensor.icon,
+				data: {
+					...(existingSensor.data &&
+					typeof existingSensor.data === 'object' &&
+					!Array.isArray(existingSensor.data)
+						? existingSensor.data
+						: {}),
+					deviceSchemaSensorId: schemaSensor.id,
+				},
+				order: index,
+			})
+		}
+
+		return { isUpdated: true }
+	}
 
 	let persistedOrder = 0
 
@@ -91,8 +221,14 @@ export async function action({ request, params }: Route.ActionArgs) {
 			})
 			persistedOrder++
 		} else if (sensor?.deleted === true) {
+			if (!currentSensorsById.has(sensor.id)) {
+				return { isUpdated: false, message: 'Sensor not found.' }
+			}
 			await deleteSensor(sensor.id)
 		} else if (!sensor?.new) {
+			if (!currentSensorsById.has(sensor.id)) {
+				return { isUpdated: false, message: 'Sensor not found.' }
+			}
 			await updateSensor({
 				id: sensor.id,
 				title: sensor.title,
@@ -105,8 +241,8 @@ export async function action({ request, params }: Route.ActionArgs) {
 		}
 	}
 
-	const currentSensors = await getSensorsFromDevice(deviceId)
-	const validSensorIds = currentSensors
+	const nextSensors = await getSensorsFromDevice(deviceId)
+	const validSensorIds = nextSensors
 		.map((sensor: any) => sensor._id || sensor.id)
 		.filter(Boolean)
 
@@ -123,6 +259,7 @@ export default function EditBoxSensors() {
 	const data = useLoaderData<typeof loader>()
 	const actionData = useActionData<typeof action>()
 	const navigation = useNavigation()
+	const submit = useSubmit()
 	const isSubmitting = navigation.state !== 'idle'
 
 	const { copyToClipboard } = useCopyToClipboard()
@@ -135,7 +272,12 @@ export default function EditBoxSensors() {
 	const [copiedSensorId, setCopiedSensorId] = React.useState<string | null>(
 		null,
 	)
-	const [sensorsData, setSensorsData] = useState(data)
+	const originalSensorsData = Array.isArray(data) ? data : data.sensors
+	const deviceSchema = Array.isArray(data) ? null : data.deviceSchema
+	const isSchemaBacked = !!deviceSchema
+	const isSchemaOutOfSync =
+		isSchemaBacked && originalSensorsData.length !== deviceSchema.sensors.length
+	const [sensorsData, setSensorsData] = useState(originalSensorsData)
 
 	/* temp impl. until figuring out how to updating state of nested objects  */
 	const [tepmState, setTepmState] = useState(false)
@@ -149,9 +291,9 @@ export default function EditBoxSensors() {
 	const getOriginalSensor = React.useCallback(
 		(sensor: any, index: number) =>
 			sensor?.id
-				? data.find((item: any) => item.id === sensor.id)
-				: data[index],
-		[data],
+				? originalSensorsData.find((item: any) => item.id === sensor.id)
+				: originalSensorsData[index],
+		[originalSensorsData],
 	)
 
 	React.useEffect(() => {
@@ -172,8 +314,18 @@ export default function EditBoxSensors() {
 					delete sensor.editing
 				}
 			}
+		} else if (actionData?.message) {
+			toast({
+				title: t('save_failed'),
+				description: actionData.message,
+				variant: 'destructive',
+			})
 		}
-	}, [actionData, setToastOpen]) // eslint-disable-line react-hooks/exhaustive-deps
+	}, [actionData, setToastOpen, toast, t]) // eslint-disable-line react-hooks/exhaustive-deps
+
+	React.useEffect(() => {
+		setSensorsData(originalSensorsData)
+	}, [originalSensorsData])
 
 	const handleCopySensorId = React.useCallback(
 		async (sensorId: string | null) => {
@@ -216,15 +368,15 @@ export default function EditBoxSensors() {
 						{/* Heading */}
 						<div>
 							{/* Title */}
-							<div className="mt-2 flex justify-between">
+							<div className="mt-2 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
 								<div>
 									<h1 className="text-4xl">Sensor</h1>
 								</div>
-								<div className="flex items-center gap-3">
+								<div className="flex flex-wrap items-center gap-2 sm:gap-3">
 									<Button
 										type="button"
 										variant="outline"
-										disabled={isSubmitting}
+										disabled={isSubmitting || isSchemaBacked}
 										onClick={() => {
 											setSensorsData([
 												{
@@ -243,6 +395,47 @@ export default function EditBoxSensors() {
 										<Plus className="h-4 w-4" />
 										{t('add')}
 									</Button>
+
+									{isSchemaBacked && (
+										<AlertDialog>
+											<AlertDialogTrigger asChild>
+												<Button
+													type="button"
+													variant="outline"
+													disabled={isSubmitting}
+												>
+													{t('schema_detach')}
+												</Button>
+											</AlertDialogTrigger>
+											<AlertDialogContent>
+												<AlertDialogHeader>
+													<AlertDialogTitle>
+														{t('schema_detach')}
+													</AlertDialogTitle>
+													<AlertDialogDescription>
+														{t('schema_detach_confirm')}
+													</AlertDialogDescription>
+												</AlertDialogHeader>
+												<AlertDialogFooter>
+													<AlertDialogCancel type="button">
+														{t('cancel')}
+													</AlertDialogCancel>
+													<AlertDialogAction
+														type="button"
+														disabled={isSubmitting}
+														onClick={() =>
+															submit(
+																{ intent: 'detach-schema' },
+																{ method: 'post' },
+															)
+														}
+													>
+														{t('schema_detach')}
+													</AlertDialogAction>
+												</AlertDialogFooter>
+											</AlertDialogContent>
+										</AlertDialog>
+									)}
 
 									<Button
 										type="submit"
@@ -265,8 +458,28 @@ export default function EditBoxSensors() {
 							<p>{t('sensor_delete_warning')}</p>
 						</Callout>
 
+						{isSchemaBacked && (
+							<Callout variant="note">
+								<p className="font-semibold">
+									{t('schema_notice_title', {
+										name: deviceSchema.name,
+										version: deviceSchema.version,
+									})}
+								</p>
+								<p className="mt-1">{t('schema_notice_text')}</p>
+								{isSchemaOutOfSync && (
+									<p className="mt-2 font-semibold">
+										{t('schema_out_of_sync')}
+									</p>
+								)}
+							</Callout>
+						)}
+
 						<ul className="border-border bg-card text-card-foreground mt-2 overflow-hidden rounded-md border">
 							{sensorsData?.map((sensor: any, index: number) => {
+								const isSchemaSensor = isSchemaBacked && !sensor?.new
+								const canEditSchemaFields = !isSchemaSensor
+
 								return (
 									<li
 										key={sensor.id ?? index}
@@ -288,19 +501,21 @@ export default function EditBoxSensors() {
 										}}
 										className="border-border hover:bg-muted/30 border-t p-4 first:border-t-0"
 									>
-										<div className="grid grid-cols-12">
+										<div className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-3 sm:grid-cols-12 sm:gap-0">
 											{/* drag handle */}
 											{!sensor?.editing && (
-												<div className="col-span-1 m-auto flex cursor-grab items-center justify-center text-[#aaa] active:cursor-grabbing">
+												<div className="col-start-1 row-start-1 m-auto flex cursor-grab items-center justify-center text-[#aaa] active:cursor-grabbing sm:col-span-1 sm:col-start-auto sm:row-start-auto">
 													<GripVertical className="h-5 w-5" />
 												</div>
 											)}
-											{sensor?.editing && <div className="col-span-1" />}
+											{sensor?.editing && (
+												<div className="col-start-1 row-start-1 sm:col-span-1 sm:col-start-auto sm:row-start-auto" />
+											)}
 
 											{/* left side -> sensor icons list */}
-											<div className="col-span-1 m-auto sm:col-span-1">
+											<div className="col-start-1 row-start-2 m-auto sm:col-span-1 sm:col-start-auto sm:row-start-auto">
 												{sensor?.editing ? (
-													<span className="table-cell h-55.5 w-[30%] text-center align-middle">
+													<span className="table-cell text-center align-middle sm:h-55.5 sm:w-[30%]">
 														<div className="relative inline-block align-middle">
 															{/* view icon */}
 															<button
@@ -354,7 +569,7 @@ export default function EditBoxSensors() {
 														</div>
 													</span>
 												) : (
-													<span className="table-cell h-22.5 w-[30%] text-center align-middle">
+													<span className="table-cell text-center align-middle sm:h-22.5 sm:w-[30%]">
 														{sensor.icon
 															? getIcon(sensor.icon)
 															: assignIcon(sensor.sensorType, sensor.title)}
@@ -362,7 +577,7 @@ export default function EditBoxSensors() {
 												)}
 											</div>
 											{/* middle -> sensor attributes */}
-											<div className="border-border col-span-8 border-r sm:col-span-8">
+											<div className="border-border col-start-2 row-span-2 row-start-1 min-w-0 sm:col-span-8 sm:col-start-auto sm:row-span-1 sm:row-start-auto sm:border-r">
 												{/* shown by default */}
 												{!sensor?.editing && (
 													<span className="table-cell align-middle leading-[1.75]">
@@ -372,10 +587,12 @@ export default function EditBoxSensors() {
 																{sensor?.title}
 															</span>
 														</strong>
-														<span className="text-foreground inline-flex max-w-full items-center gap-1">
+														<span className="text-foreground flex max-w-full min-w-0 items-center gap-1">
 															<strong className="text-foreground">ID:</strong>
-															<div className="bg-muted text-muted-foreground border-border rounded-md border">
-																<code>{sensor.id}</code>
+															<div className="bg-muted text-muted-foreground border-border flex min-w-0 items-center rounded-md border">
+																<code className="min-w-0 truncate pl-1">
+																	{sensor.id}
+																</code>
 																<button
 																	type="button"
 																	aria-label={`Copy sensor ID ${sensor?.id}`}
@@ -416,7 +633,12 @@ export default function EditBoxSensors() {
 
 												{/* shown when edit button clicked */}
 												{sensor?.editing && (
-													<div className="mb-4 pr-4">
+													<div className="mb-4 sm:pr-4">
+														{isSchemaSensor && (
+															<div className="border-border bg-muted text-muted-foreground mb-4 rounded-md border p-3">
+																{t('schema_fields_locked')}
+															</div>
+														)}
 														<div className="mb-4 space-y-1.5">
 															<Label
 																htmlFor={`phenomenon-${sensor.id ?? index}`}
@@ -430,8 +652,10 @@ export default function EditBoxSensors() {
 																type="text"
 																defaultValue={sensor?.title}
 																placeholder="Phenomenon"
+																disabled={!canEditSchemaFields}
 																aria-invalid={sensor.notValidInput}
 																onChange={(e) => {
+																	if (!canEditSchemaFields) return
 																	setTepmState(!tepmState)
 																	sensor.title = e.target.value
 																	sensor.notValidInput =
@@ -453,8 +677,10 @@ export default function EditBoxSensors() {
 																type="text"
 																defaultValue={sensor?.unit}
 																placeholder="Unit"
+																disabled={!canEditSchemaFields}
 																aria-invalid={sensor.notValidInput}
 																onChange={(e) => {
+																	if (!canEditSchemaFields) return
 																	setTepmState(!tepmState)
 																	sensor.unit = e.target.value
 																	sensor.notValidInput =
@@ -476,8 +702,10 @@ export default function EditBoxSensors() {
 																type="text"
 																defaultValue={sensor?.sensorType}
 																placeholder="Type"
+																disabled={!canEditSchemaFields}
 																aria-invalid={sensor.notValidInput}
 																onChange={(e) => {
+																	if (!canEditSchemaFields) return
 																	setTepmState(!tepmState)
 																	sensor.sensorType = e.target.value
 																	sensor.notValidInput =
@@ -490,7 +718,7 @@ export default function EditBoxSensors() {
 											</div>
 
 											{/* right side -> Save, delete, cancel buttons */}
-											<div className="col-span-2 ml-4 sm:col-span-2">
+											<div className="col-span-2 min-w-0 border-t pt-3 sm:col-span-2 sm:ml-4 sm:border-t-0 sm:pt-0">
 												{/* buttons shown by default */}
 												<span className="table-cell align-middle leading-[1.6]">
 													{/* warning text - delete */}
@@ -529,30 +757,32 @@ export default function EditBoxSensors() {
 																}}
 															>
 																<Edit className="h-4 w-4" />
-																{t('edit')}
+																{isSchemaSensor ? t('edit_icon') : t('edit')}
 															</Button>
 
 															{/* delete button */}
-															<Button
-																type="button"
-																variant="destructive"
-																size="sm"
-																className="mt-2 mb-1 flex gap-1"
-																onClick={() => {
-																	setTepmState(!tepmState)
-																	sensor.deleting = true
-																	sensor.deleted = true
-																}}
-															>
-																<Trash2 className="h-4 w-4" />
-																{t('delete')}
-															</Button>
+															{!isSchemaSensor && (
+																<Button
+																	type="button"
+																	variant="destructive"
+																	size="sm"
+																	className="mt-2 mb-1 flex gap-1"
+																	onClick={() => {
+																		setTepmState(!tepmState)
+																		sensor.deleting = true
+																		sensor.deleted = true
+																	}}
+																>
+																	<Trash2 className="h-4 w-4" />
+																	{t('delete')}
+																</Button>
+															)}
 														</span>
 													)}
 												</span>
 
 												{sensor?.editing && (
-													<div className="table-cell h-55.5 align-middle leading-[1.6]">
+													<div className="w-full align-middle leading-[1.6] sm:table-cell sm:h-55.5">
 														{sensor?.notValidInput && (
 															<div className="bg-destructive text-destructive-foreground mb-2 rounded-md px-2 py-1 text-xs font-medium">
 																{t('fill_required_fields')}
@@ -568,9 +798,10 @@ export default function EditBoxSensors() {
 																setTepmState(!tepmState)
 
 																if (
-																	sensor.title &&
-																	sensor.unit &&
-																	sensor.sensorType
+																	isSchemaSensor ||
+																	(sensor.title &&
+																		sensor.unit &&
+																		sensor.sensorType)
 																) {
 																	sensor.notValidInput = false
 																	sensor.editing = false
@@ -603,6 +834,7 @@ export default function EditBoxSensors() {
 																	sensor.title = originalSensor?.title
 																	sensor.unit = originalSensor?.unit
 																	sensor.sensorType = originalSensor?.sensorType
+																	sensor.icon = originalSensor?.icon
 																}
 															}}
 														>

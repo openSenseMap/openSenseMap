@@ -4,7 +4,6 @@ import { Button } from '~/components/ui/button'
 import {
 	Tooltip,
 	TooltipContent,
-	TooltipProvider,
 	TooltipTrigger,
 } from '~/components/ui/tooltip'
 import type { ThemePreference } from '~/lib/theme'
@@ -53,23 +52,21 @@ export default function ThemeToggle() {
 			: `${themePreference[0].toUpperCase()}${themePreference.slice(1)} theme`
 
 	return (
-		<TooltipProvider>
-			<Tooltip>
-				<TooltipTrigger asChild>
-					<Button
-						variant="topbar"
-						size="topbarPill"
-						onClick={toggleTheme}
-						disabled={fetcher.state !== 'idle'}
-						aria-label={`Toggle theme. Current preference: ${themePreference}`}
-					>
-						<Sun className="block dark:hidden" />
-						<Moon className="hidden dark:block" />
-					</Button>
-				</TooltipTrigger>
+		<Tooltip>
+			<TooltipTrigger asChild>
+				<Button
+					variant="topbar"
+					size="topbarPill"
+					onClick={toggleTheme}
+					disabled={fetcher.state !== 'idle'}
+					aria-label={`Toggle theme. Current preference: ${themePreference}`}
+				>
+					<Sun className="block dark:hidden" />
+					<Moon className="hidden dark:block" />
+				</Button>
+			</TooltipTrigger>
 
-				<TooltipContent side="bottom">{tooltipText}</TooltipContent>
-			</Tooltip>
-		</TooltipProvider>
+			<TooltipContent side="bottom">{tooltipText}</TooltipContent>
+		</Tooltip>
 	)
 }

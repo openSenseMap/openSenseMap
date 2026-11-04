@@ -1,6 +1,10 @@
 'use client'
 
-import { type ColumnDef } from '@tanstack/react-table'
+import {
+	createColumnHelper,
+	type RowData,
+	type ColumnDef,
+} from '@tanstack/react-table'
 import { ArrowUpDown, Ellipsis, LucideMapPin } from 'lucide-react'
 import { type UseTranslationResponse } from 'react-i18next'
 import { Link } from 'react-router'
@@ -15,6 +19,7 @@ import {
 } from '~/components/ui/dropdown-menu'
 import { type Device } from '~/db/schema'
 import { DeviceIdCell } from './device-id-cell'
+import { type CustomTableFeatures } from './data-table'
 
 export type SenseBox = {
 	id: string
@@ -30,13 +35,16 @@ const colStyle = 'pl-0 dark:text-white'
 
 export function getColumns(
 	useTranslation: UseTranslationResponse<'data-table', any>,
+	hydrated: boolean,
 	opts?: { isOwner?: boolean },
-): ColumnDef<SenseBox>[] {
-	const { t } = useTranslation
+): ColumnDef<CustomTableFeatures, SenseBox, unknown>[] {
+	const { t, i18n } = useTranslation
 	const isOwner = opts?.isOwner ?? false
-	return [
-		{
-			accessorKey: 'name',
+
+	const columnHelper = createColumnHelper<CustomTableFeatures, SenseBox>()
+
+	return columnHelper.columns([
+		columnHelper.accessor('name', {
 			header: ({ column }) => {
 				return (
 					<Button
@@ -72,10 +80,9 @@ export function getColumns(
 					</div>
 				)
 			},
-		},
-		{
-			accessorKey: 'createdAt',
-			sortingFn: 'datetime',
+		}),
+		columnHelper.accessor('createdAt', {
+			sortFn: 'datetime',
 			header: ({ column }) => {
 				return (
 					<Button
@@ -90,11 +97,10 @@ export function getColumns(
 			},
 			cell: ({ row }) => {
 				const date = new Date(row.getValue('createdAt'))
-				return <div>{date.toLocaleDateString()}</div>
+				return <div>{hydrated && date.toLocaleDateString(i18n.language)}</div>
 			},
-		},
-		{
-			accessorKey: 'exposure',
+		}),
+		columnHelper.accessor('exposure', {
 			header: ({ column }) => {
 				return (
 					<Button
@@ -107,9 +113,12 @@ export function getColumns(
 					</Button>
 				)
 			},
-		},
-		/* {
-    accessorKey: "model",
+			cell: ({ row }) => {
+				const exposure = row.original.exposure
+				return <div>{t(`exposure_values.${exposure}`)}</div>
+			},
+		}),
+		/*columnHelper.accessor("model", {
     header: ({ column }) => {
       return (
         <Button
@@ -123,8 +132,7 @@ export function getColumns(
       );
     },
   }, */
-		{
-			accessorKey: 'id',
+		columnHelper.accessor('id', {
 			header: () => (
 				<div className="text-muted-foreground pl-0">{t('device_id')}</div>
 			),
@@ -139,8 +147,8 @@ export function getColumns(
 					/>
 				)
 			},
-		},
-		{
+		}),
+		columnHelper.display({
 			id: 'actions',
 			header: () => (
 				<div className="text-center dark:text-white">{t('actions')}</div>
@@ -202,7 +210,6 @@ export function getColumns(
 									</DropdownMenuItem>
 								)}
 								<DropdownMenuItem
-									asChild
 									onClick={() => navigator.clipboard.writeText(device.id)}
 									className="cursor-pointer"
 								>
@@ -219,6 +226,6 @@ export function getColumns(
 						</Link>
 					)
 			},
-		},
-	]
+		}),
+	])
 }

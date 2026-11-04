@@ -10,5 +10,6 @@
 	"error_help_text": "Wenn dieses Problem weiterhin besteht, wenden Sie sich bitte an unser Support-Team.",
 	"go_back": "Zurück",
 	"go_home": "Zur Startseite",
-	"try_again": "Erneut versuchen"
+	"try_again": "Erneut versuchen",
+	"map_cluster_marker_label": "In eine Gruppe von {{total}} Geräten hineinzoomen: {{active}} aktiv, {{inactive}} inaktiv, {{old}} alt."
 }

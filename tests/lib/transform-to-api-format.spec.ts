@@ -1,6 +1,15 @@
 import { transformDeviceToApiFormat } from '~/lib/device-transform'
 
 describe('transformDeviceToApiFormat', () => {
+	beforeAll(() => {
+		vi.useFakeTimers()
+		vi.setSystemTime(new Date('2024-01-02T00:00:00Z'))
+	})
+
+	afterAll(() => {
+		vi.useRealTimers()
+	})
+
 	const mockDevice = {
 		id: 'test-device-id',
 		name: 'Test Device',
@@ -12,6 +21,9 @@ describe('transformDeviceToApiFormat', () => {
 		model: 'custom',
 		latitude: 37.7749,
 		longitude: -122.4194,
+		heightAboveGround: 3.25,
+		terrainElevation: 15,
+		terrainElevationDataset: 'eudem25m',
 		useAuth: true,
 		public: false,
 		status: 'active',
@@ -54,6 +66,11 @@ describe('transformDeviceToApiFormat', () => {
 			model: 'custom',
 			latitude: 37.7749,
 			longitude: -122.4194,
+			heightAboveGround: 3.25,
+			heightAboveSeaLevel: 18.25,
+			terrainElevation: 15,
+			terrainElevationDataset: 'eudem25m',
+			height: 18.25,
 			useAuth: true,
 			public: false,
 			status: 'active',
@@ -63,7 +80,7 @@ describe('transformDeviceToApiFormat', () => {
 			userId: 'user-123',
 			currentLocation: {
 				type: 'Point',
-				coordinates: [-122.4194, 37.7749],
+				coordinates: [-122.4194, 37.7749, 18.25],
 				timestamp: '2024-01-01T12:00:00.000Z',
 			},
 			lastMeasurementAt: '2024-01-01T12:00:00.000Z',
@@ -71,7 +88,7 @@ describe('transformDeviceToApiFormat', () => {
 				{
 					geometry: {
 						type: 'Point',
-						coordinates: [-122.4194, 37.7749],
+						coordinates: [-122.4194, 37.7749, 18.25],
 						timestamp: '2024-01-01T12:00:00.000Z',
 					},
 					type: 'Feature',
@@ -160,7 +177,7 @@ describe('transformDeviceToApiFormat', () => {
 
 		expect(result.currentLocation).toEqual({
 			type: 'Point',
-			coordinates: [-122.4194, 37.7749], // [longitude, latitude]
+			coordinates: [-122.4194, 37.7749, 18.25], // [longitude, latitude, height]
 			timestamp: '2024-01-01T12:00:00.000Z',
 		})
 	})
@@ -172,13 +189,37 @@ describe('transformDeviceToApiFormat', () => {
 			{
 				geometry: {
 					type: 'Point',
-					coordinates: [-122.4194, 37.7749], // [longitude, latitude]
+					coordinates: [-122.4194, 37.7749, 18.25], // [longitude, latitude, height]
 					timestamp: '2024-01-01T12:00:00.000Z',
 				},
 				type: 'Feature',
 			},
 		])
 	})
+
+	test('preserves zero height in both location coordinate formats', () => {
+		const result = transformDeviceToApiFormat({
+			...mockDevice,
+			terrainElevation: -3.25,
+		} as any)
+
+		expect(result.height).toBe(0)
+		expect(result.currentLocation.coordinates).toEqual([-122.4194, 37.7749, 0])
+		expect(result.loc[0].geometry.coordinates).toEqual([-122.4194, 37.7749, 0])
+	})
+
+	test.each([null, undefined])(
+		'omits the third coordinate when terrain elevation is %s',
+		(height) => {
+			const result = transformDeviceToApiFormat({
+				...mockDevice,
+				terrainElevation: height,
+			} as any)
+
+			expect(result.currentLocation.coordinates).toEqual([-122.4194, 37.7749])
+			expect(result.loc[0].geometry.coordinates).toEqual([-122.4194, 37.7749])
+		},
+	)
 
 	test('sets correct integrations structure', () => {
 		const result = transformDeviceToApiFormat(mockDevice as any)
@@ -209,7 +250,7 @@ describe('transformDeviceToApiFormat', () => {
 		expect(result.loc[0].geometry.coordinates).toEqual([0, 0])
 	})
 
-	test('preserves all original device fields', () => {
+	test('preserves original device fields except derived status', () => {
 		const result = transformDeviceToApiFormat(mockDevice as any)
 
 		// Check that all original fields are preserved
@@ -221,6 +262,13 @@ describe('transformDeviceToApiFormat', () => {
 		expect(result.model).toBe(mockDevice.model)
 		expect(result.latitude).toBe(mockDevice.latitude)
 		expect(result.longitude).toBe(mockDevice.longitude)
+		expect(result.height).toBe(18.25)
+		expect(result.heightAboveGround).toBe(mockDevice.heightAboveGround)
+		expect(result.heightAboveSeaLevel).toBe(18.25)
+		expect(result.terrainElevation).toBe(mockDevice.terrainElevation)
+		expect(result.terrainElevationDataset).toBe(
+			mockDevice.terrainElevationDataset,
+		)
 		expect(result.useAuth).toBe(mockDevice.useAuth)
 		expect(result.public).toBe(mockDevice.public)
 		expect(result.status).toBe(mockDevice.status)
@@ -228,6 +276,63 @@ describe('transformDeviceToApiFormat', () => {
 		expect(result.updatedAt).toBe(mockDevice.updatedAt.toISOString())
 		expect(result.expiresAt).toBe(mockDevice.expiresAt.toISOString())
 		expect(result.userId).toBe(mockDevice.userId)
+	})
+
+	test.each([
+		['active', '2023-12-31T00:00:00Z'],
+		['inactive', '2023-12-20T00:00:00Z'],
+		['old', '2023-11-01T00:00:00Z'],
+	] as const)(
+		'derives %s status from the latest measurement',
+		(status, createdAt) => {
+			const result = transformDeviceToApiFormat({
+				...mockDevice,
+				status: status === 'active' ? 'old' : 'active',
+				sensors: [
+					{
+						...mockDevice.sensors[0],
+						lastMeasurement: { value: '1', createdAt },
+					},
+				],
+			} as any)
+
+			expect(result.status).toBe(status)
+		},
+	)
+
+	test('uses the newest measurement across all sensors', () => {
+		const result = transformDeviceToApiFormat({
+			...mockDevice,
+			status: 'old',
+			sensors: [
+				{
+					...mockDevice.sensors[0],
+					lastMeasurement: {
+						value: '1',
+						createdAt: '2023-11-01T00:00:00Z',
+					},
+				},
+				{
+					...mockDevice.sensors[1],
+					lastMeasurement: {
+						value: '2',
+						createdAt: '2024-01-01T00:00:00Z',
+					},
+				},
+			],
+		} as any)
+
+		expect(result.status).toBe('active')
+	})
+
+	test('returns old for a device without valid measurements', () => {
+		const result = transformDeviceToApiFormat({
+			...mockDevice,
+			status: 'active',
+			sensors: [],
+		} as any)
+
+		expect(result.status).toBe('old')
 	})
 
 	test('converts numeric lastMeasurement values to strings', () => {

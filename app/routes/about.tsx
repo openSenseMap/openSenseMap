@@ -1,5 +1,4 @@
 import { readItems } from '@directus/sdk'
-import { useMediaQuery } from '@mantine/hooks'
 import { motion } from 'framer-motion'
 import { useTranslation } from 'react-i18next'
 import { data, Link, useLoaderData } from 'react-router'
@@ -14,6 +13,7 @@ import Partners from '~/components/landing/sections/partners'
 import PricingPlans from '~/components/landing/sections/pricing-plans'
 import Stats from '~/components/landing/stats'
 import { getLatestDevices } from '~/db/models/device.server'
+import { useMediaQuery } from '~/hooks/use-media-query'
 import { type SupportedLanguage } from '~/i18next-config'
 import { type Partner, getDirectusClient } from '~/lib/directus'
 import { getLocale } from '~/middleware/i18next'
@@ -104,11 +104,10 @@ export default function Index() {
 	}>()
 
 	const { t } = useTranslation('landing')
-
-	const isDesktop = useMediaQuery('(min-width: 768px)')
+	const showGlobe = useMediaQuery('(min-width: 1120px)')
 
 	return (
-		<div className="max-h-screen bg-white dark:bg-black">
+		<div className="min-h-screen bg-white dark:bg-black">
 			<header className="z-10">
 				<Header />
 			</header>
@@ -118,7 +117,7 @@ export default function Index() {
 					className="mx-auto flex max-w-7xl flex-col justify-center px-4 sm:px-6 lg:px-8"
 				>
 					<div className="flex items-center justify-between">
-						<div className="md:w-1/2">
+						<div className="w-full min-[1120px]:w-1/2">
 							<motion.div
 								initial={{ opacity: 0, scale: 0 }}
 								animate={{ opacity: 1, scale: 1 }}
@@ -127,7 +126,7 @@ export default function Index() {
 									scale: { type: 'spring', visualDuration: 0.4, bounce: 0.5 },
 								}}
 							>
-								<h1 className="text-light-green dark:text-dark-green text-5xl font-bold tracking-tight">
+								<h1 className="text-light-green dark:text-dark-green text-4xl font-bold tracking-tight sm:text-5xl">
 									openSenseMap
 								</h1>
 							</motion.div>
@@ -136,11 +135,11 @@ export default function Index() {
 								animate={{ opacity: 1, x: 0 }}
 								transition={{ ease: 'easeInOut', duration: 0.5 }}
 							>
-								<p className="mt-6 ml-6 text-lg text-gray-600 dark:text-gray-100">
+								<p className="mt-6 text-lg text-gray-600 sm:ml-6 dark:text-gray-100">
 									{t('introduction')}
 								</p>
 							</motion.div>
-							<div className="mt-8 flex items-center justify-around gap-x-6 gap-y-4 text-xl">
+							<div className="mt-8 flex flex-wrap items-center justify-around gap-x-6 gap-y-4 text-xl">
 								<motion.div
 									initial={{ opacity: 0, y: 100, scale: 0.8 }}
 									animate={{ opacity: 1, y: 0, scale: 1 }}
@@ -198,30 +197,26 @@ export default function Index() {
 								</motion.div>
 							</div>
 						</div>
-						{isDesktop && (
-							<div className="w-1/3 cursor-pointer">
-								<GlobeComponent latestDevices={latestDevices} />
-							</div>
-						)}
-					</div>
-					{isDesktop && (
-						<div>
-							<Stats {...stats} />
+						<div className="hidden w-125 shrink-0 cursor-pointer min-[1120px]:block">
+							{showGlobe && <GlobeComponent latestDevices={latestDevices} />}
 						</div>
-					)}
+					</div>
+					<div>
+						<Stats {...stats} />
+					</div>
 				</div>
 				{sections.map((section, _index) => {
 					const Component = section.component
 					return (
 						<section
 							key={section.title}
-							className="mx-auto flex w-full max-w-7xl items-center justify-center px-4 py-16 sm:px-6 md:py-24 lg:px-8"
+							className="mx-auto flex w-full max-w-7xl items-center justify-center px-4 py-12 sm:px-6 sm:py-16 md:py-20 lg:px-8 lg:py-24"
 						>
 							<Component />
 						</section>
 					)
 				})}
-				<div className="mx-32 flex flex-col items-center justify-center py-16 md:py-24">
+				<div className="mx-auto flex w-full max-w-7xl flex-col items-center justify-center px-4 py-16 sm:px-6 md:py-24 lg:px-8">
 					<Partners data={partners} />
 					<Footer />
 				</div>

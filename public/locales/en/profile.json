@@ -4,6 +4,8 @@
 	"devices": "Devices",
 	"sensors": "Sensors",
 	"measurements": "Measurements",
+	"device_schemas": "Device schemas",
+	"download": "Download",
 	"badges": "Badges",
 	"take_over_device": "Take over device",
 	"transfer_device": "Device Transfer",

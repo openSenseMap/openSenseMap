@@ -1,11 +1,17 @@
 import { randomBytes } from 'crypto'
-import { createId } from '@paralleldrive/cuid2'
 import {
 	relations,
 	type InferInsertModel,
 	type InferSelectModel,
 } from 'drizzle-orm'
-import { pgTable, text, timestamp, json, integer } from 'drizzle-orm/pg-core'
+import {
+	pgTable,
+	text,
+	timestamp,
+	json,
+	integer,
+	index,
+} from 'drizzle-orm/pg-core'
 import { device } from './device'
 import { DeviceStatusEnum } from './enum'
 import { type Measurement } from './measurement'
@@ -26,30 +32,34 @@ export type LastMeasurement = {
 /**
  * Table
  */
-export const sensor = pgTable('sensor', {
-	id: text('id')
-		.primaryKey()
-		.notNull()
-		.$defaultFn(() => generateHexId()), // store as hex strings to maintain compatibility with the byte protocol
-	title: text('title').notNull(),
-	unit: text('unit'),
-	sensorType: text('sensor_type'),
-	icon: text('icon'),
-	status: DeviceStatusEnum('status').default('inactive'),
-	createdAt: timestamp('created_at').defaultNow().notNull(),
-	updatedAt: timestamp('updated_at').defaultNow().notNull(),
-	deviceId: text('device_id')
-		.references(() => device.id, {
-			onDelete: 'cascade',
-		})
-		.notNull(),
-	sensorWikiType: text('sensor_wiki_type'),
-	sensorWikiPhenomenon: text('sensor_wiki_phenomenon'),
-	sensorWikiUnit: text('sensor_wiki_unit'),
-	lastMeasurement: json('lastMeasurement').$type<LastMeasurement>(),
-	data: json('data'),
-	order: integer('order').default(0),
-})
+export const sensor = pgTable(
+	'sensor',
+	{
+		id: text('id')
+			.primaryKey()
+			.notNull()
+			.$defaultFn(() => generateHexId()), // store as hex strings to maintain compatibility with the byte protocol
+		title: text('title').notNull(),
+		unit: text('unit'),
+		sensorType: text('sensor_type'),
+		icon: text('icon'),
+		status: DeviceStatusEnum('status').default('inactive'),
+		createdAt: timestamp('created_at').defaultNow().notNull(),
+		updatedAt: timestamp('updated_at').defaultNow().notNull(),
+		deviceId: text('device_id')
+			.references(() => device.id, {
+				onDelete: 'cascade',
+			})
+			.notNull(),
+		sensorWikiType: text('sensor_wiki_type'),
+		sensorWikiPhenomenon: text('sensor_wiki_phenomenon'),
+		sensorWikiUnit: text('sensor_wiki_unit'),
+		lastMeasurement: json('lastMeasurement').$type<LastMeasurement>(),
+		data: json('data'),
+		order: integer('order').default(0),
+	},
+	(t) => [index('sensor_device_id_idx').on(t.deviceId)],
+)
 
 /**
  * Relations

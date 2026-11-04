@@ -35,6 +35,7 @@ import {
 	parseDeviceExposure,
 } from '~/lib/device-enums'
 import { AutosaveStatusText } from '~/components/autosave-status.text'
+import { PasswordInput } from '~/components/ui/password-input'
 
 type GeneralAutosaveValues = {
 	name: string
@@ -1001,13 +1002,12 @@ Installed on the school roof.
 							</div>
 
 							<div>
-								<input
+								<PasswordInput
 									id="passwordDelete"
 									name="passwordDelete"
-									type="password"
 									placeholder="Password"
 									ref={passwordDelRef}
-									className="w-full rounded border border-gray-200 px-2 py-2 text-base placeholder-[#999]"
+									className="text-base placeholder-[#999]"
 									value={passwordDelVal}
 									onChange={(e) => setPasswordVal(e.target.value)}
 								/>

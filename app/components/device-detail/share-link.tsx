@@ -1,10 +1,12 @@
 import { Copy, Link } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import { Button } from '../ui/button'
 import { Input } from '../ui/input'
 import { useToast } from '@/components/ui/use-toast'
 
 export default function ShareLink() {
 	const { toast } = useToast()
+	const { t } = useTranslation('device-detail-box')
 
 	return (
 		<div className="my-4">
@@ -84,14 +86,14 @@ export default function ShareLink() {
 					onClick={() => {
 						void navigator.clipboard.writeText(window.location.href)
 						toast({
-							title: 'Copied to clipboard',
-							description: 'Go ahead and share your link! 🎉',
+							title: t('copied_to_clipboard'),
+							description: t('share_link_hint'),
 						})
 					}}
 					className="bg-primary text-primary-foreground inline-flex h-9 transform items-center justify-center rounded-md px-2 py-2 text-sm font-medium shadow-sm transition-transform active:scale-75"
 				>
 					<Copy className="mr-2 h-5 w-5" />
-					Copy
+					{t('copy')}
 				</Button>
 			</div>
 		</div>

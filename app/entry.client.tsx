@@ -5,7 +5,6 @@ import { startTransition, StrictMode } from 'react'
 import { hydrateRoot } from 'react-dom/client'
 import { I18nextProvider, initReactI18next } from 'react-i18next'
 import { HydratedRouter } from 'react-router/dom'
-import { getInitialNamespaces } from 'remix-i18next/client'
 import { i18nextOptions } from './i18next-config'
 
 const hydrate = async () => {
@@ -17,7 +16,7 @@ const hydrate = async () => {
 		.use(I18nextBrowserLanguageDetector)
 		.init({
 			...i18nextOptions,
-			ns: getInitialNamespaces(),
+			ns: [i18nextOptions.defaultNS],
 			backend: { loadPath: '/locales/{{lng}}/{{ns}}.json' },
 			detection: {
 				order: ['htmlTag'],

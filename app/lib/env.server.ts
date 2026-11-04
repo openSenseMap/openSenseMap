@@ -4,8 +4,14 @@ const schema = z.object({
 	NODE_ENV: z.enum(['production', 'development', 'test'] as const),
 	DATABASE_URL: z.string(),
 	PG_CLIENT_SSL: z.string(),
+	PG_POOL_MAX: z
+		.string()
+		.regex(/^[1-9]\d*$/)
+		.optional(),
 	SESSION_SECRET: z.string(),
 	NOMINATIM_SEARCH_API: z.string(),
+	GPXZ_API_URL: z.string().url().optional(),
+	GPXZ_API_KEY: z.string().min(1).optional(),
 	OSEM_API_URL: z.string().url(),
 	DIRECTUS_URL: z.string().url(),
 	SENSORWIKI_API_URL: z.string().url(),

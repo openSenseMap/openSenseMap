@@ -52,6 +52,7 @@ Object.defineProperty(authSessionStorage, 'commitSession', {
 })
 
 const USER_SESSION_KEY = 'userId'
+const DISMISSED_GRACE_TOS_VERSION_SESSION_KEY = 'dismissedGraceTosVersionId'
 
 export async function getUserSession(request: Request) {
 	const cookie = request.headers.get('Cookie')
@@ -64,6 +65,23 @@ export async function getUserId(
 	const session = await getUserSession(request)
 	const userId = session.get(USER_SESSION_KEY)
 	return userId
+}
+
+export async function getDismissedGraceTosVersionId(request: Request) {
+	const session = await getUserSession(request)
+	const tosVersionId = session.get(DISMISSED_GRACE_TOS_VERSION_SESSION_KEY)
+
+	return typeof tosVersionId === 'string' ? tosVersionId : undefined
+}
+
+export async function dismissGraceTosVersion(
+	request: Request,
+	tosVersionId: string,
+) {
+	const session = await getUserSession(request)
+	session.set(DISMISSED_GRACE_TOS_VERSION_SESSION_KEY, tosVersionId)
+
+	return authSessionStorage.commitSession(session)
 }
 
 export async function getUserEmail(request: Request) {
@@ -146,6 +164,7 @@ export async function createUserSession({
 }) {
 	const session = await getUserSession(request)
 	session.set(USER_SESSION_KEY, userId)
+	session.unset(DISMISSED_GRACE_TOS_VERSION_SESSION_KEY)
 	session.flash('global_message', 'You successfully logged in.')
 	return redirect(redirectTo, {
 		headers: {
@@ -167,6 +186,7 @@ export async function logout({
 }) {
 	const session = await getUserSession(request)
 	session.unset(USER_SESSION_KEY)
+	session.unset(DISMISSED_GRACE_TOS_VERSION_SESSION_KEY)
 	session.flash('global_message', 'You successfully logged out.')
 	return redirect(redirectTo, {
 		headers: {

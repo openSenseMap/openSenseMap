@@ -1,8 +1,12 @@
 {
 	"tos_update": "Terms of service update",
 	"must_accept": "You need to accept the latest Terms of Service to continue using the app.",
+	"grace_description": "We have updated our Terms of Service. Please review and accept them by {{date}}.",
+	"grace_action_error": "The Terms of Service could not be updated. Please try again.",
 	"tos_agree": "I agree to the <termsLink>Terms of Service</termsLink>.",
 	"delete_account": "You can still <deleteLink>delete your account</deleteLink>.",
+	"accept_now": "Accept and continue",
+	"remind_later": "Remind me later",
 	"continue": "Continue",
 	"not_configured": "No effective Terms of Service are configured."
 }

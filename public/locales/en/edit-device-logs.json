@@ -1,0 +1,13 @@
+{
+	"title": "Device Logs",
+	"content_placeholder": "Enter log content",
+	"content": "Content",
+	"created_at": "Created at",
+	"public": "Public",
+	"actions": "Actions",
+	"log_added": "Log added successfully!",
+	"log_deleted": "Log deleted successfully!",
+	"visibility_updated": "Log visibility updated!",
+	"unknown_action": "Unknown action.",
+	"error": "Something went wrong."
+}

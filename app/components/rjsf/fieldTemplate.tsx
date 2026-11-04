@@ -22,7 +22,7 @@ export function FieldTemplate(props: FieldTemplateProps) {
 			{displayLabel && label && (
 				<label
 					htmlFor={id}
-					className="mb-1 block text-sm font-medium text-gray-700"
+					className="text-foreground mb-1 block text-sm font-medium"
 				>
 					{label}
 					{required && <span className="text-red-500">*</span>}

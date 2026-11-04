@@ -1,7 +1,6 @@
 import * as React from 'react'
 import { useTranslation } from 'react-i18next'
 import {
-	type MetaFunction,
 	data,
 	redirect,
 	Form,
@@ -15,6 +14,7 @@ import { type Route } from './+types/explore.register'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { PasswordInput } from '@/components/ui/password-input'
 import Spinner from '~/components/spinner'
 import { Button } from '~/components/ui/button'
 import {
@@ -217,10 +217,6 @@ export async function action({ context, request }: Route.ActionArgs) {
 	})
 }
 
-export const meta: MetaFunction = () => {
-	return [{ title: 'Explore' }]
-}
-
 export default function RegisterDialog() {
 	const { t } = useTranslation('register')
 	const navigation = useNavigation()
@@ -251,16 +247,16 @@ export default function RegisterDialog() {
 		actionData.emailDeliveryFailed
 	) {
 		return (
-			<div className="flex h-screen items-center justify-center">
+			<div className="relative flex h-full w-full items-start justify-center overflow-y-auto p-4 sm:items-center">
 				<Link
 					to={{
 						pathname: '/explore',
 						search: searchParams.toString(),
 					}}
 				>
-					<div className="fixed inset-0 z-40 h-full w-full bg-black opacity-25" />
+					<div className="absolute inset-0 z-40 h-full w-full bg-black opacity-25" />
 				</Link>
-				<Card className="z-50 w-full max-w-md">
+				<Card className="relative z-50 my-auto w-full max-w-md min-w-0">
 					<CardHeader>
 						<CardTitle className="text-2xl font-bold">
 							{t('account_created')}
@@ -282,16 +278,16 @@ export default function RegisterDialog() {
 	}
 
 	return (
-		<div className="flex h-screen items-center justify-center">
+		<div className="relative flex h-full w-full items-start justify-center overflow-y-auto p-4 sm:items-center">
 			<Link
 				to={{
 					pathname: '/explore',
 					search: searchParams.toString(),
 				}}
 			>
-				<div className="fixed inset-0 z-40 h-full w-full bg-black opacity-25" />
+				<div className="absolute inset-0 z-40 h-full w-full bg-black opacity-25" />
 			</Link>
-			<Card className="z-50 w-full max-w-md">
+			<Card className="relative z-50 my-auto w-full max-w-md min-w-0">
 				{navigation.state === 'loading' && (
 					<div className="absolute inset-0 z-50 flex items-center justify-center bg-white/30 backdrop-blur-xs dark:bg-zinc-800/30">
 						<Spinner />
@@ -309,6 +305,10 @@ export default function RegisterDialog() {
 							<Label htmlFor="username">{t('username')}</Label>
 							<Input
 								id="username"
+								aria-invalid={actionErrors?.username ? true : undefined}
+								aria-describedby={
+									actionErrors?.username ? 'username-error' : undefined
+								}
 								placeholder={t('enter_username')}
 								ref={usernameRef}
 								name="username"
@@ -319,7 +319,7 @@ export default function RegisterDialog() {
 								{t('username_hint')}
 							</p>
 							{actionErrors?.username && (
-								<div className="mt-1 text-sm text-red-500" id="password-error">
+								<div className="mt-1 text-sm text-red-500" id="username-error">
 									{t(actionErrors?.username)}
 								</div>
 							)}
@@ -346,9 +346,8 @@ export default function RegisterDialog() {
 						</div>
 						<div className="space-y-2">
 							<Label htmlFor="password">{t('password')}</Label>
-							<Input
+							<PasswordInput
 								id="password"
-								type="password"
 								placeholder={t('enter_password')}
 								ref={passwordRef}
 								name="password"
@@ -365,13 +364,14 @@ export default function RegisterDialog() {
 								</div>
 							)}
 						</div>
-						<div className="flex items-center gap-2">
+						<div className="flex items-start gap-2">
 							<Checkbox
 								id="tosAccepted"
 								name="tosAccepted"
 								value="on"
 								aria-invalid={actionErrors?.tosAccepted ? true : undefined}
 								aria-describedby="tos-error"
+								className="mt-1"
 							/>
 							<Label htmlFor="tosAccepted" className="text-sm leading-5">
 								{t('agree_tos_prefix')}{' '}
@@ -386,17 +386,18 @@ export default function RegisterDialog() {
 								{t('agree_tos_suffix')}
 							</Label>
 						</div>
-						<div className="flex items-center gap-2">
+						<div className="flex items-start gap-2">
 							<Checkbox
 								id="newsletterOptIn"
 								name="newsletterOptIn"
 								value="on"
+								className="mt-1"
 							/>
 							<Label htmlFor="newsletterOptIn" className="text-sm leading-5">
 								{t('newsletter_opt_in')}
 							</Label>
 						</div>
-						<div className="flex items-center gap-2">
+						<div className="flex items-start gap-2">
 							<Label className="text-sm leading-5">
 								{t('privacy_policy_prefix')}{' '}
 								<Link
@@ -419,7 +420,7 @@ export default function RegisterDialog() {
 					</CardContent>
 					<CardFooter className="flex flex-col items-center gap-2">
 						<Button className="bg-light-blue w-full">{t('register')}</Button>
-						<div className="text-muted-foreground text-sm">
+						<div className="text-muted-foreground text-center text-sm">
 							{t('already_account')}{' '}
 							<Link to="/explore/login" className="underline">
 								{t('login')}

@@ -6,29 +6,33 @@ import { useTranslation } from 'react-i18next'
 import {
 	data,
 	Links,
-	Meta,
 	Outlet,
 	Scripts,
 	ScrollRestoration,
 	useRouteLoaderData,
-	type MetaFunction,
 } from 'react-router'
 import invariant from 'tiny-invariant'
 import { type Route } from './+types/root'
 import ErrorMessage from './components/error-message'
+import { TosGraceDialog } from './components/tos-grace-dialog'
 import { Toaster } from './components/ui/toaster'
+import { getTosRequirementForUser } from './db/models/tos.server'
 import { updateUserPreferencesById } from './db/models/user.server'
 import { getEnv } from './lib/env.server'
 import { getLocale, i18nCookie, i18nextMiddleware } from './middleware/i18next'
 import { tosUiMiddleware } from './middleware/tos-ui.server'
 import { prometheusMetricsMiddleware } from './middleware/metrics.server'
-import { getUser } from './services/session-service.server'
+import {
+	getDismissedGraceTosVersionId,
+	getUser,
+} from './services/session-service.server'
 import { getServerTheme, ThemePreferenceSchema } from './lib/theme'
 import {
 	getThemePreference,
 	themeCookie,
 } from './services/theme-service.server'
 import { PreventFlashOnWrongTheme } from './components/prevent-theme-flash'
+import { TooltipProvider } from './components/ui/tooltip'
 
 export const middleware: Route.MiddlewareFunction[] = [
 	prometheusMetricsMiddleware,
@@ -80,21 +84,25 @@ export const links = () => {
 	]
 }
 
-export const meta: MetaFunction = () => [
-	{ charset: 'utf-8' },
-	{ title: 'openSenseMap' },
-	{ viewport: 'width=device-width,initial-scale=1' },
-	{ 'theme-color': '#3d843f', media: '(prefers-color-scheme: light)' },
-	{ 'theme-color': '#6fa161', media: '(prefers-color-scheme: dark)' },
-	{
-		description:
-			'The environmental data platform to promote education, environmental and climate protection, enthusiasm for STEM, citizen science, open data, and open source.',
-	},
-]
-
 export async function loader({ context, request }: Route.LoaderArgs) {
 	const locale = getLocale(context)
 	const user = await getUser(request)
+	const dismissedGraceTosVersionId = user
+		? await getDismissedGraceTosVersionId(request)
+		: undefined
+	const tosRequirement = user
+		? await getTosRequirementForUser(user.id)
+		: undefined
+	const graceTos =
+		tosRequirement?.inGrace &&
+		!tosRequirement.accepted &&
+		tosRequirement.tos &&
+		dismissedGraceTosVersionId !== tosRequirement.tos.id
+			? {
+					id: tosRequirement.tos.id,
+					acceptBy: tosRequirement.acceptBy?.toISOString() ?? '',
+				}
+			: null
 
 	const cookieThemePreference = await getThemePreference(request)
 
@@ -122,6 +130,7 @@ export async function loader({ context, request }: Route.LoaderArgs) {
 	return data(
 		{
 			user,
+			graceTos,
 			locale,
 			themePreference,
 			theme,
@@ -211,8 +220,30 @@ export const useRootRouteLoaderData = () => {
 	return rootData
 }
 
+const meta = () => (
+	<>
+		<title>openSenseMap</title>
+		<meta charSet="utf-8" />
+		<meta name="viewport" content="width=device-width,initial-scale=1" />
+		<meta
+			name="theme-color"
+			content="#3d843f"
+			media="(prefers-color-scheme: light)"
+		/>
+		<meta
+			name="theme-color"
+			content="#6fa161"
+			media="(prefers-color-scheme: dark)"
+		/>
+		<meta
+			name="description"
+			content="The environmental data platform to promote education, environmental and climate protection, enthusiasm for STEM, citizen science, open data, and open source."
+		/>
+	</>
+)
+
 export default function App({
-	loaderData: { locale, ENV, themePreference, theme },
+	loaderData: { locale, ENV, themePreference, theme, graceTos },
 }: Route.ComponentProps) {
 	const { i18n } = useTranslation()
 	useEffect(() => {
@@ -229,13 +260,18 @@ export default function App({
 			suppressHydrationWarning
 		>
 			<head>
-				<Meta />
 				<PreventFlashOnWrongTheme themePreference={themePreference} />
 				<Links />
 			</head>
 			<body className="dark:bg-dark-background dark:text-dark-text h-full">
-				<Outlet />
+				{meta()}
+
+				<TooltipProvider>
+					<Outlet />
+				</TooltipProvider>
+				{graceTos && <TosGraceDialog key={graceTos.id} tos={graceTos} />}
 				<Toaster />
+
 				<ScrollRestoration />
 				<Scripts />
 				<script
@@ -259,11 +295,11 @@ export function ErrorBoundary() {
 	return (
 		<html className="light h-full" suppressHydrationWarning>
 			<head>
-				<Meta />
 				<PreventFlashOnWrongTheme themePreference="system" />
 				<Links />
 			</head>
 			<body className="bg-background text-foreground h-full">
+				{meta()}
 				<div className="flex h-screen w-screen items-center justify-center">
 					<ErrorMessage />
 				</div>

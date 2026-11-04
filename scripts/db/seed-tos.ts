@@ -23,13 +23,13 @@ export async function seedTos(
 	const now = new Date()
 
 	const effectiveFrom =
-		options.effectiveFrom ?? new Date('2026-01-01T00:00:00.000Z')
-	const acceptBy = options.acceptBy ?? new Date('2026-02-01T00:00:00.000Z')
+		options.effectiveFrom ?? new Date('2026-09-10T00:00:00.000Z')
+	const acceptBy = options.acceptBy ?? new Date('2027-01-01T00:00:00.000Z')
 
 	await db
 		.insert(tosVersion)
 		.values({
-			version: options.version ?? '2026-01',
+			version: options.version ?? '2026-09',
 			title: options.title ?? {
 				en: 'Terms of Service',
 				de: 'Nutzungsbedingungen',

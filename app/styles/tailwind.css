@@ -1,6 +1,6 @@
 @import 'tailwindcss';
 
-@plugin 'tailwindcss-animate';
+@import "tw-animate-css";
 @plugin '@tailwindcss/typography';
 
 @custom-variant dark (&:where(.dark, .dark *));
@@ -117,7 +117,7 @@
 	--color-light-green: #3d843f;
 	--color-light-blue: #037ea1;
 
-	--color-dark-title: #FFFFFF;
+	--color-dark-title: #ffffff;
 	--color-dark-menu: #d2d1d0;
 	--color-dark-text: #d2d1d0;
 	--color-dark-green: #6fa161;

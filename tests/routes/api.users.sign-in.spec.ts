@@ -1,14 +1,11 @@
+import { generateTestUserCredentials } from 'tests/data/generate_test_user'
 import { type Route } from '../../.react-router/types/app/routes/+types/api.users.sign-in'
 import { BASE_URL } from '../../vitest.setup'
 import { deleteUserByEmail } from '~/db/models/user.server'
 import { action } from '~/routes/api.users.sign-in'
 import { registerUser } from '~/services/user-service.server'
 
-const VALID_SIGN_IN_TEST_USER = {
-	name: 'signingIn',
-	email: 'test@sign.in',
-	password: 'some secure password',
-}
+const VALID_SIGN_IN_TEST_USER = generateTestUserCredentials()
 
 export const createSignInRequest = (email: string, password: string) =>
 	new Request(`${BASE_URL}/users/sign-in`, {

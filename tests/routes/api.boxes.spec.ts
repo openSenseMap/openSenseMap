@@ -1,4 +1,5 @@
 import { generateTestUserCredentials } from 'tests/data/generate_test_user'
+import invariant from 'tiny-invariant'
 import { type Route } from '../../.react-router/types/app/routes/+types/api.boxes'
 import { BASE_URL } from '../../vitest.setup'
 import { createDevice, deleteDevice } from '~/db/models/device.server'
@@ -7,6 +8,32 @@ import { type Device, type User } from '~/db/schema'
 import { createToken } from '~/lib/jwt'
 import { loader, action } from '~/routes/api.boxes'
 import { registerUser } from '~/services/user-service.server'
+import { getTerrainElevation } from '~/services/elevation-service.server'
+import { applyElevationConsentChoice } from '~/db/models/elevation-consent.server'
+
+const TEST_TERRAIN_ELEVATION = vi.hoisted(() => 250)
+const TEST_ELEVATION_DATASET = vi.hoisted(() => 'eudem25m')
+
+vi.mock('~/db/models/elevation-consent.server', () => ({
+	applyElevationConsentChoice: vi.fn(async () => true),
+}))
+
+vi.mock('~/services/elevation-service.server', async (importOriginal) => {
+	const actual =
+		await importOriginal<typeof import('~/services/elevation-service.server')>()
+
+	return {
+		...actual,
+		getTerrainElevation: vi.fn(async (latitude: number, longitude: number) => ({
+			elevation: TEST_TERRAIN_ELEVATION,
+			dataset: TEST_ELEVATION_DATASET,
+			datum: null,
+			attribution: null,
+			latitude,
+			longitude,
+		})),
+	}
+})
 
 const BOXES_TEST_USER = generateTestUserCredentials()
 const generateMinimalDevice = (
@@ -101,6 +128,51 @@ describe('openSenseMap API Routes: /boxes', () => {
 			expect(body.type).toBe('FeatureCollection')
 			expect(Array.isArray(body.features)).toBe(true)
 			expect(body.features.length).lessThanOrEqual(2)
+		})
+
+		it('should include a non-null height in device GeoJSON coordinates', async () => {
+			invariant(user, 'Test user must be registered')
+
+			const heightDevice = await createDevice(
+				{
+					name: `GeoJSON Height Device ${Date.now()}`,
+					latitude: 51.969,
+					longitude: 7.596,
+					heightAboveGround: 2.5,
+					terrainElevation: -15,
+					exposure: 'outdoor',
+					model: 'custom',
+					sensors: [],
+				},
+				user.id,
+			)
+			createdDeviceIds.push(heightDevice.id)
+
+			const searchParams = new URLSearchParams({
+				format: 'geojson',
+				name: heightDevice.name,
+				limit: '1',
+			})
+			const request = new Request(`${BASE_URL}?${searchParams}`, {
+				method: 'GET',
+			})
+
+			const response = (await loader({
+				request,
+			} as Route.LoaderArgs)) as Response
+			const body = await response.json()
+			const feature = body.features.find(
+				(candidate: any) => candidate.properties.id === heightDevice.id,
+			)
+
+			expect(response.status).toBe(200)
+			expect(feature).toBeDefined()
+			expect(feature.properties.height).toBe(-12.5)
+			expect(feature.properties.heightAboveGround).toBeUndefined()
+			expect(feature.properties.terrainElevation).toBeUndefined()
+			expect(feature.properties.terrainElevationDataset).toBeUndefined()
+			expect(feature.properties.heightAboveSeaLevel).toBe(-12.5)
+			expect(feature.geometry.coordinates).toEqual([7.596, 51.969, -12.5])
 		})
 
 		it('should deny searching for a name if limit is greater than max value', async () => {
@@ -311,7 +383,9 @@ describe('openSenseMap API Routes: /boxes', () => {
 				expect(feature.geometry).toBeDefined()
 				expect(feature.geometry.type).toBe('Point')
 				expect(Array.isArray(feature.geometry.coordinates)).toBe(true)
-				expect(feature.geometry.coordinates).toHaveLength(2)
+				expect(feature.geometry.coordinates.length).toBe(
+					feature.properties.height === null ? 2 : 3,
+				)
 				expect(feature.geometry.coordinates[0]).toBeDefined()
 				expect(feature.geometry.coordinates[1]).toBeDefined()
 				expect(feature.properties).toBeDefined()
@@ -505,6 +579,10 @@ describe('openSenseMap API Routes: /boxes', () => {
 			expect(body).toHaveProperty('sensors')
 			expect(Array.isArray(body.sensors)).toBe(true)
 			expect(body.sensors).toHaveLength(0)
+			expect(body.height).toBeNull()
+			expect(body.heightAboveGround).toBeNull()
+			expect(body.heightAboveSeaLevel).toBeNull()
+			expect(body.currentLocation.coordinates).toEqual([7.5, 51.9])
 		})
 
 		it('should reject creation without authentication', async () => {
@@ -655,7 +733,7 @@ describe('openSenseMap API Routes: /boxes', () => {
 
 		it('should allow to set the location for a new box as array', async () => {
 			// Arrange
-			const loc = [0, 0, 0]
+			const loc = [7.123456, 51.654321, 123.4]
 			const requestBody = generateMinimalDevice(loc)
 
 			const request = new Request(`${BASE_URL}/boxes`, {
@@ -673,13 +751,29 @@ describe('openSenseMap API Routes: /boxes', () => {
 			} as Route.ActionArgs)) as Response
 			const responseData = await response.json()
 			await deleteDevice({ id: responseData._id })
+			const expectedHeight = TEST_TERRAIN_ELEVATION + loc[2]
 
 			// Assert
 			expect(response.status).toBe(201)
 			expect(responseData.latitude).toBeDefined()
 			expect(responseData.longitude).toBeDefined()
-			expect(responseData.latitude).toBe(loc[0])
-			expect(responseData.longitude).toBe(loc[1])
+			expect(responseData.latitude).toBe(loc[1])
+			expect(responseData.longitude).toBe(loc[0])
+			expect(responseData.height).toBe(expectedHeight)
+			expect(responseData.heightAboveGround).toBe(loc[2])
+			expect(responseData.heightAboveSeaLevel).toBe(expectedHeight)
+			expect(responseData.terrainElevation).toBe(TEST_TERRAIN_ELEVATION)
+			expect(responseData.terrainElevationDataset).toBe(TEST_ELEVATION_DATASET)
+			expect(responseData.currentLocation.coordinates).toEqual([
+				loc[0],
+				loc[1],
+				expectedHeight,
+			])
+			expect(responseData.loc[0].geometry.coordinates).toEqual([
+				loc[0],
+				loc[1],
+				expectedHeight,
+			])
 			expect(responseData.createdAt).toBeDefined()
 
 			// Check that createdAt is recent (within 5 minutes)
@@ -691,7 +785,7 @@ describe('openSenseMap API Routes: /boxes', () => {
 
 		it('should allow to set the location for a new box as latLng object', async () => {
 			// Arrange
-			const loc = { lng: 120.123456, lat: 60.654321 }
+			const loc = { lng: 120.123456, lat: 60.654321, height: 0 }
 			const requestBody = generateMinimalDevice(loc)
 
 			const request = new Request(BASE_URL, {
@@ -713,6 +807,21 @@ describe('openSenseMap API Routes: /boxes', () => {
 			expect(responseData.latitude).toBe(loc.lat)
 			expect(responseData.longitude).toBeDefined()
 			expect(responseData.longitude).toBe(loc.lng)
+			expect(responseData.height).toBe(TEST_TERRAIN_ELEVATION)
+			expect(responseData.heightAboveGround).toBe(0)
+			expect(responseData.heightAboveSeaLevel).toBe(TEST_TERRAIN_ELEVATION)
+			expect(responseData.terrainElevation).toBe(TEST_TERRAIN_ELEVATION)
+			expect(responseData.terrainElevationDataset).toBe(TEST_ELEVATION_DATASET)
+			expect(responseData.currentLocation.coordinates).toEqual([
+				loc.lng,
+				loc.lat,
+				TEST_TERRAIN_ELEVATION,
+			])
+			expect(responseData.loc[0].geometry.coordinates).toEqual([
+				loc.lng,
+				loc.lat,
+				TEST_TERRAIN_ELEVATION,
+			])
 			expect(responseData.createdAt).toBeDefined()
 
 			// Check that createdAt is recent (within 5 minutes)
@@ -720,6 +829,60 @@ describe('openSenseMap API Routes: /boxes', () => {
 			const createdAt = new Date(responseData.createdAt)
 			const diffInMs = now.getTime() - createdAt.getTime()
 			expect(diffInMs).toBeLessThan(300000) // 5 minutes in milliseconds
+		})
+
+		it('should retain height above ground when elevation lookup fails', async () => {
+			vi.mocked(getTerrainElevation).mockRejectedValueOnce(
+				new Error('Elevation unavailable'),
+			)
+			const request = new Request(BASE_URL, {
+				method: 'POST',
+				headers: { Authorization: `Bearer ${jwt}` },
+				body: JSON.stringify(
+					generateMinimalDevice({ lng: 7.6, lat: 51.9, height: 5 }),
+				),
+			})
+
+			const response = (await action({
+				request,
+			} as Route.ActionArgs)) as Response
+			const responseData = await response.json()
+			if (responseData._id) createdDeviceIds.push(responseData._id)
+
+			expect(response.status).toBe(201)
+			expect(responseData.heightAboveGround).toBe(5)
+			expect(responseData.heightAboveSeaLevel).toBeNull()
+			expect(responseData.terrainElevation).toBeNull()
+			expect(responseData.terrainElevationDataset).toBeNull()
+			expect(responseData.height).toBeNull()
+			expect(responseData.currentLocation.coordinates).toEqual([7.6, 51.9])
+		})
+
+		it('should not request elevation without consent', async () => {
+			vi.mocked(applyElevationConsentChoice).mockResolvedValueOnce(false)
+			const elevationLookup = vi.mocked(getTerrainElevation)
+			elevationLookup.mockClear()
+
+			const request = new Request(BASE_URL, {
+				method: 'POST',
+				headers: { Authorization: `Bearer ${jwt}` },
+				body: JSON.stringify(
+					generateMinimalDevice({ lng: 7.6, lat: 51.9, height: 5 }),
+				),
+			})
+
+			const response = (await action({
+				request,
+			} as Route.ActionArgs)) as Response
+			const responseData = await response.json()
+			if (responseData._id) createdDeviceIds.push(responseData._id)
+
+			expect(response.status).toBe(201)
+			expect(elevationLookup).not.toHaveBeenCalled()
+			expect(responseData.heightAboveGround).toBe(5)
+			expect(responseData.heightAboveSeaLevel).toBeNull()
+			expect(responseData.terrainElevation).toBeNull()
+			expect(responseData.terrainElevationDataset).toBeNull()
 		})
 
 		it('should reject a new box with invalid coords', async () => {

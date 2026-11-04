@@ -10,6 +10,8 @@
 	"apply": "Anwenden",
 	"no_data_in_range": "Es liegen keine Daten in der ausgewählten Zeitspanne vor.",
 	"reset_zoom": "Zoom zurücksetzen",
+	"connect_points": "Punkte verbinden",
+	"disconnect_points": "Punkte anzeigen",
 	"dateRanges": {
 		"last-30-minutes": "Letzte 30 Minuten",
 		"last-1-hour": "Letzte Stunde",

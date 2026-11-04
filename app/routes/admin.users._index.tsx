@@ -1,9 +1,12 @@
 import { Link } from 'react-router'
 import { type Route } from './+types/admin.users._index'
 import { getUsers } from '~/db/models/user.server'
+import { useTranslation } from 'react-i18next'
+import { useHydrated } from '~/hooks/use-hydrated'
 
 export async function loader({}: Route.LoaderArgs) {
 	const users = await getUsers()
+
 	return { users }
 }
 
@@ -11,6 +14,8 @@ export default function AdminUsersIndexRoute({
 	loaderData,
 }: Route.ComponentProps) {
 	const { users } = loaderData
+	const { i18n } = useTranslation()
+	const hydrated = useHydrated()
 
 	return (
 		<div className="flex w-full flex-col">
@@ -45,10 +50,12 @@ export default function AdminUsersIndexRoute({
 								</td>
 								<td className="border-r-2 border-black p-2">{user.role}</td>
 								<td className="border-r-2 border-black p-2">
-									{new Date(user.createdAt).toLocaleString()}
+									{hydrated &&
+										new Date(user.createdAt).toLocaleString(i18n.language)}
 								</td>
 								<td className="border-r-2 border-black p-2">
-									{new Date(user.updatedAt).toLocaleString()}
+									{hydrated &&
+										new Date(user.updatedAt).toLocaleString(i18n.language)}
 								</td>
 								{/* <td className="border-r-2 border-black p-2">
 									{user.devicesCount}

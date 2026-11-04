@@ -1,15 +1,18 @@
-import { forwardRef, ForwardedRef, useEffect, useCallback } from 'react'
+import { forwardRef, useEffect, useCallback, type ForwardedRef } from 'react'
 import {
-	LayerSpecification,
 	Map,
-	MapInstance,
-	MapProps,
-	MapRef,
-	SkySpecification,
+	type LayerSpecification,
+	type MapInstance,
+	type MapProps,
+	type MapRef,
+	type SkySpecification,
 } from 'react-map-gl/maplibre'
-import SpaceBackground from './map/space-background'
 import 'maplibre-gl/dist/maplibre-gl.css'
 import { useTranslation } from 'react-i18next'
+import workerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url'
+import { setWorkerUrl } from 'maplibre-gl'
+
+setWorkerUrl(workerUrl)
 
 export const BaseMap = forwardRef<MapRef, MapProps>(
 	({ onLoad, ...props }: MapProps, ref: ForwardedRef<MapRef>) => {
@@ -58,7 +61,7 @@ export const BaseMap = forwardRef<MapRef, MapProps>(
 				updateMapLanguage(map, i18n.language)
 				onLoad?.(event as any)
 			},
-			[onLoad],
+			[i18n.language, onLoad, updateMapLanguage],
 		)
 
 		useEffect(() => {
@@ -71,21 +74,18 @@ export const BaseMap = forwardRef<MapRef, MapProps>(
 		}, [i18n.language, ref, updateMapLanguage])
 
 		return (
-			<>
-				<SpaceBackground />
-				<Map
-					ref={ref}
-					mapStyle={theme === 'dark' ? DEFAULT_DARK_STYLE : DEFAULT_LIGHT_STYLE}
-					minZoom={1.5}
-					projection={{ type: 'globe' }}
-					dragRotate={false}
-					pitchWithRotate={false}
-					touchZoomRotate={{ around: 'center' }}
-					sky={SKY_DEFINITION}
-					onLoad={handleMapLoad}
-					{...props}
-				/>
-			</>
+			<Map
+				ref={ref}
+				mapStyle={theme === 'dark' ? DEFAULT_DARK_STYLE : DEFAULT_LIGHT_STYLE}
+				minZoom={1.5}
+				projection={{ type: 'globe' }}
+				dragRotate={false}
+				pitchWithRotate={false}
+				touchZoomRotate={{ around: 'center' }}
+				sky={SKY_DEFINITION}
+				onLoad={handleMapLoad}
+				{...props}
+			/>
 		)
 	},
 )
@@ -101,19 +101,5 @@ const SKY_DEFINITION: SkySpecification = {
 	'sky-horizon-blend': 0.12,
 	'horizon-fog-blend': 0.08,
 	'fog-ground-blend': 0.06,
-	'atmosphere-blend': [
-		'interpolate',
-		['linear'],
-		['zoom'],
-		0,
-		1,
-		3,
-		1,
-		5,
-		0.85,
-		7,
-		0.45,
-		9,
-		0.12,
-	],
+	'atmosphere-blend': ['interpolate', ['linear'], ['zoom'], 0, 1, 5, 1, 7, 0],
 }

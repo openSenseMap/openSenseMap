@@ -1,7 +1,6 @@
 import * as React from 'react'
 import { useTranslation } from 'react-i18next'
 import {
-	type MetaFunction,
 	data,
 	redirect,
 	Form,
@@ -68,10 +67,6 @@ export async function action({ request }: Route.ActionArgs) {
 	}
 }
 
-export const meta: MetaFunction = () => {
-	return [{ title: 'Forgot Password' }]
-}
-
 export default function ForgotPasswordPage() {
 	const [searchParams] = useSearchParams()
 	const actionData = useActionData<typeof action>()
@@ -87,16 +82,16 @@ export default function ForgotPasswordPage() {
 	}, [actionData])
 
 	return (
-		<div className="flex h-screen items-center justify-center">
+		<div className="relative flex h-full w-full items-start justify-center overflow-y-auto p-4 sm:items-center">
 			<Link
 				to={{
 					pathname: '/explore',
 					search: searchParams.toString(),
 				}}
 			>
-				<div className="fixed inset-0 z-40 h-full w-full bg-black opacity-25" />
+				<div className="absolute inset-0 z-40 h-full w-full bg-black opacity-25" />
 			</Link>
-			<Card className="z-50 w-full max-w-md">
+			<Card className="relative z-50 my-auto w-full max-w-md min-w-0">
 				{navigation.state === 'loading' && (
 					<div className="absolute inset-0 z-50 flex items-center justify-center bg-white/30 backdrop-blur-xs dark:bg-zinc-800/30">
 						<Spinner />
@@ -147,7 +142,7 @@ export default function ForgotPasswordPage() {
 								<Button type="submit" className="bg-light-blue w-full">
 									{t('reset_password_button')}
 								</Button>
-								<p className="text-muted-foreground text-sm">
+								<p className="text-muted-foreground text-center text-sm">
 									{t('remember_password')}{' '}
 									<Link
 										className="font-medium underline"

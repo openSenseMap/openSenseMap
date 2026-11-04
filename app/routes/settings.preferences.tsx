@@ -326,7 +326,10 @@ export default function PreferencesSettingsPage() {
 
 	const getSavedMapValues = useCallback(
 		(actionData: PreferencesActionData): MapPreferenceAutosaveValues => {
-			if (actionData.intent !== 'autosave-map-preferences' || !actionData.success) {
+			if (
+				actionData.intent !== 'autosave-map-preferences' ||
+				!actionData.success
+			) {
 				return {
 					homeLatitude,
 					homeLongitude,
@@ -347,7 +350,10 @@ export default function PreferencesSettingsPage() {
 
 	const handleMapAutosaveError = useCallback(
 		(actionData: PreferencesActionData) => {
-			if (actionData.intent !== 'autosave-map-preferences' || actionData.success) {
+			if (
+				actionData.intent !== 'autosave-map-preferences' ||
+				actionData.success
+			) {
 				return
 			}
 
@@ -535,14 +541,11 @@ export default function PreferencesSettingsPage() {
 		<Card className="border-border bg-card text-card-foreground">
 			<CardHeader>
 				<CardTitle>{t('preferences')}</CardTitle>
-				<AutosaveStatusText
-					status={mapAutosave.status}
-					namespace="settings"
-				/>
+				<AutosaveStatusText status={mapAutosave.status} namespace="settings" />
 			</CardHeader>
 
 			<CardContent className="divide-border divide-y">
-				<div className="flex items-center justify-between gap-4 py-4 first:pt-0">
+				<div className="flex flex-col items-stretch gap-3 py-4 first:pt-0 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
 					<div>
 						<div className="text-foreground font-medium">{t('language')}</div>
 					</div>
@@ -550,8 +553,8 @@ export default function PreferencesSettingsPage() {
 					<LanguageSelect />
 				</div>
 
-				<div className="flex items-center justify-between gap-4 py-4 last:pb-0">
-					<div>
+				<div className="flex flex-col items-stretch gap-3 py-4 last:pb-0 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
+					<div className="min-w-0">
 						<div className="text-foreground font-medium">{t('theme')}</div>
 						<div className="text-muted-foreground text-sm">
 							{t('theme_description')}
@@ -634,8 +637,8 @@ export default function PreferencesSettingsPage() {
 					</div>
 				</div>
 
-				<div className="flex items-center justify-between gap-4 py-4 last:pb-0">
-					<div className="flex items-center gap-2">
+				<div className="flex flex-col items-start justify-between gap-3 py-4 last:pb-0 sm:flex-row sm:items-center sm:gap-4">
+					<div className="flex w-full min-w-0 items-start gap-2 sm:w-auto">
 						<Checkbox
 							id="newsletterOptIn"
 							name="newsletterOptIn"
@@ -659,7 +662,7 @@ export default function PreferencesSettingsPage() {
 					<AutosaveStatusText
 						status={newsletterAutosave.status}
 						namespace="settings"
-						className="min-h-5 text-sm"
+						className="min-h-5 shrink-0 text-sm"
 					/>
 				</div>
 			</CardContent>

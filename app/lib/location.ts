@@ -35,23 +35,33 @@ const missingLocationValueToUndefined = (value: unknown) => {
 	return value
 }
 
-export const locationSchema = z.object({
+const LOCATION_VALIDATION_ERROR_KEYS = {
+	latitudeRequired: 'latitude_required',
+	latitudeInvalid: 'latitude_invalid',
+	latitudeOutOfRange: 'latitude_out_of_range',
+	longitudeRequired: 'longitude_required',
+	longitudeInvalid: 'longitude_invalid',
+	longitudeOutOfRange: 'longitude_out_of_range',
+	heightAboveGroundInvalid: 'height_above_ground_invalid',
+} as const
+
+export const locationCoordinatesSchema = z.object({
 	latitude: z.preprocess(
 		missingLocationValueToUndefined,
 		z.coerce
 			.number({
 				error: (issue) =>
 					issue.input === undefined
-						? 'Latitude is required'
-						: 'Latitude must be a valid number',
+						? LOCATION_VALIDATION_ERROR_KEYS.latitudeRequired
+						: LOCATION_VALIDATION_ERROR_KEYS.latitudeInvalid,
 			})
 			.min(
 				LOCATION_LIMITS.latitude.min,
-				`Latitude must be greater than or equal to ${LOCATION_LIMITS.latitude.min}`,
+				LOCATION_VALIDATION_ERROR_KEYS.latitudeOutOfRange,
 			)
 			.max(
 				LOCATION_LIMITS.latitude.max,
-				`Latitude must be less than or equal to ${LOCATION_LIMITS.latitude.max}`,
+				LOCATION_VALIDATION_ERROR_KEYS.latitudeOutOfRange,
 			),
 	),
 
@@ -61,24 +71,89 @@ export const locationSchema = z.object({
 			.number({
 				error: (issue) =>
 					issue.input === undefined
-						? 'Longitude is required'
-						: 'Longitude must be a valid number',
+						? LOCATION_VALIDATION_ERROR_KEYS.longitudeRequired
+						: LOCATION_VALIDATION_ERROR_KEYS.longitudeInvalid,
 			})
 			.min(
 				LOCATION_LIMITS.longitude.min,
-				`Longitude must be greater than or equal to ${LOCATION_LIMITS.longitude.min}`,
+				LOCATION_VALIDATION_ERROR_KEYS.longitudeOutOfRange,
 			)
 			.max(
 				LOCATION_LIMITS.longitude.max,
-				`Longitude must be less than or equal to ${LOCATION_LIMITS.longitude.max}`,
+				LOCATION_VALIDATION_ERROR_KEYS.longitudeOutOfRange,
 			),
 	),
 })
 
-export type LocationData = z.infer<typeof locationSchema>
+export type LocationCoordinates = z.infer<typeof locationCoordinatesSchema>
+
+export const deviceLocationInputSchema = locationCoordinatesSchema.extend({
+	heightAboveGround: z.preprocess(
+		missingLocationValueToUndefined,
+		z.coerce
+			.number({
+				error: LOCATION_VALIDATION_ERROR_KEYS.heightAboveGroundInvalid,
+			})
+			.finite(LOCATION_VALIDATION_ERROR_KEYS.heightAboveGroundInvalid)
+			.optional(),
+	),
+})
+
+export type DeviceLocationInput = z.infer<typeof deviceLocationInputSchema>
+
+export type DeviceLocationInputFieldErrors = {
+	latitude?: string
+	longitude?: string
+	heightAboveGround?: string
+}
+
+export function parseDeviceLocationInputFormData(formData: FormData):
+	| {
+			success: true
+			data: DeviceLocationInput
+	  }
+	| {
+			success: false
+			errors: DeviceLocationInputFieldErrors
+	  } {
+	const parsed = deviceLocationInputSchema.safeParse({
+		latitude: formData.get('latitude'),
+		longitude: formData.get('longitude'),
+		heightAboveGround: formData.get('heightAboveGround'),
+	})
+
+	if (parsed.success) return { success: true, data: parsed.data }
+
+	const flattened = z.flattenError(parsed.error)
+
+	return {
+		success: false,
+		errors: {
+			latitude: flattened.fieldErrors.latitude?.[0],
+			longitude: flattened.fieldErrors.longitude?.[0],
+			heightAboveGround: flattened.fieldErrors.heightAboveGround?.[0],
+		},
+	}
+}
+
+export function validateDeviceLocationInputFieldErrors(
+	value: unknown,
+): DeviceLocationInputFieldErrors {
+	const parsed = deviceLocationInputSchema.safeParse(value)
+
+	if (parsed.success) return {}
+
+	const flattened = z.flattenError(parsed.error)
+
+	return {
+		latitude: flattened.fieldErrors.latitude?.[0],
+		longitude: flattened.fieldErrors.longitude?.[0],
+		heightAboveGround: flattened.fieldErrors.heightAboveGround?.[0],
+	}
+}
 
 export function validLngLat(lng: number, lat: number): boolean {
-	return locationSchema.safeParse({
+	return locationCoordinatesSchema.safeParse({
 		latitude: lat,
 		longitude: lng,
 	}).success
@@ -114,61 +189,8 @@ export function getValidMapViewport(value: {
 export function isValidLocation(value: {
 	latitude: number | null | undefined
 	longitude: number | null | undefined
-}): value is LocationData {
-	return locationSchema.safeParse(value).success
-}
-
-export function parseLocationFormData(formData: FormData):
-	| {
-			success: true
-			data: LocationData
-	  }
-	| {
-			success: false
-			errors: LocationFieldErrors
-	  } {
-	const parsed = locationSchema.safeParse({
-		latitude: formData.get('latitude'),
-		longitude: formData.get('longitude'),
-	})
-
-	if (parsed.success) {
-		return {
-			success: true,
-			data: parsed.data,
-		}
-	}
-
-	return {
-		success: false,
-		errors: getLocationFieldErrors(parsed.error),
-	}
-}
-
-export function getLocationFieldErrors(error: z.ZodError<LocationData>) {
-	const flattened = z.flattenError(error)
-
-	return {
-		latitude: flattened.fieldErrors.latitude?.[0],
-		longitude: flattened.fieldErrors.longitude?.[0],
-	}
-}
-
-export type LocationFieldErrors = {
-	latitude?: string
-	longitude?: string
-}
-
-export function validateLocationFieldErrors(
-	value: unknown,
-): LocationFieldErrors {
-	const parsed = locationSchema.safeParse(value)
-
-	if (parsed.success) {
-		return {}
-	}
-
-	return getLocationFieldErrors(parsed.error)
+}): value is LocationCoordinates {
+	return locationCoordinatesSchema.safeParse(value).success
 }
 
 export type OptionalMapViewportInput = {
@@ -222,19 +244,19 @@ export function parseOptionalMapViewportInput(input: OptionalMapViewportInput):
 		}
 	}
 
-	const parsedLocation = locationSchema.safeParse({
+	const parsedLocation = locationCoordinatesSchema.safeParse({
 		latitude: latitudeRaw,
 		longitude: longitudeRaw,
 	})
 
 	if (!parsedLocation.success) {
-		const errors = getLocationFieldErrors(parsedLocation.error)
+		const flattened = z.flattenError(parsedLocation.error)
 
 		return {
 			success: false,
 			message:
-				errors.latitude ??
-				errors.longitude ??
+				flattened.fieldErrors.latitude?.[0] ??
+				flattened.fieldErrors.longitude?.[0] ??
 				'Please provide a valid latitude and longitude.',
 		}
 	}
@@ -251,4 +273,12 @@ export function parseOptionalMapViewportInput(input: OptionalMapViewportInput):
 
 export function isOptionalMapViewInputValid(input: OptionalMapViewportInput) {
 	return parseOptionalMapViewportInput(input).success
+}
+
+export function toGeoJsonPosition(
+	longitude: number,
+	latitude: number,
+	height: number | null | undefined,
+): [number, number] | [number, number, number] {
+	return height == null ? [longitude, latitude] : [longitude, latitude, height]
 }

@@ -74,7 +74,7 @@ interface SingleMeasurementBody {
 	value: number
 	createdAt?: string
 	location?:
-		| [number, number, number]
+		| [number, number, number?]
 		| { lat: number; lng: number; height?: number }
 }
 

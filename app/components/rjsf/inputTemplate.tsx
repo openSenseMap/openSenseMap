@@ -11,7 +11,6 @@ export function BaseInputTemplate(props: BaseInputTemplateProps) {
 		onChange,
 		onBlur,
 		onFocus,
-		options,
 		placeholder,
 		type,
 	} = props
@@ -28,7 +27,7 @@ export function BaseInputTemplate(props: BaseInputTemplateProps) {
 			onChange={(e) => onChange(e.target.value)}
 			onBlur={() => onBlur(id, value)}
 			onFocus={() => onFocus(id, value)}
-			className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:ring-2 focus:ring-green-500 focus:outline-hidden disabled:cursor-not-allowed disabled:bg-gray-100"
+			className="border-input bg-background text-foreground ring-offset-background placeholder:text-muted-foreground focus:ring-ring disabled:bg-muted w-full rounded-md border px-3 py-2 text-sm focus:ring-2 focus:outline-hidden disabled:cursor-not-allowed disabled:opacity-50"
 		/>
 	)
 }

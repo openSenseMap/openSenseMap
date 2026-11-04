@@ -8,6 +8,7 @@ import {
 } from '~/db/schema'
 import { drizzleClient } from '~/db.server'
 import { type BoxesDataQueryParams } from '~/lib/api-schemas/boxes-data-query-schema'
+import { calculatedDeviceHeightAboveSeaLevel } from './device-height'
 // import { point } from "@turf/helpers";
 // import type { Point } from "geojson";
 
@@ -69,7 +70,7 @@ export function getSensors(deviceId: Sensor['deviceId']) {
 export function getSensorsFromDevice(deviceId: Sensor['deviceId']) {
 	return drizzleClient.query.sensor.findMany({
 		where: (sensor, { eq }) => eq(sensor.deviceId, deviceId),
-		orderBy: (sensor, { asc }) => [asc(sensor.order)],
+		orderBy: (sensor, { asc }) => [asc(sensor.order), asc(sensor.createdAt)],
 	})
 }
 
@@ -95,7 +96,11 @@ export async function getSensorsWithLastMeasurement(
         s.unit,
         s.sensor_type AS "sensorType",
         s.icon,
-        s.status,
+	        CASE
+	          WHEN max(measure.time) > now() - interval '7 days' THEN 'active'::status
+	          WHEN max(measure.time) > now() - interval '30 days' THEN 'inactive'::status
+	          ELSE 'old'::status
+	        END AS status,
         s.device_id AS "deviceId",
         s."order",
         json_agg(
@@ -175,10 +180,9 @@ export function addNewSensor({
 	icon,
 	deviceId,
 	order,
-}: Pick<
-	Sensor,
-	'title' | 'unit' | 'sensorType' | 'icon' | 'deviceId' | 'order'
->) {
+}: Pick<Sensor, 'title' | 'unit' | 'sensorType' | 'deviceId' | 'order'> & {
+	icon?: Sensor['icon']
+}) {
 	return drizzleClient.insert(sensor).values({
 		title,
 		unit,
@@ -195,18 +199,28 @@ export function updateSensor({
 	unit,
 	sensorType,
 	icon,
+	data,
 	order,
-}: Pick<Sensor, 'id' | 'title' | 'unit' | 'sensorType' | 'icon' | 'order'>) {
-	return drizzleClient
-		.update(sensor)
-		.set({
-			title,
-			unit,
-			sensorType,
-			icon,
-			order,
-		})
-		.where(eq(sensor.id, id))
+}: Pick<Sensor, 'id' | 'title' | 'unit' | 'sensorType' | 'order'> & {
+	icon?: Sensor['icon']
+	data?: Sensor['data']
+}) {
+	const setColumns: Partial<Sensor> = {
+		title,
+		unit,
+		sensorType,
+		order,
+	}
+
+	if (icon !== undefined) {
+		setColumns.icon = icon
+	}
+
+	if (data !== undefined) {
+		setColumns.data = data
+	}
+
+	return drizzleClient.update(sensor).set(setColumns).where(eq(sensor.id, id))
 }
 
 // return first sensor with its device name
@@ -256,6 +270,7 @@ export async function findMatchingSensors(params: BoxesDataQueryParams) {
 			deviceExposure: device.exposure,
 			deviceLat: device.latitude,
 			deviceLon: device.longitude,
+			deviceHeight: calculatedDeviceHeightAboveSeaLevel(),
 			sensorId: sensor.id,
 			sensorTitle: sensor.title,
 			sensorUnit: sensor.unit,
@@ -283,7 +298,7 @@ export async function findMatchingSensors(params: BoxesDataQueryParams) {
 			exposure: string | null
 			lat: number
 			lon: number
-			height?: number
+			height?: number | null
 			phenomenon: string | null
 			unit: string | null
 			sensorType: string | null
@@ -299,7 +314,7 @@ export async function findMatchingSensors(params: BoxesDataQueryParams) {
 				exposure: r.deviceExposure,
 				lat: r.deviceLat,
 				lon: r.deviceLon,
-				height: undefined,
+				height: r.deviceHeight,
 				phenomenon: r.sensorTitle,
 				unit: r.sensorUnit,
 				sensorType: r.sensorType,

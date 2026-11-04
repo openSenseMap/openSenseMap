@@ -21,6 +21,7 @@ import { location } from './location'
 import { logEntry } from './log-entry'
 import { sensor } from './sensor'
 import { user } from './user'
+import { deviceSchemaVersion } from './device-schema'
 
 /**
  * Table
@@ -51,6 +52,9 @@ export const device = pgTable('device', {
 	expiresAt: date('expires_at', { mode: 'date' }),
 	latitude: doublePrecision('latitude').notNull(),
 	longitude: doublePrecision('longitude').notNull(),
+	heightAboveGround: doublePrecision('height_above_ground'),
+	terrainElevation: doublePrecision('terrain_elevation'),
+	terrainElevationDataset: text('terrain_elevation_dataset'),
 	sensorWikiModel: text('sensor_wiki_model'),
 	userId: text('user_id')
 		.notNull()
@@ -58,6 +62,13 @@ export const device = pgTable('device', {
 			onDelete: 'cascade',
 			onUpdate: 'cascade',
 		}),
+	deviceSchemaVersionId: text('device_schema_version_id').references(
+		() => deviceSchemaVersion.id,
+		{
+			onDelete: 'set null',
+			onUpdate: 'cascade',
+		},
+	),
 })
 
 // Many-to-many relation between device - location

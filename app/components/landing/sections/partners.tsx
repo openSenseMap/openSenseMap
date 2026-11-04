@@ -11,15 +11,14 @@ export default function Partners({ data }: PartnersProps) {
 	return (
 		<div
 			id="partners"
-			className="flex h-full items-center justify-center text-xl text-gray-300 dark:text-gray-100"
+			className="flex h-full w-full items-center justify-center text-xl text-gray-300 dark:text-gray-100"
 		>
-			<div className="flex h-full w-5/6 flex-col justify-evenly">
-				<div className="flex items-center justify-center pb-10">
-					<p className="font-serif text-6xl font-black text-blue-100 subpixel-antialiased dark:text-blue-200">
-						{t('Partners')}
-					</p>
-				</div>
-				<div className="flex items-center justify-center">
+			<div className="flex h-full w-full flex-col justify-evenly md:w-5/6">
+				<p className="text-center font-serif text-4xl font-black text-blue-100 subpixel-antialiased sm:text-6xl dark:text-blue-200">
+					{t('Partners')}
+				</p>
+				<p className="text-center">{t('made_possible_by_partners')}</p>
+				<div className="flex flex-wrap items-center justify-center">
 					{data.map((partner, index) => {
 						return (
 							<motion.div
@@ -36,12 +35,24 @@ export default function Partners({ data }: PartnersProps) {
 									hidden: { opacity: 0, scale: 0, y: 50 },
 								}}
 								key={index}
-								className="w-48 p-8 md:w-64"
+								className="w-40 p-4 sm:w-48 sm:p-6 md:w-64 md:p-8"
 							>
-								<img
-									src={`${ENV.DIRECTUS_URL}/assets/${partner.logo}`}
-									alt={partner.name}
-								></img>
+								<a
+									href={partner.link}
+									target="_blank"
+									rel="noopener noreferrer"
+									className="text-foreground"
+								>
+									{partner.logo ? (
+										<img
+											src={`${ENV.DIRECTUS_URL}/assets/${partner.logo}`}
+											alt={partner.name}
+											className="h-auto max-w-full"
+										/>
+									) : (
+										partner.name
+									)}
+								</a>
 							</motion.div>
 						)
 					})}
@@ -59,13 +70,13 @@ export default function Partners({ data }: PartnersProps) {
 						visible: { opacity: 1, scale: 1, y: 0 },
 						hidden: { opacity: 0, scale: 0, y: 50 },
 					}}
-					className="flex flex-col items-center justify-center"
+					className="mt-32 flex flex-col items-center justify-center"
 				>
 					<p>{t('made_by')}</p>
 					<img
 						src="/img/openSenseLab_Logo.svg"
 						alt="openSenseLab Logo"
-						className="p-2"
+						className="h-auto max-w-prose p-2"
 					></img>
 				</motion.div>
 			</div>

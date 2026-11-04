@@ -218,6 +218,8 @@ export default function SensorView() {
 			<Graph
 				aggregation={loaderData.aggregation}
 				sensors={loaderData.sensors}
+				startDate={loaderData.startDate ?? undefined}
+				endDate={loaderData.endDate ?? undefined}
 			/>
 			{loaderData.device?.exposure === 'mobile' && (
 				<MobileBoxView sensors={loaderData.sensors} />

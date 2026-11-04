@@ -1,15 +1,26 @@
 'use client'
 
 import {
+	type CellData,
 	type ColumnDef,
 	type ColumnFiltersState,
+	type RowData,
 	type SortingState,
+	columnFilteringFeature,
+	columnVisibilityFeature,
+	createFilteredRowModel,
+	createPaginatedRowModel,
+	createSortedRowModel,
+	filterFn_includesString,
 	flexRender,
-	getCoreRowModel,
-	getFilteredRowModel,
-	getPaginationRowModel,
-	getSortedRowModel,
-	useReactTable,
+	rowPaginationFeature,
+	rowSelectionFeature,
+	rowSortingFeature,
+	sortFn_alphanumeric,
+	sortFn_datetime,
+	sortFn_text,
+	tableFeatures,
+	useTable,
 } from '@tanstack/react-table'
 import {
 	ChevronLeft,
@@ -37,13 +48,32 @@ import {
 	TableRow,
 } from '@/components/ui/table'
 
-interface DataTableProps<TData, TValue> {
-	columns: ColumnDef<TData, TValue>[]
+export const customTableFeatures = tableFeatures({
+	rowSortingFeature,
+	rowPaginationFeature,
+	rowSelectionFeature,
+	columnFilteringFeature,
+	columnVisibilityFeature,
+	sortedRowModel: createSortedRowModel(),
+	paginatedRowModel: createPaginatedRowModel(),
+	filteredRowModel: createFilteredRowModel(),
+	sortFns: {
+		alphanumeric: sortFn_alphanumeric,
+		datetime: sortFn_datetime,
+		text: sortFn_text,
+	},
+	filterFns: { includesString: filterFn_includesString },
+})
+
+export type CustomTableFeatures = typeof customTableFeatures
+
+interface DataTableProps<TData extends RowData, TValue extends CellData> {
+	columns: ColumnDef<CustomTableFeatures, RowData, TValue>[]
 	data: TData[]
 	getRowClassName?: (row: TData) => string
 }
 
-export function DataTable<TData, TValue>({
+export function DataTable<TData extends RowData, TValue extends CellData>({
 	columns,
 	data,
 	getRowClassName,
@@ -55,15 +85,12 @@ export function DataTable<TData, TValue>({
 		[],
 	)
 
-	const table = useReactTable({
+	const table = useTable({
+		features: customTableFeatures,
+		columns: columns as ColumnDef<CustomTableFeatures, TData, unknown>[],
 		data,
-		columns,
-		getCoreRowModel: getCoreRowModel(),
-		getPaginationRowModel: getPaginationRowModel(),
 		onSortingChange: setSorting,
-		getSortedRowModel: getSortedRowModel(),
 		onColumnFiltersChange: setColumnFilters,
-		getFilteredRowModel: getFilteredRowModel(),
 		state: {
 			sorting,
 			columnFilters,
@@ -71,15 +98,17 @@ export function DataTable<TData, TValue>({
 		initialState: {
 			pagination: {
 				pageSize: 5,
+				pageIndex: 0,
 			},
 		},
+		enableRowRangeSelection: false,
 	})
 
 	const tableColsWidth = [30, 30, 30, 40]
 	const { t } = useTranslation('data-table')
 
 	return (
-		<div>
+		<div className="w-full max-w-full min-w-0 overflow-hidden">
 			<div className="flex items-center py-4">
 				<Input
 					placeholder={t('filter_names')}
@@ -91,7 +120,7 @@ export function DataTable<TData, TValue>({
 				/>
 			</div>
 
-			<div className="border-border bg-card overflow-hidden rounded-md border">
+			<div className="border-border bg-card max-w-full min-w-0 overflow-hidden rounded-md border">
 				<Table>
 					<TableHeader>
 						{table.getHeaderGroups().map((headerGroup) => (
@@ -150,7 +179,7 @@ export function DataTable<TData, TValue>({
 					<div className="flex flex-wrap items-center space-x-2">
 						<span className="text-sm font-medium">{t('rows_per_page')}</span>
 						<Select
-							value={table.getState().pagination.pageSize.toString()}
+							value={table.state.pagination.pageSize.toString()}
 							onValueChange={(value) => {
 								table.setPageSize(Number(value))
 							}}
@@ -169,7 +198,7 @@ export function DataTable<TData, TValue>({
 					</div>
 					<div className="text-sm font-medium">
 						{t('page')}
-						{` ${table.getState().pagination.pageIndex + 1} `}
+						{` ${table.state.pagination.pageIndex + 1} `}
 						{t('of')}
 						{` ${table.getPageCount() ?? 10}`}
 					</div>

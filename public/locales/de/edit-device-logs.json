@@ -1,0 +1,13 @@
+{
+	"title": "Geräteprotokoll",
+	"content_placeholder": "Protokolleintrag eingeben",
+	"content": "Inhalt",
+	"created_at": "Erstellt am",
+	"public": "Öffentlich",
+	"actions": "Aktionen",
+	"log_added": "Protokolleintrag erfolgreich hinzugefügt!",
+	"log_deleted": "Protokolleintrag erfolgreich gelöscht!",
+	"visibility_updated": "Sichtbarkeit des Protokolleintrags aktualisiert!",
+	"unknown_action": "Unbekannte Aktion.",
+	"error": "Etwas ist schiefgelaufen."
+}

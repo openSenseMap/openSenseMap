@@ -1,5 +1,5 @@
 import * as dotenv from 'dotenv'
-import nodemailer from 'nodemailer'
+import nodemailer, { type Transporter } from 'nodemailer'
 import type SMTPTransport from 'nodemailer/lib/smtp-transport'
 import { render } from 'react-email'
 dotenv.config()
@@ -50,9 +50,9 @@ const getConfig = (): Config => {
 const config = getConfig()
 
 class OSEMTransporter {
-	private static _instance: nodemailer.Transporter | null = null
+	private static _instance: Transporter | null = null
 	private constructor() {}
-	public static async getInstance(): Promise<nodemailer.Transporter> {
+	public static async getInstance(): Promise<Transporter> {
 		if (this._instance !== null) return this._instance
 
 		if (process.env.TEST) {

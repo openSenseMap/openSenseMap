@@ -61,9 +61,7 @@ export default function ConfirmNewsletterRoute() {
 		<div className="flex min-h-screen items-center justify-center p-4">
 			<Card className="w-full max-w-md text-center">
 				<CardHeader className="space-y-2">
-					<CardTitle className="text-2xl font-bold">
-						{content.title}
-					</CardTitle>
+					<CardTitle className="text-2xl font-bold">{content.title}</CardTitle>
 					<CardDescription>{content.description}</CardDescription>
 				</CardHeader>
 				<CardContent />

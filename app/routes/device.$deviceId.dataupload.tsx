@@ -39,9 +39,23 @@ export async function action({
 		)
 	}
 
+	const userId = await getUserId(request)
+	if (!userId) return redirect('/')
+
 	const deviceId = params['deviceId']
 	if (deviceId === undefined)
 		return StandardResponse.badRequest('deviceId must be set but is undefined')
+
+	const device = await getDevice({ id: deviceId })
+	if (!device) return StandardResponse.badRequest('device not found')
+
+	if (device.userId !== userId) {
+		return StandardResponse.forbidden('User does not own this device')
+	}
+
+	const deviceApiKey = device.apiKey
+	if (!deviceApiKey)
+		return StandardResponse.badRequest('device api key not found')
 
 	const formData = await request.formData()
 	const contentType = formData.get('contentType')
@@ -55,8 +69,6 @@ export async function action({
 		return StandardResponse.badRequest(
 			'measurement data is either not set or has a wrong type',
 		)
-	const deviceApiKey = (await getDevice({ id: deviceId }))?.apiKey
-	if (!deviceApiKey) return StandardResponse.badRequest('device not found')
 
 	try {
 		await postNewMeasurements(deviceId, measurementData, {
@@ -97,12 +109,12 @@ export default function DataUpload({ actionData }: any) {
 	const [dataFormat, setDataFormat] = useState('text/csv')
 
 	return (
-		<div className="font-helvetica space-y-6 px-10 pb-16">
+		<div className="font-helvetica space-y-6 px-4 pb-16 sm:px-6 lg:px-10">
 			<NavBar />
 
 			<div>
-				<div className="font-helvetica grid grid-cols-8 gap-10 text-[15px] tracking-wide max-md:grid-cols-2 lg:grid-rows-1">
-					<nav className="col-span-2 md:col-span-2">
+				<div className="font-helvetica grid grid-cols-1 gap-6 text-[15px] tracking-wide md:grid-cols-8 md:gap-10 lg:grid-rows-1">
+					<nav className="col-span-1 md:col-span-2">
 						<ul>
 							<li className="rounded p-3 text-[#676767] hover:bg-[#eee]">
 								<ArrowLeft className="mr-2 inline h-5 w-5" />
@@ -113,9 +125,9 @@ export default function DataUpload({ actionData }: any) {
 						</ul>
 					</nav>
 
-					<main className="col-span-6 md:col-span-6">
+					<main className="col-span-1 min-w-0 md:col-span-6">
 						<Form method="post" noValidate>
-							<div className="container mx-auto max-w-3xl px-4 py-12">
+							<div className="mx-auto max-w-3xl py-6 sm:px-4 sm:py-12">
 								<h1 className="mb-6 text-3xl font-bold">
 									{t('dataUploadHeading')}
 								</h1>
@@ -149,7 +161,7 @@ export default function DataUpload({ actionData }: any) {
 										</Trans>
 									</p>
 								</div>
-								<div className="mb-8 grid grid-cols-2 gap-4">
+								<div className="mb-8 grid grid-cols-1 gap-4 sm:grid-cols-2">
 									<div>
 										<Button
 											variant="outline"

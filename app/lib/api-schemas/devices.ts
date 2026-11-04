@@ -1,4 +1,36 @@
 import { z } from 'zod'
+import {
+	DeviceLocationInputSchema,
+	HeightSchema,
+	LatitudeSchema,
+	LongitudeSchema,
+} from '~/lib/openapi/schemas/location'
+import { ElevationLookupConsentSchema } from '~/lib/openapi/schemas/consent'
+
+const DeviceLocationArrayInputSchema = z
+	.union([
+		z.tuple([LongitudeSchema, LatitudeSchema]).meta({
+			override: { minItems: 2, maxItems: 2, items: false },
+		}),
+		z
+			.tuple([
+				LongitudeSchema,
+				LatitudeSchema,
+				HeightSchema.meta({
+					description:
+						'Device height above the local ground surface in meters.',
+					example: 3.5,
+				}),
+			])
+			.meta({
+				override: { minItems: 3, maxItems: 3, items: false },
+			}),
+	])
+	.meta({
+		description:
+			'Coordinates as [longitude, latitude, height?], where height is above the local ground surface in meters.',
+		example: [7.68123, 51.9123, 3.5],
+	})
 
 export const CreateDeviceSchema = z.object({
 	// public API request shape
@@ -13,18 +45,16 @@ export const CreateDeviceSchema = z.object({
 		.optional()
 		.default('unknown'),
 	location: z
-		.union([
-			z.array(z.number()).min(2).max(3),
-			z.object({
-				lng: z.number(),
-				lat: z.number(),
-				height: z.number().optional(),
-			}),
-		])
+		.union([DeviceLocationArrayInputSchema, DeviceLocationInputSchema])
 		.transform((loc) => {
 			if (Array.isArray(loc)) return loc
-			return [loc.lng, loc.lat, ...(loc.height ? [loc.height] : [])]
+			return [
+				loc.lng,
+				loc.lat,
+				...(loc.height !== undefined ? [loc.height] : []),
+			]
 		}),
+	elevationLookupConsent: ElevationLookupConsentSchema.optional(),
 	grouptag: z.array(z.string()).optional().default([]),
 	model: z
 		.enum([

@@ -5,7 +5,6 @@ import {
 	Settings,
 	Compass,
 	PlusIcon,
-	DownloadIcon,
 	Info,
 } from 'lucide-react'
 import { useState } from 'react'
@@ -30,19 +29,12 @@ import Spinner from '~/components/spinner'
 import { toast } from '~/components/ui/use-toast'
 import { useOptionalUser } from '~/utils'
 import { Button } from '~/components/ui/button'
-import Download from '../download'
-
-interface MenuProps {
-	devices?: any
-}
-
-export default function Menu({ devices }: MenuProps) {
+export default function Menu() {
 	const [searchParams] = useSearchParams()
 	const redirectTo =
 		searchParams.size > 0 ? '/explore?' + searchParams.toString() : '/explore'
 
 	const [open, setOpen] = useState(false)
-	const [downloadOpen, setDownloadOpen] = useState(false)
 
 	const navigation = useNavigation()
 	const isLoggingOut = Boolean(navigation.state === 'submitting')
@@ -149,24 +141,6 @@ export default function Menu({ devices }: MenuProps) {
 							</DropdownMenuGroup>
 						)}
 
-						{isExplore && (
-							<DropdownMenuGroup>
-								<DropdownMenuItem
-									className="cursor-pointer"
-									onSelect={(event) => {
-										event.preventDefault()
-										setOpen(false)
-										setDownloadOpen(true)
-									}}
-								>
-									<DownloadIcon className="mr-2 h-5 w-5" />
-									<span>{t('download_label', 'Download data')}</span>
-								</DropdownMenuItem>
-
-								<DropdownMenuSeparator />
-							</DropdownMenuGroup>
-						)}
-
 						<DropdownMenuGroup>
 							<DropdownMenuItem
 								onSelect={(e) => {
@@ -217,13 +191,6 @@ export default function Menu({ devices }: MenuProps) {
 					</div>
 				</DropdownMenuContent>
 			</DropdownMenu>
-			{devices && (
-				<Download
-					devices={devices}
-					open={downloadOpen}
-					onOpenChange={setDownloadOpen}
-				/>
-			)}
 		</>
 	)
 }

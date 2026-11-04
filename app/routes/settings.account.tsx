@@ -26,6 +26,7 @@ import {
 } from '~/components/ui/card'
 import { Input } from '~/components/ui/input'
 import { Label } from '~/components/ui/label'
+import { PasswordInput } from '~/components/ui/password-input'
 import { useToast } from '~/components/ui/use-toast'
 import {
 	getUserById,
@@ -456,9 +457,9 @@ export default function EditUserProfilePage() {
 									</span>
 								</p>
 							) : (
-								<div className="flex items-center justify-between gap-3">
-									<p className="flex items-center gap-1 text-sm text-orange-500 dark:text-amber-400">
-										<span className="inline-flex gap-1">
+								<div className="flex flex-col items-stretch gap-3 sm:flex-row sm:items-center sm:justify-between">
+									<p className="min-w-0 text-sm text-orange-500 dark:text-amber-400">
+										<span className="inline-flex items-start gap-1">
 											<OctagonAlert />{' '}
 											{hasPendingEmail
 												? t('email_not_confirmed')
@@ -470,6 +471,7 @@ export default function EditUserProfilePage() {
 										type="button"
 										variant="default"
 										size="sm"
+										className="w-full sm:w-auto"
 										disabled={resendFetcher.state === 'submitting'}
 										onClick={() => {
 											void resendFetcher.submit(
@@ -495,8 +497,8 @@ export default function EditUserProfilePage() {
 							) : null}
 						</div>
 
-						<div className="flex items-center justify-between gap-4 rounded-lg border p-4 dark:border-white">
-							<div className="space-y-1">
+						<div className="flex flex-col items-stretch gap-4 rounded-lg border p-4 sm:flex-row sm:items-center sm:justify-between dark:border-white">
+							<div className="min-w-0 space-y-1">
 								<p className="font-medium">{t('update_password')}</p>
 								<p className="text-muted-foreground text-sm">
 									{t('update_password_description')}
@@ -506,6 +508,7 @@ export default function EditUserProfilePage() {
 							<Button
 								type="button"
 								variant="outline"
+								className="w-full shrink-0 sm:w-auto"
 								onClick={() => setPasswordDialogOpen(true)}
 							>
 								{t('update_password')}
@@ -548,11 +551,10 @@ export default function EditUserProfilePage() {
 
 					<div className="grid gap-2">
 						<Label htmlFor="passwordUpdate">{t('confirm_password')}</Label>
-						<Input
+						<PasswordInput
 							ref={passwordUpdRef}
 							id="passwordUpdate"
 							name="passwordUpdate"
-							type="password"
 							autoComplete="current-password"
 							placeholder={t('enter_current_password')}
 							value={emailPassword}
@@ -607,24 +609,22 @@ export default function EditUserProfilePage() {
 
 						<div className="space-y-2">
 							<Label htmlFor="currentPassword">{t('current_password')}</Label>
-							<Input
+							<PasswordInput
 								ref={currPassRef}
 								id="currentPassword"
 								name="currentPassword"
 								placeholder={t('enter_current_password')}
-								type="password"
 								autoComplete="current-password"
 							/>
 						</div>
 
 						<div className="space-y-2">
 							<Label htmlFor="newPassword">{t('new_password')}</Label>
-							<Input
+							<PasswordInput
 								ref={newPassRef}
 								id="newPassword"
 								name="newPassword"
 								placeholder={t('enter_new_password')}
-								type="password"
 								autoComplete="new-password"
 							/>
 						</div>
@@ -633,12 +633,11 @@ export default function EditUserProfilePage() {
 							<Label htmlFor="newPasswordConfirm">
 								{t('confirm_password')}
 							</Label>
-							<Input
+							<PasswordInput
 								ref={confirmPassRef}
 								id="newPasswordConfirm"
 								name="newPasswordConfirm"
 								placeholder={t('confirm_new_password')}
-								type="password"
 								autoComplete="new-password"
 							/>
 						</div>

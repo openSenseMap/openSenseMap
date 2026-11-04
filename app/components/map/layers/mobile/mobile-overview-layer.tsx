@@ -1,6 +1,5 @@
 import bbox from '@turf/bbox'
 import { point, featureCollection } from '@turf/helpers'
-import { format } from 'date-fns'
 import { type FeatureCollection, type Point } from 'geojson'
 import { CalendarClock } from 'lucide-react'
 import { useState, useEffect, useMemo, useCallback } from 'react'
@@ -10,6 +9,7 @@ import {
 	type LocationPoint,
 	categorizeIntoTrips,
 } from '~/lib/mobile-box-helper'
+import { useTranslation } from 'react-i18next'
 
 const FIT_PADDING = 100
 
@@ -121,6 +121,12 @@ export default function MobileOverviewLayer({
 }: {
 	locations: LocationPoint[]
 }) {
+	const { i18n } = useTranslation()
+	const dateTimeFormat = new Intl.DateTimeFormat(i18n.language, {
+		dateStyle: 'short',
+		timeStyle: 'short',
+	})
+
 	// Generate trips and assign colors once
 	const trips = useMemo(() => categorizeIntoTrips(locations, 50), [locations])
 
@@ -451,7 +457,7 @@ export default function MobileOverviewLayer({
 						)}
 						<div>
 							<p className="text-primary text-sm font-bold">
-								{format(new Date(popupInfo.startTime), 'Pp')}
+								{dateTimeFormat.format(new Date(popupInfo.startTime))}
 							</p>
 						</div>
 						{popupInfo.isCluster &&
@@ -461,7 +467,7 @@ export default function MobileOverviewLayer({
 										To
 									</span>
 									<p className="text-primary text-sm font-bold">
-										{format(new Date(popupInfo.endTime), 'Pp')}
+										{dateTimeFormat.format(new Date(popupInfo.endTime))}
 									</p>
 								</div>
 							)}

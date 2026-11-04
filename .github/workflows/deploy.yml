@@ -19,67 +19,69 @@ jobs:
   lint:
     name: ⬣ Lint
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
       - name: ⬇️ Checkout repo
         uses: actions/checkout@v7
-
-      - name: ⎔ Setup node
-        uses: actions/setup-node@v6
         with:
-          cache: npm
-          cache-dependency-path: ./package.json
-          node-version-file: .nvmrc
+          persist-credentials: false
 
-      - name: 📥 Install deps
-        run: npm install
+      - name: ⎔ Setup Vite+
+        uses: voidzero-dev/setup-vp@v1.22.0
+        with:
+          cache: true
+          node-version-file: .node-version
+          run-install: |
+            - args: ['--frozen-lockfile']
 
       - name: 🔬 Lint
-        run: npm run lint
+        run: vp lint
 
   typecheck:
     name: ʦ TypeScript
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
       - name: ⬇️ Checkout repo
         uses: actions/checkout@v7
-
-      - name: ⎔ Setup node
-        uses: actions/setup-node@v6
         with:
-          cache: npm
-          cache-dependency-path: ./package.json
-          node-version-file: .nvmrc
+          persist-credentials: false
 
-      - name: 📥 Install deps
-        run: npm install
+      - name: ⎔ Setup Vite+
+        uses: voidzero-dev/setup-vp@v1.22.0
+        with:
+          cache: true
+          node-version-file: .node-version
+          run-install: |
+            - args: ['--frozen-lockfile']
 
       - name: 🔎 Type check
-        run: npm run typecheck --if-present
+        run: vp run typecheck
 
-  vitest:
+  test:
     name: ⚡ Test
     runs-on: ubuntu-latest
     permissions:
-      # Required to checkout the code
       contents: read
-      # Required to put a comment into the pull-request
       pull-requests: write
     steps:
       - name: ⬇️ Checkout repo
         uses: actions/checkout@v7
+        with:
+          persist-credentials: false
 
       - name: 🏄 Copy test env vars
         run: cp .env.example .env
 
-      - name: ⎔ Setup node
-        uses: actions/setup-node@v6
+      - name: ⎔ Setup Vite+
+        uses: voidzero-dev/setup-vp@v1.22.0
         with:
-          cache: npm
-          cache-dependency-path: ./package.json
-          node-version-file: .nvmrc
-
-      - name: 📥 Install deps
-        run: npm install
+          cache: true
+          node-version-file: .node-version
+          run-install: |
+            - args: ['--frozen-lockfile']
 
       - name: 🐳 Docker compose
         # we need a postgres container for runnign the tests
@@ -95,10 +97,10 @@ jobs:
           max_attempts: 5
           retry_wait_seconds: 45
           retry_on: error
-          command: npm run db:migrate
+          command: vp run db:migrate
 
-      - name: ⚡ Run vitest
-        run: npm run test:coverage
+      - name: ⚡ Run tests
+        run: vp test --coverage
 
       - name: 🧐 Report Coverage
         uses: davelosert/vitest-coverage-report-action@v2
@@ -132,12 +134,12 @@ jobs:
         id: meta
         uses: docker/metadata-action@v6
         with:
-          images: ghcr.io/opensensemap/frontend
+          images: ghcr.io/opensensemap/openSenseMap
 
-      - name: 👓 Read .nvmrc
-        id: nvmrc
+      - name: 👓 Read .node-version
+        id: node-version
         run: |
-          echo "NODE_VERSION=$(cat .nvmrc)" >> $GITHUB_OUTPUT
+          echo "NODE_VERSION=$(cat .node-version)" >> $GITHUB_OUTPUT
 
       - name: 🔑 GitHub Registry Auth
         uses: docker/login-action@v4
@@ -156,7 +158,7 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           build-args: |
             COMMIT_SHA=${{ github.sha }}
-            NODE_VERSION=${{ steps.nvmrc.outputs.NODE_VERSION }}
+            NODE_VERSION=${{ steps.node-version.outputs.NODE_VERSION }}
           cache-from: type=local,src=/tmp/.buildx-cache
           cache-to: type=local,mode=max,dest=/tmp/.buildx-cache-new
 
