@@ -510,6 +510,7 @@ export default function EditUserProfilePage() {
 							<Link
 								preventScrollReset
 								to="photo"
+								prefetch="intent"
 								className="border-night-700 bg-night-500 pointer-events-auto absolute top-3 -right-3 flex h-4 w-4 items-center justify-center rounded-full border-4 p-5"
 								title={t('change_profile_photo')}
 								aria-label={t('change_profile_photo')}
