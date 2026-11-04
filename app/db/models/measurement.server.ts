@@ -1,5 +1,4 @@
 import { and, desc, eq, gt, gte, inArray, lt, lte, sql } from 'drizzle-orm'
-import { ArchivedDeviceError } from './device.server'
 import {
 	type LastMeasurement,
 	location,
@@ -236,25 +235,7 @@ export async function saveMeasurements(
 	})
 
 	await drizzleClient.transaction(async (tx) => {
-		const [currentDevice] = await tx
-			.select({
-				id: device.id,
-				archivedAt: device.archivedAt,
-			})
-			.from(device)
-			.where(eq(device.id, minimalDevice.id))
-			.limit(1)
-		timing?.mark('transactionDeviceLookup')
-
-		if (!currentDevice) {
-			const error = new Error('Device not found')
-			error.name = 'NotFoundError'
-			throw error
-		}
-
-		if (currentDevice.archivedAt) {
-			throw new ArchivedDeviceError(currentDevice.id)
-		}
+		timing?.mark('transactionStart')
 
 		const locations =
 			deviceLocationUpdates.length > 0
