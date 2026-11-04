@@ -63,7 +63,9 @@ export default function DeviceOverview() {
 
 			<p className="inline-block rounded p-3 text-[#676767] hover:bg-[#eee]">
 				<ArrowLeft className="mr-2 inline h-5 w-5" />
-				<Link to="/profile/me">{t('back_to_dashboard')}</Link>
+				<Link to="/profile/me" prefetch="intent">
+					{t('back_to_dashboard')}
+				</Link>
 			</p>
 
 			<main className="mx-auto max-w-(--breakpoint-xl)">
