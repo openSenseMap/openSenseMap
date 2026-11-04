@@ -99,7 +99,10 @@ jobs:
           command: vp run db:migrate
 
       - name: ⚡ Run tests
-        run: vp test
+        run: vp test --coverage
+
+      - name: 🧐 Report Coverage
+        uses: davelosert/vitest-coverage-report-action@v2
 
       - name: 🗑️ Cleanup
         if: always()

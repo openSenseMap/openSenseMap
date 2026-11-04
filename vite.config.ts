@@ -64,6 +64,9 @@ export default defineConfig(({ mode }) => {
 			environment: 'jsdom',
 			setupFiles: ['./vitest.setup.ts'],
 			include: ['**/*.{test,spec}.{ts,tsx}'],
+			coverage: {
+				reporter: ['text', 'json-summary', 'json'],
+			},
 			testTimeout: 10_000,
 			hookTimeout: process.env.CI ? 30_000 : 10_000,
 		},
