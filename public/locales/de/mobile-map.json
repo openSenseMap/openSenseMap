@@ -1,0 +1,13 @@
+{
+	"recentTrips": "Letzte Fahrten",
+	"tripExplanationLabel": "Wie Fahrten bestimmt werden",
+	"tripExplanation": "Fahrten werden anhand von Pausen zwischen Standortaktualisierungen abgeleitet. Es werden bis zu {{count}} der letzten Fahrten angezeigt. Die Gruppierung entspricht daher möglicherweise nicht immer der tatsächlichen Fahrt.",
+	"colorByTrip": "Nach Fahrt einfärben",
+	"colorByTripAriaLabel": "Kartenpunkte nach Fahrt einfärben",
+	"visibleTrips": "Sichtbare Fahrten",
+	"latest": "Neueste",
+	"latestTripAriaLabel": "{{label}}, neueste Fahrt",
+	"sensorValues": "Sensorwerte",
+	"clusterPoints": "Cluster aus {{count}} Punkten",
+	"to": "Bis"
+}
