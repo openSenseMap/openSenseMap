@@ -23,6 +23,16 @@ const schema = z.object({
 	MYBADGES_CLIENT_ID: z.string(),
 	MYBADGES_CLIENT_SECRET: z.string(),
 	DISCOURSE_URL: z.string().url(),
+	SENTRY_DSN: z.string().url().optional(),
+	SENTRY_ENVIRONMENT: z.string().min(1).optional(),
+	SENTRY_RELEASE: z.string().min(1).optional(),
+	SENTRY_TRACES_SAMPLE_RATE: z
+		.string()
+		.refine((value) => {
+			const sampleRate = Number(value)
+			return Number.isFinite(sampleRate) && sampleRate >= 0 && sampleRate <= 1
+		}, 'Must be a number between 0 and 1')
+		.optional(),
 })
 
 declare global {
@@ -42,7 +52,20 @@ export function init() {
 	}
 }
 
-export function getEnv() {
+function getSentryTracesSampleRate() {
+	if (process.env.SENTRY_TRACES_SAMPLE_RATE === undefined) return 1
+
+	const sampleRate = Number(process.env.SENTRY_TRACES_SAMPLE_RATE)
+	return Number.isFinite(sampleRate) && sampleRate >= 0 && sampleRate <= 1
+		? sampleRate
+		: 0
+}
+
+export function getEnv({
+	sentryPerformanceTracingEnabled = false,
+}: {
+	sentryPerformanceTracingEnabled?: boolean
+} = {}) {
 	return {
 		NOMINATIM_SEARCH_API: process.env.NOMINATIM_SEARCH_API,
 		OSEM_GITHUB_URL: process.env.OSEM_API_URL,
@@ -52,6 +75,11 @@ export function getEnv() {
 		MYBADGES_URL: process.env.MYBADGES_URL,
 		SENSORWIKI_API_URL: process.env.SENSORWIKI_API_URL,
 		COMMUNITY_URL: process.env.DISCOURSE_URL,
+		SENTRY_DSN: process.env.SENTRY_DSN,
+		SENTRY_ENVIRONMENT: process.env.SENTRY_ENVIRONMENT ?? process.env.NODE_ENV,
+		SENTRY_RELEASE: process.env.SENTRY_RELEASE,
+		SENTRY_TRACES_SAMPLE_RATE: getSentryTracesSampleRate(),
+		SENTRY_PERFORMANCE_TRACING_ENABLED: sentryPerformanceTracingEnabled,
 	}
 }
 

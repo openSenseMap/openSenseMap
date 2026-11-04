@@ -2,6 +2,7 @@ import * as dotenv from 'dotenv'
 import nodemailer, { type Transporter } from 'nodemailer'
 import type SMTPTransport from 'nodemailer/lib/smtp-transport'
 import { render } from 'react-email'
+import { logServerError } from '~/lib/sentry.server'
 dotenv.config()
 
 /**
@@ -125,6 +126,11 @@ export const sendMail = async (mailConfig: {
 			attachments: mailConfig.attachments,
 		})
 	} catch (err) {
+		logServerError('Transactional email delivery failed', err, {
+			'app.operation': 'email.send',
+			'email.has_attachments': Boolean(mailConfig.attachments?.length),
+			'email.transport': 'smtp',
+		})
 		console.error(err)
 		throw err
 	}

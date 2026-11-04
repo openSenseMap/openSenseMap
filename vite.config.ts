@@ -1,6 +1,10 @@
 import epicOxfmt from '@epic-web/config/oxfmt'
 import epicOxlint from '@epic-web/config/oxlint' with { type: 'json' }
 import { reactRouter } from '@react-router/dev/vite'
+import {
+	sentryReactRouter,
+	type SentryReactRouterBuildOptions,
+} from '@sentry/react-router/vite'
 import tailwindcss from '@tailwindcss/vite'
 import preserveDirectives from 'rollup-preserve-directives'
 import { defineConfig, lazyPlugins, loadEnv, type UserConfig } from 'vite-plus'
@@ -9,12 +13,25 @@ const epicOxlintConfig = epicOxlint as unknown as NonNullable<
 	UserConfig['lint']
 >
 
-export default defineConfig(({ mode }) => {
+export default defineConfig(async (configEnv) => {
+	const { mode } = configEnv
+	const env = loadEnv(mode, process.cwd(), '')
+	const hasSentrySourceMapConfig = Boolean(
+		env.SENTRY_AUTH_TOKEN && env.SENTRY_ORG && env.SENTRY_PROJECT,
+	)
+	const sentryConfig: SentryReactRouterBuildOptions = {
+		authToken: env.SENTRY_AUTH_TOKEN,
+		org: env.SENTRY_ORG,
+		project: env.SENTRY_PROJECT,
+		release: env.SENTRY_RELEASE ? { name: env.SENTRY_RELEASE } : undefined,
+	}
+	const sentryPlugins = hasSentrySourceMapConfig
+		? await sentryReactRouter(sentryConfig, configEnv)
+		: []
+
 	// Make .env variables available in tests
 	// Might be required only because reactRouter() is disabled in test mode
 	if (mode === 'test') {
-		// Loads .env, .env.test, etc.
-		const env = loadEnv(mode, process.cwd(), '')
 		Object.assign(process.env, env)
 	}
 
@@ -57,6 +74,7 @@ export default defineConfig(({ mode }) => {
 			// https://github.com/remix-run/remix/issues/9871 prevents this from
 			// being enabled in test mode...
 			mode === 'test' ? null : reactRouter(),
+			...sentryPlugins,
 			preserveDirectives(), // makes sure directives such as "use client" are present in the output bundle
 		]),
 		test: {

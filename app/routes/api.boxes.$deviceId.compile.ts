@@ -1,4 +1,5 @@
 import { type Route } from './+types/api.boxes.$deviceId.compile'
+import { logServerError } from '~/lib/sentry.server'
 
 const COMPILER_URL = 'https://compiler.sensebox.de/compile'
 
@@ -42,6 +43,10 @@ export const action = async ({
 			}),
 		})
 	} catch (err) {
+		logServerError('Compiler service request failed', err, {
+			'app.operation': 'device.compile',
+			'upstream.service': 'sensebox-compiler',
+		})
 		const message = err instanceof Error ? err.message : String(err)
 		return Response.json(
 			{
@@ -53,6 +58,17 @@ export const action = async ({
 	}
 
 	if (!upstreamResponse.ok) {
+		if (upstreamResponse.status >= 500) {
+			logServerError(
+				'Compiler service returned an error response',
+				upstreamResponse,
+				{
+					'app.operation': 'device.compile',
+					'upstream.service': 'sensebox-compiler',
+				},
+			)
+		}
+
 		const errorText = await upstreamResponse.text().catch(() => '')
 		return Response.json(
 			{

@@ -1,5 +1,6 @@
 import { PassThrough } from 'stream'
 import { createReadableStreamFromReadable } from '@react-router/node'
+import * as Sentry from '@sentry/react-router'
 import { isbot } from 'isbot'
 import {
 	renderToPipeableStream,
@@ -7,11 +8,13 @@ import {
 } from 'react-dom/server'
 import { I18nextProvider } from 'react-i18next'
 import {
+	type HandleErrorFunction,
 	type RouterContextProvider,
 	ServerRouter,
 	type EntryContext,
 } from 'react-router'
 import { getEnv, init } from './lib/env.server'
+import { getErrorLogAttributes } from './lib/sentry.server'
 import { getInstance } from './middleware/i18next'
 
 export const STREAM_TIMEOUT = 5_000
@@ -19,7 +22,7 @@ export const STREAM_TIMEOUT = 5_000
 init()
 global.ENV = getEnv()
 
-export default async function handleRequest(
+async function handleRequest(
 	request: Request,
 	responseStatusCode: number,
 	responseHeaders: Headers,
@@ -56,14 +59,17 @@ export default async function handleRequest(
 						}),
 					)
 
-					pipe(body)
+					pipe(Sentry.getMetaTagTransformer(body))
 				},
 				onShellError: (err: unknown) => {
 					reject(err)
 				},
 				onError: (error: unknown) => {
 					didError = true
-					if (shellRendered) console.error(error)
+					if (shellRendered) {
+						console.error(error)
+						Sentry.captureException(error)
+					}
 				},
 			},
 		)
@@ -73,3 +79,22 @@ export default async function handleRequest(
 		setTimeout(abort, STREAM_TIMEOUT + 1_000)
 	})
 }
+
+export default Sentry.wrapSentryHandleRequest(handleRequest)
+
+const sentryHandleError = Sentry.createSentryHandleError({ logErrors: true })
+
+export const handleError: HandleErrorFunction = async (error, args) => {
+	if (!args.request.signal.aborted) {
+		Sentry.logger.error('Unhandled React Router server error', {
+			...getErrorLogAttributes(error),
+			'http.request.method': args.request.method,
+		})
+	}
+
+	await sentryHandleError(error, args)
+}
+
+export const instrumentations = [
+	Sentry.createSentryServerInstrumentation({ captureErrors: false }),
+]
