@@ -12,7 +12,7 @@ import {
 	NotepadText,
 } from 'lucide-react'
 import { useState } from 'react'
-import { redirect, Link, Outlet, useParams, useLoaderData } from 'react-router'
+import { redirect, Link, Outlet } from 'react-router'
 import { type Route } from './+types/device.$deviceId.edit'
 import { EditDeviceSidebarNav } from '~/components/mydevices/edit-device/edit-device-sidebar-nav'
 import { NavBar } from '~/components/nav-bar'
@@ -39,13 +39,12 @@ export async function action() {
 }
 
 //**********************************
-export default function EditBox() {
+export default function EditBox({
+	loaderData: { integrations },
+	params: { deviceId },
+}: Route.ComponentProps) {
 	const [toastOpen, setToastOpen] = useState(false)
 	const { t } = useTranslation('device-overview')
-
-	const { integrations } = useLoaderData<typeof loader>()
-
-	const { deviceId } = useParams()
 
 	const staticNavItems = [
 		{

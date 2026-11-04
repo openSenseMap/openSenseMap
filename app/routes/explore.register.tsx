@@ -5,7 +5,6 @@ import {
 	redirect,
 	Form,
 	Link,
-	useActionData,
 	useNavigation,
 	useSearchParams,
 } from 'react-router'
@@ -217,11 +216,10 @@ export async function action({ context, request }: Route.ActionArgs) {
 	})
 }
 
-export default function RegisterDialog() {
+export default function RegisterDialog({ actionData }: Route.ComponentProps) {
 	const { t } = useTranslation('register')
 	const navigation = useNavigation()
 	const [searchParams] = useSearchParams()
-	const actionData = useActionData<typeof action>()
 	const usernameRef = React.useRef<HTMLInputElement>(null)
 	const emailRef = React.useRef<HTMLInputElement>(null)
 	const passwordRef = React.useRef<HTMLInputElement>(null)

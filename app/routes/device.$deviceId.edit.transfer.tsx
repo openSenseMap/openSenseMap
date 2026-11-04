@@ -1,13 +1,7 @@
 import { Check, Copy } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { Trans, useTranslation } from 'react-i18next'
-import {
-	Form,
-	redirect,
-	useActionData,
-	useLoaderData,
-	useNavigation,
-} from 'react-router'
+import { Form, redirect, useNavigation } from 'react-router'
 import { type Route } from './+types/device.$deviceId.edit.transfer'
 import { Callout } from '~/components/ui/alert'
 import { getDevice } from '~/db/models/device.server'
@@ -141,9 +135,10 @@ export async function action({
 	}
 }
 
-export default function EditDeviceTransfer() {
-	const { deviceName, existingTransfer } = useLoaderData<typeof loader>()
-	const actionData = useActionData<typeof action>()
+export default function EditDeviceTransfer({
+	loaderData: { deviceName, existingTransfer },
+	actionData,
+}: Route.ComponentProps) {
 	const navigation = useNavigation()
 	const { t, i18n } = useTranslation('device-transfer')
 	const hydrated = useHydrated()

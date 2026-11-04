@@ -1,7 +1,7 @@
 import { ArrowLeft, Upload } from 'lucide-react'
 import { useRef, useState } from 'react'
 import { Trans, useTranslation } from 'react-i18next'
-import { redirect, Form, Link, useNavigation, useParams } from 'react-router'
+import { redirect, Form, Link, useNavigation } from 'react-router'
 import { type Route } from './+types/device.$deviceId.dataupload'
 import { NavBar } from '~/components/nav-bar'
 import { Button } from '~/components/ui/button'
@@ -19,6 +19,10 @@ import { getDevice } from '~/db/models/device.server'
 import { StandardResponse } from '~/lib/responses'
 import { postNewMeasurements } from '~/services/measurement-service.server'
 import { getUserId } from '~/services/session-service.server'
+
+type UploadActionData = {
+	error?: string
+}
 
 export async function loader({ request }: Route.LoaderArgs) {
 	//* if user is not logged in, redirect to home
@@ -96,13 +100,17 @@ export async function action({
 	}
 }
 
-export default function DataUpload({ actionData }: any) {
-	// actionData needs to be any type until we migrate to Route.ActionArgs
+export default function DataUpload({
+	actionData,
+	params,
+}: Route.ComponentProps) {
+	// React Router intentionally cannot infer data from a raw JSON Response.
+	// Keep that legacy action boundary cast local while using generated props.
+	const responseData = actionData as unknown as UploadActionData | undefined
 	// Max number of characters to show for data
 	// thats input to the text area
 	const DATA_CUTOFF_CHARS = 3_000
 	const { t } = useTranslation(['csv-upload', 'common'])
-	const params = useParams()
 	const nav = useNavigation()
 	const textareaRef = useRef<HTMLTextAreaElement | null>(null)
 	const [measurementData, setMeasurementData] = useState('')
@@ -132,14 +140,14 @@ export default function DataUpload({ actionData }: any) {
 									{t('dataUploadHeading')}
 								</h1>
 
-								{actionData && Object.keys(actionData).length === 0 && (
+								{responseData && !responseData.error && (
 									<div className="bg-light-green mb-8 rounded-md p-4 text-white">
 										{t('successMessage')}
 									</div>
 								)}
-								{actionData && Object.keys(actionData).includes('error') && (
+								{responseData?.error && (
 									<div className="mb-8 rounded-md bg-red-500 p-4 font-bold text-white">
-										{t('errorMessage', { message: actionData.error })}
+										{t('errorMessage', { message: responseData.error })}
 									</div>
 								)}
 

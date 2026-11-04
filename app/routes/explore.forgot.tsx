@@ -5,7 +5,6 @@ import {
 	redirect,
 	Form,
 	Link,
-	useActionData,
 	useNavigation,
 	useSearchParams,
 } from 'react-router'
@@ -67,9 +66,10 @@ export async function action({ request }: Route.ActionArgs) {
 	}
 }
 
-export default function ForgotPasswordPage() {
+export default function ForgotPasswordPage({
+	actionData,
+}: Route.ComponentProps) {
 	const [searchParams] = useSearchParams()
-	const actionData = useActionData<typeof action>()
 	const emailRef = React.useRef<HTMLInputElement>(null)
 
 	const { t } = useTranslation('forgot-password')

@@ -6,8 +6,6 @@ import {
 	Link,
 	data,
 	redirect,
-	useActionData,
-	useLoaderData,
 	useNavigation,
 	useSearchParams,
 } from 'react-router'
@@ -121,9 +119,10 @@ export async function action({ request }: Route.ActionArgs) {
 	}
 }
 
-export default function PasswordResetRoute() {
-	const { token } = useLoaderData() as LoaderData
-	const actionData = useActionData() as ActionData | undefined
+export default function PasswordResetRoute({
+	loaderData: { token },
+	actionData,
+}: Route.ComponentProps) {
 	const navigation = useNavigation()
 	const [searchParams] = useSearchParams()
 	const { t } = useTranslation('reset-password')

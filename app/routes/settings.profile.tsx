@@ -1,7 +1,7 @@
 import { CopyIcon, CopyCheckIcon, InfoIcon } from 'lucide-react'
 import { useCallback, useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Form, Link, Outlet, useActionData, useLoaderData } from 'react-router'
+import { Form, Link, Outlet } from 'react-router'
 import { type Route } from './+types/settings.profile'
 
 import { Avatar, AvatarFallback, AvatarImage } from '~/components/ui/avatar'
@@ -252,10 +252,10 @@ type ProfileAutosaveValues = {
 	isPublic: boolean
 }
 
-export default function EditUserProfilePage() {
-	const data = useLoaderData<typeof loader>()
-	const actionData = useActionData<typeof action>()
-
+export default function EditUserProfilePage({
+	loaderData: data,
+	actionData,
+}: Route.ComponentProps) {
 	const [displayName, setDisplayName] = useState(data.profile.displayName)
 	const [isPublic, setIsPublic] = useState(data.profile.public ?? false)
 
