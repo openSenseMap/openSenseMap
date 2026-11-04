@@ -28,7 +28,7 @@ jobs:
           persist-credentials: false
 
       - name: ⎔ Setup Vite+
-        uses: voidzero-dev/setup-vp@v1.21.2
+        uses: voidzero-dev/setup-vp@v1.22.0
         with:
           cache: true
           node-version-file: .node-version
@@ -50,7 +50,7 @@ jobs:
           persist-credentials: false
 
       - name: ⎔ Setup Vite+
-        uses: voidzero-dev/setup-vp@v1.21.2
+        uses: voidzero-dev/setup-vp@v1.22.0
         with:
           cache: true
           node-version-file: .node-version
@@ -78,7 +78,7 @@ jobs:
         run: cp .env.example .env
 
       - name: ⎔ Setup Vite+
-        uses: voidzero-dev/setup-vp@v1.21.2
+        uses: voidzero-dev/setup-vp@v1.22.0
         with:
           cache: true
           node-version-file: .node-version
