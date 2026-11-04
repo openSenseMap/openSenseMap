@@ -4,7 +4,7 @@ import {
 	TooltipContent,
 	TooltipTrigger,
 } from '~/components/ui/tooltip'
-import { topbarSurface } from '~/components/map/topbar-styles'
+import { topbarSurface } from '~/components/ui/topbar-styles'
 import { cn } from '~/lib/utils'
 
 interface HomeProps {
