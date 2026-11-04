@@ -270,6 +270,9 @@ async function post(request: Request, user: User) {
 				name: validatedData.name,
 				exposure: validatedData.exposure,
 				model: sensorsProvided ? undefined : validatedData.model,
+				sensorTemplates: sensorsProvided
+					? undefined
+					: validatedData.sensorTemplates,
 				latitude: latitude,
 				longitude: longitude,
 				heightAboveGround: heightAboveGround ?? null,

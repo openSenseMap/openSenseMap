@@ -1,11 +1,13 @@
 import { z } from 'zod'
+import { ApiDeviceModelZodSchema } from '~/lib/device-enums'
+import { getSensorTemplateValidationError } from '~/lib/model-definitions'
+import { ElevationLookupConsentSchema } from '~/lib/openapi/schemas/consent'
 import {
 	DeviceLocationInputSchema,
 	HeightSchema,
 	LatitudeSchema,
 	LongitudeSchema,
 } from '~/lib/openapi/schemas/location'
-import { ElevationLookupConsentSchema } from '~/lib/openapi/schemas/consent'
 
 const DeviceLocationArrayInputSchema = z
 	.union([
@@ -32,53 +34,69 @@ const DeviceLocationArrayInputSchema = z
 		example: [7.68123, 51.9123, 3.5],
 	})
 
-export const CreateDeviceSchema = z.object({
-	// public API request shape
-	name: z.string().min(1).max(100),
-	description: z
-		.string()
-		.max(5000, 'Description should not exceed 5000 characters')
-		.optional()
-		.nullable(),
-	exposure: z
-		.enum(['indoor', 'outdoor', 'mobile', 'unknown'])
-		.optional()
-		.default('unknown'),
-	location: z
-		.union([DeviceLocationArrayInputSchema, DeviceLocationInputSchema])
-		.transform((loc) => {
-			if (Array.isArray(loc)) return loc
-			return [
-				loc.lng,
-				loc.lat,
-				...(loc.height !== undefined ? [loc.height] : []),
-			]
-		}),
-	elevationLookupConsent: ElevationLookupConsentSchema.optional(),
-	grouptag: z.array(z.string()).optional().default([]),
-	model: z
-		.enum([
-			'homeV2Lora',
-			'homeV2Ethernet',
-			'homeV2Wifi',
-			'senseBox:Edu',
-			'luftdaten.info',
-			'custom',
-		])
-		.optional()
-		.default('custom'),
-	sensors: z
-		.array(
-			z.object({
-				icon: z.string().optional(),
-				title: z.string().min(1),
-				unit: z.string().min(1),
-				sensorType: z.string().min(1),
+export const CreateDeviceSchema = z
+	.object({
+		// public API request shape
+		name: z.string().min(1).max(100),
+		description: z
+			.string()
+			.max(5000, 'Description should not exceed 5000 characters')
+			.optional()
+			.nullable(),
+		exposure: z
+			.enum(['indoor', 'outdoor', 'mobile', 'unknown'])
+			.optional()
+			.default('unknown'),
+		location: z
+			.union([DeviceLocationArrayInputSchema, DeviceLocationInputSchema])
+			.transform((loc) => {
+				if (Array.isArray(loc)) return loc
+				return [
+					loc.lng,
+					loc.lat,
+					...(loc.height !== undefined ? [loc.height] : []),
+				]
 			}),
+		elevationLookupConsent: ElevationLookupConsentSchema.optional(),
+		grouptag: z.array(z.string()).optional().default([]),
+		model: ApiDeviceModelZodSchema.optional().default('custom'),
+		sensorTemplates: z.array(z.string()).optional(),
+		sensors: z
+			.array(
+				z.object({
+					icon: z.string().optional(),
+					title: z.string().min(1),
+					unit: z.string().min(1),
+					sensorType: z.string().min(1),
+				}),
+			)
+			.optional()
+			.default([]),
+	})
+	.superRefine((data, ctx) => {
+		if (data.sensors.length > 0 && data.model !== 'custom') {
+			ctx.addIssue({
+				code: 'custom',
+				path: ['sensors'],
+				message:
+					'Parameters model and sensors cannot be specified at the same time.',
+			})
+			return
+		}
+		if (data.sensors.length > 0) return
+
+		const message = getSensorTemplateValidationError(
+			data.model,
+			data.sensorTemplates,
 		)
-		.optional()
-		.default([]),
-})
+		if (message) {
+			ctx.addIssue({
+				code: 'custom',
+				path: ['sensorTemplates'],
+				message,
+			})
+		}
+	})
 
 export const DevicesQuerySchema = z.object({
 	format: z

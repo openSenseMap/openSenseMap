@@ -21,6 +21,7 @@ const TEST_BOX = {
 	latitude: 51.5,
 	longitude: 7.5,
 	model: 'luftdaten.info' as const,
+	sensorTemplates: ['sds011_pm10'],
 	mqttEnabled: false,
 	ttnEnabled: false,
 }

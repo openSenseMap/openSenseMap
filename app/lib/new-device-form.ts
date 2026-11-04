@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import { uploadedDeviceSchemaV1 } from '~/lib/device-schemas/device-schema-v1'
 import { generalInfoSchema } from '~/lib/device-general'
+import { UiDeviceModelZodEnum } from '~/lib/device-enums'
 import { deviceLocationInputSchema } from '~/lib/location'
 
 export const newDeviceLocationSubmissionSchema =
@@ -28,19 +29,7 @@ export type CustomDeviceSchemaUpload = z.infer<
 >
 
 export const deviceSelectionSchema = z.object({
-	model: z.enum(
-		[
-			'homeV2Lora',
-			'homeV2Ethernet',
-			'homeV2Wifi',
-			'senseBox:Edu',
-			'luftdaten.info',
-			'custom',
-		],
-		{
-			error: () => 'Please select a device.',
-		},
-	),
+	model: UiDeviceModelZodEnum,
 })
 
 export const sensorSelectionSchema = z.object({
