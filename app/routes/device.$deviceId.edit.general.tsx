@@ -1,4 +1,4 @@
-import { Save, Upload, X } from 'lucide-react'
+import { Save, Trash2, Upload, X } from 'lucide-react'
 import React, { useCallback, useMemo, useRef, useState, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
@@ -6,6 +6,7 @@ import {
 	redirect,
 	Form,
 	useActionData,
+	useFetcher,
 	useLoaderData,
 	useNavigation,
 	useOutletContext,
@@ -15,6 +16,7 @@ import { type Route } from './+types/device.$deviceId.edit.general'
 import { MarkdownContent } from '~/components/markdown-content'
 import { Button } from '~/components/ui/button'
 import { getDevice, getDeviceWithoutSensors } from '~/db/models/device.server'
+import { deleteMeasurementsForDevice } from '~/db/models/measurement.server'
 import { verifyLogin } from '~/db/models/user.server'
 import { type Device } from '~/db/schema'
 import {
@@ -36,6 +38,17 @@ import {
 } from '~/lib/device-enums'
 import { AutosaveStatusText } from '~/components/autosave-status.text'
 import { PasswordInput } from '~/components/ui/password-input'
+import {
+	AlertDialog,
+	AlertDialogCancel,
+	AlertDialogContent,
+	AlertDialogDescription,
+	AlertDialogFooter,
+	AlertDialogHeader,
+	AlertDialogTitle,
+	AlertDialogTrigger,
+} from '~/components/ui/alert-dialog'
+import { useToast } from '~/components/ui/use-toast'
 
 type GeneralAutosaveValues = {
 	name: string
@@ -76,6 +89,22 @@ export type DeviceGeneralActionData =
 			intent: 'delete'
 			errors: DeviceGeneralActionErrors
 			status: number
+	  }
+	| {
+			intent: 'deleteMeasurements'
+			success: true
+			deletedCount: number
+			error: null
+			errors: null
+			status: 200
+	  }
+	| {
+			intent: 'deleteMeasurements'
+			success: false
+			deletedCount: null
+			error: 'password_required' | 'invalid_password'
+			errors: null
+			status: 400
 	  }
 
 function parseGroupTag(value: FormDataEntryValue | null): string[] {
@@ -382,6 +411,60 @@ export async function action({ request, params }: Route.ActionArgs) {
 			)
 		}
 
+		case 'deleteMeasurements': {
+			const password = String(
+				formData.get('passwordDeleteMeasurements') ?? '',
+			)
+
+			if (!password) {
+				return data(
+					{
+						intent,
+						success: false,
+						deletedCount: null,
+						error: 'password_required',
+						errors: null,
+						status: 400,
+					} satisfies DeviceGeneralActionData,
+					{ status: 400 },
+				)
+			}
+
+			const userEmail = await getUserEmail(request)
+
+			invariant(typeof userEmail === 'string', 'email not found')
+
+			const user = await verifyLogin(userEmail, password)
+
+			if (!user) {
+				return data(
+					{
+						intent,
+						success: false,
+						deletedCount: null,
+						error: 'invalid_password',
+						errors: null,
+						status: 400,
+					} satisfies DeviceGeneralActionData,
+					{ status: 400 },
+				)
+			}
+
+			const deletedCount = await deleteMeasurementsForDevice(deviceID)
+
+			return data(
+				{
+					intent,
+					success: true,
+					deletedCount,
+					error: null,
+					errors: null,
+					status: 200,
+				} satisfies DeviceGeneralActionData,
+				{ status: 200 },
+			)
+		}
+
 		case 'delete': {
 			const passwordDelete = String(formData.get('passwordDelete') ?? '')
 
@@ -465,10 +548,20 @@ export default function EditDeviceGeneral() {
 	const { device, imageUrl } = useLoaderData<typeof loader>()
 	const actionData = useActionData<typeof action>()
 	const navigation = useNavigation()
+	const deleteMeasurementsFetcher = useFetcher<typeof action>()
+	const { toast } = useToast()
 
 	const [passwordDelVal, setPasswordVal] = useState('')
 	const passwordDelRef = useRef<HTMLInputElement>(null)
+	const passwordDeleteMeasurementsRef = useRef<HTMLInputElement>(null)
 	const imageInputRef = useRef<HTMLInputElement>(null)
+	const [deleteMeasurementsDialogOpen, setDeleteMeasurementsDialogOpen] =
+		useState(false)
+	const [passwordDeleteMeasurements, setPasswordDeleteMeasurements] =
+		useState('')
+	const [deleteMeasurementsError, setDeleteMeasurementsError] = useState<
+		'password_required' | 'invalid_password' | null
+	>(null)
 
 	const initialAutosaveValues = useMemo<GeneralAutosaveValues>(
 		() => ({
@@ -684,12 +777,43 @@ export default function EditDeviceGeneral() {
 		}
 	}, [actionData, setToastOpen])
 
+	useEffect(() => {
+		if (deleteMeasurementsFetcher.state !== 'idle') return
+
+		const result = deleteMeasurementsFetcher.data
+		if (!result || result.intent !== 'deleteMeasurements') return
+
+		if (result.success) {
+			setDeleteMeasurementsDialogOpen(false)
+			setPasswordDeleteMeasurements('')
+			setDeleteMeasurementsError(null)
+			toast({
+				title: t('delete_measurements_success'),
+				description: t('delete_measurements_success_count', {
+					count: result.deletedCount,
+				}),
+				variant: 'success',
+			})
+			return
+		}
+
+		setDeleteMeasurementsError(result.error)
+		passwordDeleteMeasurementsRef.current?.focus()
+	}, [
+		deleteMeasurementsFetcher.data,
+		deleteMeasurementsFetcher.state,
+		t,
+		toast,
+	])
+
 	const submittingIntent = navigation.formData?.get('intent')
 	const isImageSubmitting =
 		navigation.state === 'submitting' &&
 		(submittingIntent === 'saveImage' || submittingIntent === 'removeImage')
 	const isDeleteSubmitting =
 		navigation.state === 'submitting' && submittingIntent === 'delete'
+	const isDeleteMeasurementsSubmitting =
+		deleteMeasurementsFetcher.state !== 'idle'
 
 	const actionErrors =
 		actionData && 'errors' in actionData && actionData.errors
@@ -988,6 +1112,89 @@ Installed on the school roof.
 								</p>
 							</div>
 						</Form>
+
+						{/* Delete all measurements */}
+						<div className="border-destructive/30 mt-8 rounded-md border p-4">
+							<div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+								<div>
+									<h2 className="text-xl font-semibold">
+										{t('delete_measurements')}
+									</h2>
+									<p className="text-muted-foreground mt-1 text-sm">
+										{t('delete_measurements_info')}
+									</p>
+								</div>
+
+								<AlertDialog
+									open={deleteMeasurementsDialogOpen}
+									onOpenChange={(open) => {
+										setDeleteMeasurementsDialogOpen(open)
+										setDeleteMeasurementsError(null)
+										if (!open) setPasswordDeleteMeasurements('')
+									}}
+								>
+									<AlertDialogTrigger asChild>
+										<Button type="button" variant="destructive" className="gap-2">
+											<Trash2 className="h-4 w-4" />
+											{t('delete_measurements')}
+										</Button>
+									</AlertDialogTrigger>
+
+									<AlertDialogContent>
+										<deleteMeasurementsFetcher.Form method="post">
+											<AlertDialogHeader>
+												<AlertDialogTitle>
+													{t('delete_measurements_confirm_title')}
+												</AlertDialogTitle>
+												<AlertDialogDescription>
+													{t('delete_measurements_confirm_info')}
+												</AlertDialogDescription>
+											</AlertDialogHeader>
+
+											<div className="mt-4">
+												<PasswordInput
+													id="passwordDeleteMeasurements"
+													name="passwordDeleteMeasurements"
+													placeholder={t('password')}
+													ref={passwordDeleteMeasurementsRef}
+													value={passwordDeleteMeasurements}
+													onChange={(event) => {
+														setPasswordDeleteMeasurements(event.target.value)
+														setDeleteMeasurementsError(null)
+													}}
+												/>
+
+												{deleteMeasurementsError ? (
+													<p className="mt-1 text-sm text-red-600">
+														{t(deleteMeasurementsError)}
+													</p>
+												) : null}
+											</div>
+
+											<AlertDialogFooter className="mt-6">
+												<AlertDialogCancel type="button">
+													{t('cancel')}
+												</AlertDialogCancel>
+												<Button
+													type="submit"
+													name="intent"
+													value="deleteMeasurements"
+													variant="destructive"
+													disabled={
+														!passwordDeleteMeasurements ||
+														isDeleteMeasurementsSubmitting
+													}
+												>
+													{isDeleteMeasurementsSubmitting
+														? t('deleting_measurements')
+														: t('delete_measurements')}
+												</Button>
+											</AlertDialogFooter>
+										</deleteMeasurementsFetcher.Form>
+									</AlertDialogContent>
+								</AlertDialog>
+							</div>
+						</div>
 
 						{/* Delete device */}
 						<Form method="post" noValidate>
