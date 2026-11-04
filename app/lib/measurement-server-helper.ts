@@ -26,6 +26,8 @@ export type Location = {
 
 export type LocationWithId = Location & { id: bigint }
 
+type LocationDatabase = Pick<DatabaseTransaction, 'select' | 'insert'>
+
 export type DeviceLocationUpdate = {
 	location: Location
 	time: Date
@@ -67,13 +69,13 @@ export function getLocationUpdates(
  */
 export async function findOrCreateLocations(
 	locationUpdates: DeviceLocationUpdate[],
-	tx: DatabaseTransaction,
+	db: LocationDatabase,
 ): Promise<LocationWithId[]> {
 	const newLocations = locationUpdates.map((update) => update.location)
 
 	let foundLocations: LocationWithId[] = []
 
-	const existingLocations = await tx
+	const existingLocations = await db
 		.select({ id: location.id, location: location.location })
 		.from(location)
 		.where(
@@ -111,7 +113,7 @@ export async function findOrCreateLocations(
 
 	const inserted =
 		uniqueToInsert.length > 0
-			? await tx
+			? await db
 					.insert(location)
 					.values(
 						uniqueToInsert.map((newLocation) => {
@@ -120,7 +122,10 @@ export async function findOrCreateLocations(
 							}
 						}),
 					)
-					.onConflictDoNothing()
+					.onConflictDoUpdate({
+						target: location.location,
+						set: { location: sql`excluded.location` },
+					})
 					.returning()
 			: []
 
@@ -171,12 +176,12 @@ export async function addLocationUpdates(
 	deviceLocationUpdates: DeviceLocationUpdate[],
 	deviceId: string,
 	locations: LocationWithId[],
-	tx: DatabaseTransaction,
+	db: LocationDatabase,
 ) {
 	const filteredUpdates = await filterLocationUpdates(
 		deviceLocationUpdates,
 		deviceId,
-		tx,
+		db,
 	)
 
 	filteredUpdates
@@ -187,7 +192,7 @@ export async function addLocationUpdates(
 		})
 
 	if (filteredUpdates.length > 0)
-		await tx
+		await db
 			.insert(deviceToLocation)
 			.values(
 				filteredUpdates.map((update) => {
@@ -208,9 +213,9 @@ export async function addLocationUpdates(
 export async function filterLocationUpdates(
 	deviceLocationUpdates: DeviceLocationUpdate[],
 	deviceId: string,
-	tx: DatabaseTransaction,
+	db: Pick<LocationDatabase, 'select'>,
 ): Promise<DeviceLocationUpdate[]> {
-	const currentLatestLocation = await tx
+	const currentLatestLocation = await db
 		.select({ time: deviceToLocation.time })
 		.from(deviceToLocation)
 		.where(eq(deviceToLocation.deviceId, deviceId))
