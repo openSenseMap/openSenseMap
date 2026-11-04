@@ -188,7 +188,7 @@ export async function saveMeasurements(
 	const sensorIds = new Set(minimalDevice.sensors.map((s: any) => s.id))
 	const lastMeasurements: Record<string, NonNullable<LastMeasurement>> = {}
 	const now = new Date()
-	const maxFutureTime = 30 * 1000
+	const maxFutureTime = 60 * 1000
 	timing?.mark('savePrepare')
 
 	for (let i = measurements.length - 1; i >= 0; i--) {
@@ -279,7 +279,10 @@ export async function saveMeasurements(
 			locations,
 			minimalDevice.id,
 			tx,
-			{ shouldReturn: false, timing: timing },
+			{
+				shouldReturn: false,
+				timing: timing,
+			},
 		)
 		timing?.mark('insertMeasurements')
 		await updateLastMeasurements(lastMeasurements, tx, timing)

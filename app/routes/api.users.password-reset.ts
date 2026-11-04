@@ -1,4 +1,5 @@
 import { type Route } from './+types/api.users.password-reset'
+import { parseJsonOrFormRequest } from '~/lib/request-parsing'
 import { StandardResponse } from '~/lib/responses'
 import { resetPassword } from '~/services/user-service.server'
 
@@ -9,11 +10,15 @@ import {
 	BadRequestErrorSchema,
 	ForbiddenErrorSchema,
 	InternalServerErrorSchema,
+	UnsupportedMediaTypeErrorSchema,
 	badRequestResponse,
 	forbiddenResponse,
 	internalServerErrorResponse,
+	unsupportedMediaTypeResponse,
 } from '~/lib/openapi/errors'
 import { NewPasswordSchema } from '~/lib/openapi/schemas/auth'
+import { OkMessageResponseSchema } from '~/lib/openapi/schemas/common'
+import { requestContentTypeJsonOrForm } from '~/middleware/content-type-header.server'
 
 const PasswordResetRequestSchema = z
 	.object({
@@ -37,22 +42,6 @@ const PasswordResetRequestSchema = z
 		description: 'Payload for resetting a password using an email token.',
 	})
 
-const PasswordResetResponseSchema = z
-	.object({
-		code: z.literal('Ok').default('Ok'),
-		message: z
-			.literal(
-				'Password successfully changed. You can now login with your new password',
-			)
-			.default(
-				'Password successfully changed. You can now login with your new password',
-			),
-	})
-	.meta({
-		id: 'PasswordResetResponse',
-		description: 'Password reset success response.',
-	})
-
 export const openapi: ZodOpenApiPathItemObject = {
 	post: {
 		tags: ['User Management'],
@@ -63,6 +52,9 @@ export const openapi: ZodOpenApiPathItemObject = {
 		requestBody: {
 			required: true,
 			content: {
+				'application/json': {
+					schema: PasswordResetRequestSchema,
+				},
 				'application/x-www-form-urlencoded': {
 					schema: PasswordResetRequestSchema,
 				},
@@ -77,7 +69,7 @@ export const openapi: ZodOpenApiPathItemObject = {
 				description: 'Password changed successfully.',
 				content: {
 					'application/json': {
-						schema: PasswordResetResponseSchema,
+						schema: OkMessageResponseSchema,
 					},
 				},
 			},
@@ -92,6 +84,11 @@ export const openapi: ZodOpenApiPathItemObject = {
 				'Password reset is not possible because the token is invalid, expired, or password reset is not possible for this user.',
 			),
 
+			415: unsupportedMediaTypeResponse(
+				UnsupportedMediaTypeErrorSchema,
+				'Unsupported content type. Use application/json, application/x-www-form-urlencoded, or multipart/form-data.',
+			),
+
 			500: internalServerErrorResponse(
 				InternalServerErrorSchema,
 				'Internal server error.',
@@ -100,32 +97,15 @@ export const openapi: ZodOpenApiPathItemObject = {
 	},
 }
 
-const parsePasswordResetRequest = async (
-	request: Request,
-): Promise<z.output<typeof PasswordResetRequestSchema> | Response> => {
-	let formData: FormData
-
-	try {
-		formData = await request.formData()
-	} catch {
-		return StandardResponse.badRequest('Bad Request')
-	}
-
-	const parsed = await PasswordResetRequestSchema.safeParseAsync(
-		Object.fromEntries(formData.entries()),
-	)
-
-	if (!parsed.success) {
-		return StandardResponse.badRequest(
-			parsed.error.issues[0]?.message ?? 'Bad Request',
-		)
-	}
-
-	return parsed.data
-}
+export const middleware: Route.MiddlewareFunction[] = [
+	requestContentTypeJsonOrForm(['POST']),
+]
 
 export const action = async ({ request }: Route.ActionArgs) => {
-	const requestParsed = await parsePasswordResetRequest(request)
+	const requestParsed = await parseJsonOrFormRequest(
+		request,
+		PasswordResetRequestSchema,
+	)
 
 	if (requestParsed instanceof Response) {
 		return requestParsed
@@ -151,10 +131,19 @@ export const action = async ({ request }: Route.ActionArgs) => {
 					'Password must be at least 8 characters.',
 				)
 
-			case 'success':
-				return await PasswordResetResponseSchema.safeParseAsync({
+			case 'success': {
+				const responseParsed = await OkMessageResponseSchema.safeParseAsync({
 					code: 'Ok',
+					message:
+						'Password successfully changed. You can now login with your new password',
 				})
+
+				if (!responseParsed.success) {
+					return StandardResponse.internalServerError()
+				}
+
+				return StandardResponse.ok(responseParsed.data)
+			}
 
 			default:
 				return StandardResponse.internalServerError()

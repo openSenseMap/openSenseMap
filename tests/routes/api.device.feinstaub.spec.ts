@@ -57,8 +57,8 @@ describe('Device API: Feinstaub Addon behavior', () => {
 		queryableDevice = await createDevice(
 			{
 				...generateMinimalDevice(),
-				latitude: 123,
-				longitude: 12,
+				latitude: 12,
+				longitude: 123,
 				tags: ['newgroup'],
 			},
 			user.id,
@@ -134,7 +134,7 @@ describe('Device API: Feinstaub Addon behavior', () => {
 		} as Route.ActionArgs)
 
 		expect(response.status).toBe(200)
-		const data = await response.json()
+		const { data } = await response.json()
 
 		expect(data.model).toBe('homeWifiFeinstaub')
 
@@ -164,7 +164,7 @@ describe('Device API: Feinstaub Addon behavior', () => {
 		} as Route.ActionArgs)
 
 		expect(secondResponse.status).toBe(200)
-		const secondData = await secondResponse.json()
+		const { data: secondData } = await secondResponse.json()
 		expect(secondData.sensors).toEqual(data.sensors)
 
 		await deleteDevice({ id: device.id })
@@ -196,7 +196,7 @@ describe('Device API: Feinstaub Addon behavior', () => {
 		} as Route.ActionArgs)
 
 		expect(response.status).toBe(200)
-		const data = await response.json()
+		const { data } = await response.json()
 
 		// Model should not change
 		expect(data.model).toBe('custom')

@@ -273,11 +273,13 @@ const handleUpdateTransfer = async (
 		if (isJson) {
 			const body = await request.json()
 			token = body.token
-			expiresAt = body.expiresAt
+			expiresAt = body.expiresAt?.trim() || body.date
 		} else {
 			const formData = await request.formData()
 			token = formData.get('token')?.toString()
-			expiresAt = formData.get('expiresAt')?.toString()
+			expiresAt =
+				formData.get('expiresAt')?.toString().trim() ||
+				formData.get('date')?.toString()
 		}
 
 		if (!token) return StandardResponse.badRequest('token is required')
@@ -292,6 +294,7 @@ const handleUpdateTransfer = async (
 		)
 
 		return StandardResponse.ok({
+			code: 'Ok',
 			message: 'Transfer successfully updated',
 			data: {
 				id: updated.id,

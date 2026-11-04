@@ -14,16 +14,15 @@ import { type ZodOpenApiPathItemObject } from 'zod-openapi'
 import {
 	DeviceSensorPathParamsSchema,
 	IsoDateTimeToDateSchema,
+	OkMessageResponseSchema,
 } from '~/lib/openapi/schemas/common'
 
 import {
 	BadRequestErrorSchema,
 	ForbiddenErrorSchema,
 	InternalServerErrorSchema,
-	MessageResponseSchema,
 	MethodNotAllowedErrorSchema,
 	NotFoundErrorSchema,
-	messageResponse,
 	badRequestResponse,
 	forbiddenResponse,
 	internalServerErrorResponse,
@@ -39,12 +38,10 @@ const DeleteSensorMeasurementsQueryParamsSchema = z
 			description: 'Beginning date of the measurement range to delete.',
 			example: '2026-05-13T12:00:00.000Z',
 		}),
-
 		'to-date': IsoDateTimeToDateSchema.optional().meta({
 			description: 'End date of the measurement range to delete.',
 			example: '2026-05-15T12:00:00.000Z',
 		}),
-
 		timestamps: z
 			.union([IsoDateTimeToDateSchema, z.array(IsoDateTimeToDateSchema)])
 			.optional()
@@ -82,7 +79,14 @@ export const openapi: ZodOpenApiPathItemObject = {
 		},
 
 		responses: {
-			200: messageResponse('Measurements deleted successfully.'),
+			200: {
+				description: 'Measurements deleted successfully.',
+				content: {
+					'application/json': {
+						schema: OkMessageResponseSchema,
+					},
+				},
+			},
 
 			400: badRequestResponse(
 				BadRequestErrorSchema,
@@ -112,23 +116,54 @@ export const openapi: ZodOpenApiPathItemObject = {
 	},
 }
 
-const parseQueryParams = (
+const parseSelectorParams = async (
 	request: Request,
-): z.output<typeof DeleteSensorMeasurementsQueryParamsSchema> | Response => {
+): Promise<
+	z.output<typeof DeleteSensorMeasurementsQueryParamsSchema> | Response
+> => {
 	const url = new URL(request.url)
-	const timestamps = url.searchParams.getAll('timestamps')
+	let body: Record<string, unknown> = {}
+
+	if (request.headers.get('content-type')?.includes('application/json')) {
+		try {
+			const parsed: unknown = await request.json()
+			if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+				body = parsed as Record<string, unknown>
+			}
+		} catch {
+			return StandardResponse.badRequest('Invalid JSON in request body')
+		}
+	}
+
+	const queryTimestamps = url.searchParams.getAll('timestamps')
+	const rawTimestamps =
+		queryTimestamps.length > 0 ? queryTimestamps : body.timestamps
+	const timestamps = Array.isArray(rawTimestamps)
+		? rawTimestamps.flatMap((value) =>
+				typeof value === 'string' ? value.split(',') : value,
+			)
+		: typeof rawTimestamps === 'string'
+			? rawTimestamps.split(',')
+			: rawTimestamps
+	const deleteAllMeasurements =
+		url.searchParams.get('deleteAllMeasurements') ?? body.deleteAllMeasurements
 
 	const params = {
-		'from-date': url.searchParams.get('from-date') ?? undefined,
-		'to-date': url.searchParams.get('to-date') ?? undefined,
+		'from-date':
+			url.searchParams.get('from-date') ??
+			url.searchParams.get('fromDate') ??
+			body['from-date'] ??
+			body.fromDate,
+		'to-date':
+			url.searchParams.get('to-date') ??
+			url.searchParams.get('toDate') ??
+			body['to-date'] ??
+			body.toDate,
 		deleteAllMeasurements:
-			url.searchParams.get('deleteAllMeasurements') ?? undefined,
-		timestamps:
-			timestamps.length === 0
+			deleteAllMeasurements === undefined
 				? undefined
-				: timestamps.length === 1
-					? timestamps[0]
-					: timestamps,
+				: String(deleteAllMeasurements),
+		timestamps,
 	}
 
 	const parsed = DeleteSensorMeasurementsQueryParamsSchema.safeParse(params)
@@ -173,7 +208,7 @@ export async function action({ request, params }: Route.ActionArgs) {
 				)
 			}
 
-			const queryParams = parseQueryParams(request)
+			const queryParams = await parseSelectorParams(request)
 
 			if (queryParams instanceof Response) {
 				return queryParams
@@ -200,7 +235,8 @@ export async function action({ request, params }: Route.ActionArgs) {
 				).count
 			}
 
-			const responseParsed = await MessageResponseSchema.safeParseAsync({
+			const responseParsed = await OkMessageResponseSchema.safeParseAsync({
+				code: 'Ok',
 				message: `Successfully deleted ${count} of sensor ${parsedParams.sensorId}`,
 			})
 

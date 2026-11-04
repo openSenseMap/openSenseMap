@@ -1,4 +1,5 @@
 import { type Route } from './+types/api.users.request-password-reset'
+import { parseJsonOrFormRequest } from '~/lib/request-parsing'
 import { StandardResponse } from '~/lib/responses'
 import { requestPasswordReset } from '~/services/user-service.server'
 
@@ -8,11 +9,14 @@ import { type ZodOpenApiPathItemObject } from 'zod-openapi'
 import {
 	BadRequestErrorSchema,
 	InternalServerErrorSchema,
+	UnsupportedMediaTypeErrorSchema,
 	badRequestResponse,
 	internalServerErrorResponse,
+	unsupportedMediaTypeResponse,
 } from '~/lib/openapi/errors'
 
-import { requestContentTypeForm } from '~/middleware/content-type-header.server'
+import { requestContentTypeJsonOrForm } from '~/middleware/content-type-header.server'
+import { OkMessageResponseSchema } from '~/lib/openapi/schemas/common'
 
 const RequestPasswordResetRequestSchema = z
 	.object({
@@ -39,19 +43,6 @@ const RequestPasswordResetRequestSchema = z
 		description: 'Payload for requesting a password reset.',
 	})
 
-const RequestPasswordResetResponseSchema = z
-	.object({
-		code: z.literal('Ok').default('Ok'),
-		message: z
-			.literal('Password reset initiated')
-			.default('Password reset initiated'),
-	})
-	.meta({
-		id: 'RequestPasswordResetResponse',
-		description:
-			'Password reset initiation response. This response is returned regardless of whether the email address belongs to an existing user.',
-	})
-
 export const openapi: ZodOpenApiPathItemObject = {
 	post: {
 		tags: ['User Management'],
@@ -62,6 +53,9 @@ export const openapi: ZodOpenApiPathItemObject = {
 		requestBody: {
 			required: true,
 			content: {
+				'application/json': {
+					schema: RequestPasswordResetRequestSchema,
+				},
 				'application/x-www-form-urlencoded': {
 					schema: RequestPasswordResetRequestSchema,
 				},
@@ -76,7 +70,7 @@ export const openapi: ZodOpenApiPathItemObject = {
 				description: 'Password reset initiated.',
 				content: {
 					'application/json': {
-						schema: RequestPasswordResetResponseSchema,
+						schema: OkMessageResponseSchema,
 					},
 				},
 			},
@@ -84,6 +78,11 @@ export const openapi: ZodOpenApiPathItemObject = {
 			400: badRequestResponse(
 				BadRequestErrorSchema,
 				'Bad request. The email field is missing or empty.',
+			),
+
+			415: unsupportedMediaTypeResponse(
+				UnsupportedMediaTypeErrorSchema,
+				'Unsupported content type. Use application/json, application/x-www-form-urlencoded, or multipart/form-data.',
 			),
 
 			500: internalServerErrorResponse(
@@ -94,44 +93,15 @@ export const openapi: ZodOpenApiPathItemObject = {
 	},
 }
 
-const parsePasswordResetRequest = async (
-	request: Request,
-): Promise<z.output<typeof RequestPasswordResetRequestSchema> | Response> => {
-	let formData: FormData
-
-	try {
-		formData = await request.formData()
-	} catch {
-		return StandardResponse.badRequest('Invalid form data.')
-	}
-
-	const parsed = await RequestPasswordResetRequestSchema.safeParseAsync(
-		Object.fromEntries(formData.entries()),
-	)
-
-	if (!parsed.success) {
-		const issue = parsed.error.issues[0]
-
-		if (issue?.path.includes('email')) {
-			return StandardResponse.badRequest(
-				issue.code === 'invalid_format'
-					? 'Invalid email address.'
-					: 'No email address specified.',
-			)
-		}
-
-		return StandardResponse.badRequest(
-			issue?.message ?? 'Invalid password reset request.',
-		)
-	}
-
-	return parsed.data
-}
-
-export const middleware: Route.MiddlewareFunction[] = [requestContentTypeForm()]
+export const middleware: Route.MiddlewareFunction[] = [
+	requestContentTypeJsonOrForm(['POST']),
+]
 
 export const action = async ({ request }: Route.ActionArgs) => {
-	const parsedRequest = await parsePasswordResetRequest(request)
+	const parsedRequest = await parseJsonOrFormRequest(
+		request,
+		RequestPasswordResetRequestSchema,
+	)
 
 	if (parsedRequest instanceof Response) {
 		return parsedRequest
@@ -140,11 +110,10 @@ export const action = async ({ request }: Route.ActionArgs) => {
 	try {
 		await requestPasswordReset(parsedRequest.email)
 
-		const responseParsed =
-			await RequestPasswordResetResponseSchema.safeParseAsync({
-				code: 'Ok',
-				message: 'Password reset initiated',
-			})
+		const responseParsed = await OkMessageResponseSchema.safeParseAsync({
+			code: 'Ok',
+			message: 'Password reset initiated',
+		})
 
 		if (!responseParsed.success) {
 			return StandardResponse.internalServerError()

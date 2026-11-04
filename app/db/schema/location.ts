@@ -25,7 +25,7 @@ export const location = pgTable(
 		index('location_index').using('gist', t.location),
 		unique().on(t.location),
 		sql`CONSTRAINT check_location CHECK (
-			ST_X(${t.location}) BETWEEN -180 AND 180
+			ST_X(${t.location}) BETWEEN -180 AND 180 AND
 			ST_Y(${t.location}) BETWEEN -90 AND 90
 		)`,
 	],

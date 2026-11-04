@@ -114,12 +114,14 @@ describe('openSenseMap API Routes: /api/boxes/:deviceId/data/:sensorId', () => {
 				'application/json; charset=utf-8',
 			)
 			expect(body).toHaveLength(2)
-			expect(body[0].sensor_id).toBe(sensors[0].id)
-			expect(body[1].sensor_id).toBe(sensors[0].id)
-			expect(body[0].time).toBe('1988-03-14 01:59:26+00')
-			expect(body[1].time).toBe('1954-06-07 12:00:00+00')
-			expect(body[0].value).toBeCloseTo(3.14159)
-			expect(body[1].value).toBe(1589625)
+			expect(body[0]).toEqual({
+				createdAt: '1988-03-14T01:59:26.000Z',
+				value: '3.14159',
+			})
+			expect(body[1]).toEqual({
+				createdAt: '1954-06-07T12:00:00.000Z',
+				value: '1589625',
+			})
 		})
 
 		it('should return measurements for a single sensor of a box in csv format', async () => {
@@ -146,7 +148,7 @@ describe('openSenseMap API Routes: /api/boxes/:deviceId/data/:sensorId', () => {
 				'text/csv; charset=utf-8',
 			)
 			expect(body).toBe(
-				'createdAt,value\n1988-03-14 01:59:26+00,3.14159\n1954-06-07 12:00:00+00,1589625',
+				'createdAt,value\n1988-03-14T01:59:26.000Z,3.14159\n1954-06-07T12:00:00.000Z,1589625',
 			)
 		})
 	})

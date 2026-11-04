@@ -29,7 +29,7 @@ import {
 	requestContentTypeJson,
 	requestContentTypeJsonOrForm,
 } from '~/middleware/content-type-header.server'
-import { parseFormRequest, parseJsonBody } from '~/lib/request-parsing'
+import { parseJsonBody, parseJsonOrFormRequest } from '~/lib/request-parsing'
 import { NewPasswordSchema } from '~/lib/openapi/schemas/auth'
 
 const messages = {
@@ -387,7 +387,7 @@ const put = async (user: User, request: Request): Promise<Response> => {
 
 const del = async (user: User, request: Request): Promise<Response> => {
 	try {
-		const requestData = await parseFormRequest(
+		const requestData = await parseJsonOrFormRequest(
 			request,
 			DeleteCurrentUserRequestSchema,
 		)
@@ -408,7 +408,10 @@ const del = async (user: User, request: Request): Promise<Response> => {
 			return StandardResponse.unauthorized(apiMessages.passwordIncorrect)
 		}
 
-		return StandardResponse.ok(null)
+		return StandardResponse.ok({
+			code: 'Ok',
+			message: `User and all boxes of user marked for deletion. Bye Bye ${user.name}!`,
+		})
 	} catch {
 		return StandardResponse.internalServerError()
 	}

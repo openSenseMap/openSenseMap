@@ -3,9 +3,13 @@ import * as z from 'zod/v4'
 import { type ZodOpenApiPathItemObject } from 'zod-openapi'
 import { apiRoutes as routes } from '~/lib/api-routes'
 import { tosApiMiddleware } from '~/middleware/tos-api.server'
+import { corsApiMiddleware } from '~/middleware/cors-api.server'
 
 export { routes }
-export const middleware: Route.MiddlewareFunction[] = [tosApiMiddleware]
+export const middleware: Route.MiddlewareFunction[] = [
+	corsApiMiddleware,
+	tosApiMiddleware,
+]
 
 const ApiIndexResponseSchema = z.string().meta({
 	id: 'ApiIndexResponse',

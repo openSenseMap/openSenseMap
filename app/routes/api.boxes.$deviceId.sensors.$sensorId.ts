@@ -76,7 +76,7 @@ const LatestSensorResponseSchema = z
 	})
 
 const OnlyValueResponseSchema = z
-	.union([z.string(), z.number(), z.null()])
+	.union([z.string(), z.null()])
 	.meta({
 		id: 'LatestSensorOnlyValueResponse',
 		description:
@@ -174,7 +174,8 @@ export const loader = async ({
 		}
 
 		if (onlyValue) {
-			const value = meas.lastMeasurement?.value ?? null
+			const rawValue = meas.lastMeasurement?.value
+			const value = rawValue == null ? null : String(rawValue)
 
 			const responseParsed = await OnlyValueResponseSchema.safeParseAsync(value)
 

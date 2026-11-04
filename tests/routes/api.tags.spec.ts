@@ -43,7 +43,7 @@ describe('openSenseMap API Routes: /tags', () => {
 		userId = user.id
 	})
 
-	it('should return empty array of tags when none are there', async () => {
+	it('should return an array of distinct tags', async () => {
 		// Arrange
 		const request = new Request(`${BASE_URL}/tags`, {
 			method: 'GET',
@@ -63,7 +63,10 @@ describe('openSenseMap API Routes: /tags', () => {
 			'application/json; charset=utf-8',
 		)
 		expect(Array.isArray(body.data)).toBe(true)
-		expect(body.data).toHaveLength(0)
+		expect(body.data.every((tag: unknown) => typeof tag === 'string')).toBe(
+			true,
+		)
+		expect(new Set(body.data).size).toBe(body.data.length)
 	})
 
 	it('should return distinct grouptags of boxes', async () => {

@@ -1,11 +1,13 @@
-import { type Route } from './+types/api.sign-out'
-import { type User } from '~/db/schema'
+import { type Route } from './+types/api.users.sign-out'
 import { getUserFromJwt, revokeToken } from '~/lib/jwt'
 import {
+	ForbiddenErrorSchema,
+	forbiddenResponse,
 	InternalServerErrorSchema,
 	internalServerErrorResponse,
-	messageResponse,
+	okMessageResponse,
 } from '~/lib/openapi/errors'
+import { apiMessages } from '~/lib/openapi/messages'
 import { StandardResponse } from '~/lib/responses'
 import { type ZodOpenApiPathItemObject } from 'zod-openapi'
 
@@ -16,7 +18,11 @@ export const openapi: ZodOpenApiPathItemObject = {
 		description: 'Revokes the supplied JWT access token.',
 		security: [{ bearerAuth: [] }],
 		responses: {
-			200: messageResponse('Successfully signed out.'),
+			200: okMessageResponse('Successfully signed out.'),
+			403: forbiddenResponse(
+				ForbiddenErrorSchema,
+				'Invalid or missing JWT authorization.',
+			),
 			500: internalServerErrorResponse(
 				InternalServerErrorSchema,
 				'Internal server error.',
@@ -26,16 +32,26 @@ export const openapi: ZodOpenApiPathItemObject = {
 }
 
 export const action = async ({ request }: Route.ActionArgs) => {
+	let user
+
 	try {
-		// We deliberately make casts and stuff like that, so everything
-		// but the happy path will result in an internal server error.
-		// This is done s.t. we are not leaking information if someone
-		// tries sending random token to see if users exist or similar
-		const user = (await getUserFromJwt(request)) as User
-		const rawAuthorizationHeader = request.headers
-			.get('authorization')!
-			.toString()
-		const [, jwtString = ''] = rawAuthorizationHeader.split(' ')
+		user = await getUserFromJwt(request)
+	} catch {
+		return StandardResponse.forbidden(apiMessages.invalidJwt)
+	}
+
+	if (typeof user === 'string') {
+		return StandardResponse.forbidden(apiMessages.invalidJwt)
+	}
+
+	const rawAuthorizationHeader = request.headers.get('authorization')
+	const [, jwtString] = rawAuthorizationHeader?.split(' ') ?? []
+
+	if (!jwtString) {
+		return StandardResponse.forbidden(apiMessages.invalidJwt)
+	}
+
+	try {
 		await revokeToken(user, jwtString)
 		return StandardResponse.ok({
 			code: 'Ok',

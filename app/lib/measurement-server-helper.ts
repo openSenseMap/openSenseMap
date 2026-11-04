@@ -1,5 +1,6 @@
 import { desc, eq, inArray, or, type SQL, sql } from 'drizzle-orm'
 import {
+	device,
 	deviceToLocation,
 	type LastMeasurement,
 	location,
@@ -83,7 +84,7 @@ export async function findOrCreateLocations(
 						sql`ST_EQUALS(
               ${location.location},
               ST_SetSRID(ST_MakePoint(${newLocation.lng}, ${newLocation.lat}), 4326)
-            )`,
+							)`,
 				),
 			),
 		)
@@ -186,7 +187,7 @@ export async function addLocationUpdates(
         even though it should've been inserted`)
 		})
 
-	if (filteredUpdates.length > 0)
+	if (filteredUpdates.length > 0) {
 		await tx
 			.insert(deviceToLocation)
 			.values(
@@ -199,6 +200,33 @@ export async function addLocationUpdates(
 				}),
 			)
 			.onConflictDoNothing()
+
+		const latestUpdate = filteredUpdates.reduce((latest, update) =>
+			update.time > latest.time ? update : latest,
+		)
+
+		await tx
+			.update(device)
+			.set({
+				longitude: latestUpdate.location.lng,
+				latitude: latestUpdate.location.lat,
+				heightAboveGround: latestUpdate.location.height ?? null,
+				terrainElevation: sql`CASE
+						WHEN ${device.longitude} IS DISTINCT FROM ${latestUpdate.location.lng}
+							OR ${device.latitude} IS DISTINCT FROM ${latestUpdate.location.lat}
+						THEN NULL
+						ELSE ${device.terrainElevation}
+					END`,
+				terrainElevationDataset: sql`CASE
+						WHEN ${device.longitude} IS DISTINCT FROM ${latestUpdate.location.lng}
+							OR ${device.latitude} IS DISTINCT FROM ${latestUpdate.location.lat}
+						THEN NULL
+						ELSE ${device.terrainElevationDataset}
+					END`,
+				updatedAt: sql`NOW()`,
+			})
+			.where(eq(device.id, deviceId))
+	}
 }
 
 /**

@@ -59,7 +59,7 @@ describe('openSenseMap API Routes: /boxes/transfer and /boxes/claim', () => {
 		jwt = t
 
 		queryableDevice = await createDevice(
-			{ ...generateMinimalDevice(), latitude: 123, longitude: 12 },
+			{ ...generateMinimalDevice(), latitude: 12, longitude: 123 },
 			user.id,
 		)
 	})

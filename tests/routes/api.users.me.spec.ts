@@ -349,8 +349,8 @@ describe('openSenseMap API Routes: /users', () => {
 					request: deleteRequest,
 				} as Route.ActionArgs)) as Response
 
-				// Assert: Should return 400 Bad Request
-				expect(deleteResponse.status).toBe(400)
+				// Missing content type is rejected before the required body is parsed.
+				expect(deleteResponse.status).toBe(415)
 			})
 
 			it('should deny to delete user with empty password parameter', async () => {
