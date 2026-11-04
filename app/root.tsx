@@ -45,27 +45,6 @@ export const links = () => {
 		{
 			rel: 'preload',
 			as: 'font',
-			href: '/fonts/RobotoSlab-Medium.woff2',
-			type: 'font/woff2',
-			crossOrigin: 'anonymous',
-		},
-		{
-			rel: 'preload',
-			as: 'font',
-			href: '/fonts/RobotoSlab-Regular.woff2',
-			type: 'font/woff2',
-			crossOrigin: 'anonymous',
-		},
-		{
-			rel: 'preload',
-			as: 'font',
-			href: '/fonts/Urbanist-Medium.woff2',
-			type: 'font/woff2',
-			crossOrigin: 'anonymous',
-		},
-		{
-			rel: 'preload',
-			as: 'font',
 			href: '/fonts/Urbanist-Regular.woff2',
 			type: 'font/woff2',
 			crossOrigin: 'anonymous',
