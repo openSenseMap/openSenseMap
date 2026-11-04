@@ -193,7 +193,11 @@ export default function LoginPage() {
 						<div className="space-y-2">
 							<div className="flex flex-col items-start gap-1 sm:flex-row sm:items-center sm:justify-between">
 								<Label htmlFor="password"> {t('password_label')}</Label>
-								<Link to="/explore/forgot" className="text-sm underline">
+								<Link
+									to="/explore/forgot"
+									prefetch="intent"
+									className="text-sm underline"
+								>
 									{t('forgot_password')}
 								</Link>
 							</div>
@@ -231,6 +235,7 @@ export default function LoginPage() {
 									pathname: '/explore/register',
 									search: searchParams.toString(),
 								}}
+								prefetch="intent"
 							>
 								{t('register_label')}
 							</Link>

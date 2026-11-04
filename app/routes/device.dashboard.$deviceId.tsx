@@ -1,4 +1,4 @@
-import moment from 'moment'
+import { differenceInDays, differenceInHours, parseISO } from 'date-fns'
 import { MapProvider, Marker } from 'react-map-gl/maplibre'
 import { NavBar } from '~/components/nav-bar'
 import { Badge } from '~/components/ui/badge'
@@ -127,7 +127,8 @@ export default function DeviceDashboard() {
 								{diffFromCreateDate(deviceData.createdAt)}
 							</Badge>
 
-							{moment().diff(moment(deviceData.updatedAt), 'days') > 3 ? (
+							{differenceInDays(new Date(), parseISO(deviceData.updatedAt)) >
+							3 ? (
 								<Badge
 									variant="outline"
 									className="rounded-sm bg-red-500 text-white"
@@ -217,9 +218,9 @@ export default function DeviceDashboard() {
 										<hr className="h-px w-full border-0 bg-[#dcdada] dark:border-[#ffffff] dark:bg-gray-700" />
 										{/* <p className="py-2 px-6 text-[#fa5252] text-xs">5 minutes ago</p> */}
 										{sensor.lastMeasurement?.createdAt === undefined ||
-										moment().diff(
-											moment(sensor.lastMeasurement.createdAt),
-											'hours',
+										differenceInHours(
+											new Date(),
+											parseISO(sensor.lastMeasurement.createdAt),
 										) > 25 ? (
 											<p className="px-6 py-2 text-xs text-[#fa5252]">
 												INACTIVE
