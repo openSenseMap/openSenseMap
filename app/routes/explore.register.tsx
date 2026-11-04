@@ -266,7 +266,7 @@ export default function RegisterDialog() {
 						</CardDescription>
 					</CardHeader>
 					<CardFooter className="flex flex-col items-center gap-2">
-						<Link to="/explore/login" className="w-full">
+						<Link to="/explore/login" prefetch="intent" className="w-full">
 							<Button className="bg-light-blue w-full">
 								{t('go_to_login')}
 							</Button>
@@ -422,7 +422,7 @@ export default function RegisterDialog() {
 						<Button className="bg-light-blue w-full">{t('register')}</Button>
 						<div className="text-muted-foreground text-center text-sm">
 							{t('already_account')}{' '}
-							<Link to="/explore/login" className="underline">
+							<Link to="/explore/login" prefetch="intent" className="underline">
 								{t('login')}
 							</Link>
 						</div>

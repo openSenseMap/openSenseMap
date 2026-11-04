@@ -1,4 +1,9 @@
-import moment from 'moment'
+import {
+	differenceInDays,
+	differenceInSeconds,
+	differenceInYears,
+	parseISO,
+} from 'date-fns'
 import { useMemo } from 'react'
 import { useMatches } from 'react-router'
 import { type MyBadge } from './db/models/badge.server'
@@ -153,9 +158,12 @@ export function getFilteredDevices(
 
 //* Get Minute Formatted String - last sensor measurement update
 export function getMinuteFormattedString(lastMeasurementAt: string) {
-	const secondsAgo = moment().diff(moment(lastMeasurementAt), 'seconds')
+	const secondsAgo = differenceInSeconds(
+		new Date(),
+		parseISO(lastMeasurementAt),
+	)
 
-	if (secondsAgo === null || secondsAgo === undefined) {
+	if (!Number.isFinite(secondsAgo)) {
 		return '-'
 	} else {
 		if (secondsAgo < 120) {
@@ -166,11 +174,12 @@ export function getMinuteFormattedString(lastMeasurementAt: string) {
 }
 
 export function diffFromCreateDate(DeviceCreatedAt: string) {
-	const createDate = moment(DeviceCreatedAt)
-	const yearsFromCreate = moment().diff(createDate, 'years')
+	const createDate = parseISO(DeviceCreatedAt)
+	const now = new Date()
+	const yearsFromCreate = differenceInYears(now, createDate)
 	return `Created ${
 		yearsFromCreate === 0
-			? `${moment().diff(createDate, 'days')} day(s)`
+			? `${differenceInDays(now, createDate)} day(s)`
 			: `${yearsFromCreate} year` + (yearsFromCreate > 1 ? 's' : '')
 	} ago`
 }
