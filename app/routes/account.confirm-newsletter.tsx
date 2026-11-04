@@ -69,6 +69,7 @@ export default function ConfirmNewsletterRoute({
 				<CardFooter className="flex flex-col gap-2">
 					<Link
 						to={isLoggedIn ? '/settings/preferences' : '/explore'}
+						prefetch="intent"
 						className="w-full"
 					>
 						<Button className="w-full">
@@ -76,7 +77,7 @@ export default function ConfirmNewsletterRoute({
 						</Button>
 					</Link>
 					{!isLoggedIn && (
-						<Link to="/explore/login" className="w-full">
+						<Link to="/explore/login" prefetch="intent" className="w-full">
 							<Button variant="outline" className="w-full">
 								{t('go_to_login')}
 							</Button>

@@ -130,7 +130,7 @@ export default function EditBox({
 										{/* Account successfully deleted. */}
 										<div>
 											{t('device_updated')} -
-											<Link to={`/explore/${deviceId}`}>
+											<Link to={`/explore/${deviceId}`} prefetch="intent">
 												{' '}
 												<span className="text-[#4eaf47] hover:underline">
 													{t('view')}
@@ -153,11 +153,14 @@ export default function EditBox({
 			<div className="flex flex-col items-start gap-2 rounded sm:flex-row sm:items-center sm:justify-between sm:gap-4">
 				<div className="min-w-0">
 					<ArrowLeft className="mr-2 inline h-5 w-5" />
-					<Link to="/profile/me">{t('back_to_dashboard')}</Link>
+					<Link to="/profile/me" prefetch="intent">
+						{t('back_to_dashboard')}
+					</Link>
 				</div>
 				{deviceId && (
 					<Link
 						to={`/explore/${deviceId}`}
+						prefetch="intent"
 						className="text-primary inline-flex shrink-0 items-center gap-2 text-sm hover:underline"
 					>
 						<MapPin className="h-4 w-4" />

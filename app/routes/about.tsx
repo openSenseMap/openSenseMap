@@ -174,7 +174,6 @@ export default function Index({ loaderData }: Route.ComponentProps) {
 										to="https://www.betterplace.org/de/projects/89947-opensensemap-org-die-freie-karte-fuer-umweltdaten"
 										target="_blank"
 										rel="noopener noreferrer"
-										prefetch="intent"
 									>
 										<motion.div
 											whileHover={{ scale: 1.1 }}
