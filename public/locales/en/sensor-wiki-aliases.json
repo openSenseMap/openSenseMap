@@ -1,0 +1,13 @@
+{
+	"title": "Supported Sensor-Wiki mappings",
+	"intro": "These mappings power sensor autocomplete, and phenomenon filtering on openSenseMap.",
+	"catalog_summary": "Catalog version {{version}} · {{count}} mappings",
+	"contribute": "Contribute a mapping",
+	"view_json": "View catalog as JSON",
+	"search_label": "Search mappings",
+	"search_placeholder": "Search phenomena, units, or aliases",
+	"no_results": "No mappings match your search.",
+	"title_aliases": "Phenomenon aliases",
+	"unit_aliases": "Unit aliases",
+	"sensor_type_aliases": "Sensor type aliases"
+}

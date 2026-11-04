@@ -6,6 +6,7 @@
 	"timespan": "Time range",
 	"select_phenomena": "Select phenomena",
 	"search_phenomena": "Search phenomena...",
+	"view_supported_mappings": "View supported sensor mappings",
 	"phenomena_not_found": "No phenomena found.",
 	"phenomenon": "Phenomenon",
 	"search_tags": "Search tags...",
