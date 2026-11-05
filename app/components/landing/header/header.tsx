@@ -67,6 +67,7 @@ export default function Header() {
 									<li key={index}>
 										<Link
 											to={item.link}
+											prefetch={item.link === '/explore' ? 'intent' : undefined}
 											className="md:hover:text-light-green block rounded py-2 pr-4 pl-3 md:p-0 md:font-thin dark:md:hover:text-green-200"
 										>
 											{t(item.name)}
@@ -121,6 +122,7 @@ export default function Header() {
 									<Link
 										key={index}
 										to={item.link}
+										prefetch={item.link === '/explore' ? 'intent' : undefined}
 										className="hover:text-light-green block px-4 py-2 text-sm text-gray-700 dark:hover:text-green-200"
 										role="menuitem"
 									>

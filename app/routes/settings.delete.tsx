@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Form, useActionData, data, redirect } from 'react-router'
+import { Form, data, redirect } from 'react-router'
 import invariant from 'tiny-invariant'
 import { type Route } from './+types/settings.delete'
 import { Button } from '~/components/ui/button'
@@ -69,8 +69,9 @@ export async function action({ request }: Route.ActionArgs) {
 	return redirect('')
 }
 
-export default function EditUserProfilePage() {
-	const actionData = useActionData<typeof action>()
+export default function EditUserProfilePage({
+	actionData,
+}: Route.ComponentProps) {
 	const [passwordDelVal, setPasswordVal] = useState('') //* to enable delete account button
 	//* To focus when an error occured
 	const passwordDelRef = useRef<HTMLInputElement>(null)

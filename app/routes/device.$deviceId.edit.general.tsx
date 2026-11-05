@@ -5,8 +5,6 @@ import {
 	data,
 	redirect,
 	Form,
-	useActionData,
-	useLoaderData,
 	useNavigation,
 	useOutletContext,
 } from 'react-router'
@@ -461,9 +459,10 @@ export async function action({ request, params }: Route.ActionArgs) {
 }
 
 //**********************************
-export default function EditDeviceGeneral() {
-	const { device, imageUrl } = useLoaderData<typeof loader>()
-	const actionData = useActionData<typeof action>()
+export default function EditDeviceGeneral({
+	loaderData: { device, imageUrl },
+	actionData,
+}: Route.ComponentProps) {
 	const navigation = useNavigation()
 
 	const [passwordDelVal, setPasswordVal] = useState('')
