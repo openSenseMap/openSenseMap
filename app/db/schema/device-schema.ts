@@ -44,8 +44,12 @@ export const deviceSchema = pgTable(
 		visibility: deviceSchemaVisibilityEnum('visibility')
 			.default('private')
 			.notNull(),
-		createdAt: timestamp('created_at').defaultNow().notNull(),
-		updatedAt: timestamp('updated_at').defaultNow().notNull(),
+		createdAt: timestamp('created_at', { withTimezone: true })
+			.defaultNow()
+			.notNull(),
+		updatedAt: timestamp('updated_at', { withTimezone: true })
+			.defaultNow()
+			.notNull(),
 	},
 	(table) => [
 		uniqueIndex('device_schema_owner_slug_unique').on(
@@ -81,9 +85,11 @@ export const deviceSchemaVersion = pgTable(
 			.references(() => user.id, {
 				onDelete: 'restrict',
 			}),
-		createdAt: timestamp('created_at').defaultNow().notNull(),
-		publishedAt: timestamp('published_at'),
-		deprecatedAt: timestamp('deprecated_at'),
+		createdAt: timestamp('created_at', { withTimezone: true })
+			.defaultNow()
+			.notNull(),
+		publishedAt: timestamp('published_at', { withTimezone: true }),
+		deprecatedAt: timestamp('deprecated_at', { withTimezone: true }),
 	},
 	(table) => [
 		uniqueIndex('device_schema_version_unique').on(

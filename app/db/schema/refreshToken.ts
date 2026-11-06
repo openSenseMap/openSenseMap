@@ -9,7 +9,7 @@ export const refreshToken = pgTable('refresh_token', {
 			onDelete: 'cascade',
 		}),
 	token: text('token'),
-	expiresAt: timestamp('expires_at'),
+	expiresAt: timestamp('expires_at', { withTimezone: true }),
 })
 
 export const refreshTokenRelations = relations(refreshToken, ({ one }) => ({
@@ -22,7 +22,7 @@ export const refreshTokenRelations = relations(refreshToken, ({ one }) => ({
 export const tokenRevocation = pgTable('token_revocation', {
 	hash: text('hash').notNull(),
 	token: json('token').notNull(),
-	expiresAt: timestamp('expires_at')
+	expiresAt: timestamp('expires_at', { withTimezone: true })
 		.notNull()
 		.$defaultFn(() => new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)), // UTC today + 1 week in MS
 })

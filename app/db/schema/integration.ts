@@ -14,7 +14,7 @@ export const integration = pgTable('integration', {
 	icon: text('icon'), //name of lucide icon , pascal case!
 	description: text('description'),
 	order: integer('order').default(0).notNull(),
-	createdAt: timestamp('created_at').defaultNow(),
+	createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
 })
 
 export type Integration = InferSelectModel<typeof integration>
