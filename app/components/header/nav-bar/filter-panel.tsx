@@ -1,6 +1,7 @@
 import { X } from 'lucide-react'
 import { useContext, useEffect, useMemo, useState } from 'react'
 import {
+	useLocation,
 	useNavigation,
 	useRouteLoaderData,
 	useSearchParams,
@@ -15,6 +16,7 @@ import FilterPhenomena from './filter-options/filter-phenomena'
 import FilterTime from './filter-options/filter-time'
 import { useTranslation } from 'react-i18next'
 import { DeviceExposureType, DeviceStatusType } from '~/lib/device-enums'
+import { getExplorePendingUi } from '~/lib/explore-pending-navigation'
 
 export type TimeFilterState =
 	| {
@@ -183,6 +185,12 @@ export default function FilterPanel() {
 	const { setOpen } = useContext(NavbarContext)
 	const [searchParams, setSearchParams] = useSearchParams()
 	const navigation = useNavigation()
+	const location = useLocation()
+	const { filters: areFiltersPending } = getExplorePendingUi({
+		navigationState: navigation.state,
+		currentLocation: location,
+		nextLocation: navigation.location,
+	})
 	const { t } = useTranslation('filter')
 
 	const data = useRouteLoaderData<typeof exploreLoader>('routes/explore')
@@ -230,9 +238,14 @@ export default function FilterPanel() {
 
 	return (
 		<div className="relative py-2 dark:text-zinc-200">
-			{navigation.state === 'loading' && (
-				<div className="absolute inset-0 z-50 flex items-center justify-center bg-white/30 backdrop-blur-xs dark:bg-zinc-800/30">
+			{areFiltersPending && (
+				<div
+					className="absolute inset-0 z-50 flex items-center justify-center bg-white/30 backdrop-blur-xs dark:bg-zinc-800/30"
+					role="status"
+					aria-live="polite"
+				>
 					<Spinner />
+					<span className="sr-only">{t('applying_filters')}</span>
 				</div>
 			)}
 

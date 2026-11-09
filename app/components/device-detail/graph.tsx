@@ -25,7 +25,12 @@ import {
 import { Line } from 'react-chartjs-2'
 import { isBrowser, isTablet } from 'react-device-detect'
 import Draggable, { type DraggableData } from 'react-draggable'
-import { useNavigate, useNavigation, useSearchParams } from 'react-router'
+import {
+	useLocation,
+	useNavigate,
+	useNavigation,
+	useSearchParams,
+} from 'react-router'
 import { AggregationFilter } from '../aggregation-filter'
 import { ClientOnly } from '../client-only'
 import { ColorPicker } from '../color-picker'
@@ -46,6 +51,7 @@ import {
 	type MeasurementChartData,
 	type MeasurementChartPoint,
 } from '~/lib/measurement-chart'
+import { getExplorePendingUi } from '~/lib/explore-pending-navigation'
 
 ChartJS.register(
 	LineElement,
@@ -136,6 +142,12 @@ export default function Graph({
 }: GraphProps) {
 	const { hoveredPoint, setHoveredPoint } = useContext(HoveredPointContext)
 	const navigation = useNavigation()
+	const location = useLocation()
+	const { graph: isGraphPending } = getExplorePendingUi({
+		navigationState: navigation.state,
+		currentLocation: location,
+		nextLocation: navigation.location,
+	})
 	const { t, i18n } = useTranslation('graph')
 	const navigate = useNavigate()
 	const [offsetPositionX, setOffsetPositionX] = useState(0)
@@ -519,9 +531,14 @@ export default function Graph({
 					ref={nodeRef}
 					className="absolute top-14 right-4 bottom-6 left-4 z-40 flex flex-col gap-2 rounded-xl bg-white px-4 pt-2 text-sm font-medium text-zinc-800 shadow-lg ring-1 shadow-zinc-800/5 ring-zinc-900/5 md:top-auto md:right-4 md:bottom-7.5 md:left-auto md:h-[35%] md:max-h-[35%] md:w-[60vw] dark:bg-zinc-800 dark:text-zinc-200 dark:opacity-95 dark:ring-white dark:backdrop-blur-xs"
 				>
-					{navigation.state === 'loading' && (
-						<div className="absolute inset-0 z-50 flex items-center justify-center bg-gray-100/30 backdrop-blur-[1.5px]">
+					{isGraphPending && (
+						<div
+							className="absolute inset-0 z-50 flex items-center justify-center bg-gray-100/30 backdrop-blur-[1.5px]"
+							role="status"
+							aria-live="polite"
+						>
 							<Spinner />
+							<span className="sr-only">{t('loading_graph')}</span>
 						</div>
 					)}
 					<div
