@@ -53,6 +53,7 @@ export default function AdminDevicesIndexRoute({
 								<td className="border-r-2 border-black p-2">
 									<Link
 										to={`/admin/devices/${device.id}`}
+										prefetch="intent"
 										className="cursor-pointer hover:underline hover:underline-offset-2"
 									>
 										Open

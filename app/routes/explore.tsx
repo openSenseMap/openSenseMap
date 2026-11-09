@@ -13,7 +13,6 @@ import {
 	useOutlet,
 	useNavigate,
 	useSearchParams,
-	useLoaderData,
 	useParams,
 	useLocation,
 } from 'react-router'
@@ -59,10 +58,12 @@ import {
 	type ClusterFeature,
 } from '~/components/cluster-marker'
 import MapHeader from '~/components/map/topbar'
-import { getMeasurementsCount } from '~/db/models/measurement.server'
 import { getTags } from '~/services/device-service.server'
 import { getPhenomena } from '~/db/models/phenomena.server'
 import { DOWNLOAD_FILTER_KEYS } from '~/components/header/download'
+import { getApproximateMeasurementCount } from '~/services/statistics-service.server'
+
+export { shouldRevalidate } from '~/lib/explore-revalidation'
 
 const INITIAL_VIEW_STATE = {
 	zoom: 2,
@@ -191,9 +192,13 @@ function parseMapHash(hash: string) {
 	})
 }
 
-function getHomeView(
-	profile: Awaited<ReturnType<typeof getProfileByUserId>> | null,
-) {
+type HomeViewProfile = {
+	homeLatitude: number | null
+	homeLongitude: number | null
+	homeZoom: number | null
+}
+
+function getHomeView(profile: HomeViewProfile | null | undefined) {
 	if (!profile) return null
 
 	return getValidMapViewport({
@@ -454,7 +459,7 @@ export async function loader({ context, request }: Route.LoaderArgs) {
 
 	const availableTags = await getTags()
 
-	const measurementCount = await getMeasurementsCount()
+	const measurementCount = await getApproximateMeasurementCount()
 
 	const session = await getUserSession(request)
 	const message = session.get('global_message') || null
@@ -507,7 +512,7 @@ if (process.env.NODE_ENV === 'production') {
 	currentDate = new Date(Date.now() - 1000 * 600)
 }
 
-export default function Explore() {
+export default function Explore({ loaderData }: Route.ComponentProps) {
 	// data from our loader
 	const {
 		devices,
@@ -517,7 +522,7 @@ export default function Explore() {
 		user,
 		profile,
 		userDeviceLocations,
-	} = useLoaderData<typeof loader>()
+	} = loaderData
 	const { t } = useTranslation()
 	const mapRef = useRef<MapRef | null>(null)
 	const appliedInitialMyAreaRef = useRef(false)
