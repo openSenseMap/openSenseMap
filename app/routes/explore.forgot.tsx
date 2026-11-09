@@ -14,13 +14,16 @@ import { Label } from '@/components/ui/label'
 import Spinner from '~/components/spinner'
 import { Button } from '~/components/ui/button'
 import {
-	Card,
 	CardContent,
 	CardDescription,
 	CardFooter,
 	CardHeader,
 	CardTitle,
 } from '~/components/ui/card'
+import {
+	ExploreAuthOverlayBackdrop,
+	ExploreAuthOverlayCard,
+} from '~/components/explore-auth-overlay'
 import { getUserId } from '~/services/session-service.server'
 import { requestPasswordReset } from '~/services/user-service.server'
 import { validateEmail } from '~/utils'
@@ -82,16 +85,14 @@ export default function ForgotPasswordPage({
 	}, [actionData])
 
 	return (
-		<div className="relative flex h-full w-full items-start justify-center overflow-y-auto p-4 sm:items-center">
-			<Link
+		<>
+			<ExploreAuthOverlayBackdrop
 				to={{
 					pathname: '/explore',
 					search: searchParams.toString(),
 				}}
-			>
-				<div className="absolute inset-0 z-40 h-full w-full bg-black opacity-25" />
-			</Link>
-			<Card className="relative z-50 my-auto w-full max-w-md min-w-0">
+			/>
+			<ExploreAuthOverlayCard className="relative z-50 my-auto w-full max-w-md min-w-0">
 				{navigation.state === 'loading' && (
 					<div className="absolute inset-0 z-50 flex items-center justify-center bg-white/30 backdrop-blur-xs dark:bg-zinc-800/30">
 						<Spinner />
@@ -159,7 +160,7 @@ export default function ForgotPasswordPage({
 						</Form>
 					</>
 				)}
-			</Card>
-		</div>
+			</ExploreAuthOverlayCard>
+		</>
 	)
 }

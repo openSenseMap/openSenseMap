@@ -5,6 +5,189 @@
 
 @custom-variant dark (&:where(.dark, .dark *));
 
+@keyframes nested-route-section-out {
+	from {
+		opacity: 1;
+		transform: translateY(0);
+	}
+	to {
+		opacity: 0;
+		transform: translateY(-0.25rem);
+	}
+}
+
+@keyframes nested-route-section-in {
+	from {
+		opacity: 0;
+		transform: translateY(0.25rem);
+	}
+	to {
+		opacity: 1;
+		transform: translateY(0);
+	}
+}
+
+@keyframes explore-device-panel-out {
+	from {
+		opacity: 1;
+		transform: translateX(0);
+	}
+	to {
+		opacity: 0;
+		transform: translateX(-0.5rem);
+	}
+}
+
+@keyframes explore-device-panel-in {
+	from {
+		opacity: 0;
+		transform: translateX(-0.5rem);
+	}
+	to {
+		opacity: 1;
+		transform: translateX(0);
+	}
+}
+
+@keyframes explore-graph-panel-out {
+	from {
+		opacity: 1;
+		transform: translateY(0);
+	}
+	to {
+		opacity: 0;
+		transform: translateY(0.5rem);
+	}
+}
+
+@keyframes explore-graph-panel-in {
+	from {
+		opacity: 0;
+		transform: translateY(0.5rem);
+	}
+	to {
+		opacity: 1;
+		transform: translateY(0);
+	}
+}
+
+@keyframes overlay-dialog-out {
+	from {
+		opacity: 1;
+		transform: scale(1);
+	}
+	to {
+		opacity: 0;
+		transform: scale(0.98);
+	}
+}
+
+@keyframes overlay-dialog-in {
+	from {
+		opacity: 0;
+		transform: scale(0.98);
+	}
+	to {
+		opacity: 1;
+		transform: scale(1);
+	}
+}
+
+@keyframes overlay-backdrop-out {
+	from {
+		opacity: 1;
+	}
+	to {
+		opacity: 0;
+	}
+}
+
+@keyframes overlay-backdrop-in {
+	from {
+		opacity: 0;
+	}
+	to {
+		opacity: 1;
+	}
+}
+
+::view-transition-group(.nested-route-section),
+::view-transition-group(.explore-device-panel),
+::view-transition-group(.explore-graph-panel),
+::view-transition-group(.explore-auth-dialog),
+::view-transition-group(.profile-photo-dialog) {
+	animation-duration: 200ms;
+	animation-timing-function: ease-out;
+}
+
+::view-transition-old(.nested-route-section) {
+	animation: 120ms ease-in both nested-route-section-out;
+}
+
+::view-transition-new(.nested-route-section) {
+	animation: 180ms ease-out both nested-route-section-in;
+}
+
+::view-transition-old(.explore-device-panel) {
+	animation: 140ms ease-in both explore-device-panel-out;
+}
+
+::view-transition-new(.explore-device-panel) {
+	animation: 200ms ease-out both explore-device-panel-in;
+}
+
+::view-transition-old(.explore-graph-panel) {
+	animation: 140ms ease-in both explore-graph-panel-out;
+}
+
+::view-transition-new(.explore-graph-panel) {
+	animation: 200ms ease-out both explore-graph-panel-in;
+}
+
+::view-transition-old(.explore-auth-dialog),
+::view-transition-old(.profile-photo-dialog) {
+	animation: 140ms ease-in both overlay-dialog-out;
+}
+
+::view-transition-new(.explore-auth-dialog),
+::view-transition-new(.profile-photo-dialog) {
+	animation: 200ms ease-out both overlay-dialog-in;
+}
+
+::view-transition-group(.explore-overlay-backdrop),
+::view-transition-group(.profile-photo-dialog-backdrop) {
+	animation-duration: 160ms;
+}
+
+::view-transition-old(.explore-overlay-backdrop),
+::view-transition-old(.profile-photo-dialog-backdrop) {
+	animation: 120ms ease-in both overlay-backdrop-out;
+}
+
+::view-transition-new(.explore-overlay-backdrop),
+::view-transition-new(.profile-photo-dialog-backdrop) {
+	animation: 160ms ease-out both overlay-backdrop-in;
+}
+
+@supports (view-transition-name: none) {
+	.view-transition-dialog-content,
+	.view-transition-dialog-overlay {
+		animation: none;
+	}
+
+	.view-transition-dialog-overlay {
+		transition: none;
+	}
+}
+
+@media (prefers-reduced-motion: reduce) {
+	::view-transition-group(*),
+	::view-transition-old(*),
+	::view-transition-new(*) {
+		animation: none !important;
+	}
+}
+
 @utility container {
 	margin-inline: auto;
 	padding-inline: 2rem;
