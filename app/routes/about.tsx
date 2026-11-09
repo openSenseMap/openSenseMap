@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next'
 import { data, Link } from 'react-router'
 import { type Route } from './+types/about'
 import Footer from '~/components/landing/footer'
-import { GlobeComponent } from '~/components/landing/globe.client'
+import { GlobeComponent } from '~/components/landing/globe'
 import Header from '~/components/landing/header/header'
 import Connect from '~/components/landing/sections/connect'
 import Features from '~/components/landing/sections/features'
@@ -13,7 +13,6 @@ import Partners from '~/components/landing/sections/partners'
 import PricingPlans from '~/components/landing/sections/pricing-plans'
 import Stats from '~/components/landing/stats'
 import { getLatestDevices } from '~/db/models/device.server'
-import { useMediaQuery } from '~/hooks/use-media-query'
 import { type SupportedLanguage } from '~/i18next-config'
 import { getDirectusClient } from '~/lib/directus'
 import { getLocale } from '~/middleware/i18next'
@@ -99,8 +98,6 @@ export const loader = async ({ context, request }: Route.LoaderArgs) => {
 export default function Index({ loaderData }: Route.ComponentProps) {
 	const { partners, stats, latestDevices } = loaderData
 	const { t } = useTranslation('landing')
-	const showGlobe = useMediaQuery('(min-width: 1120px)')
-
 	return (
 		<div className="min-h-screen bg-white dark:bg-black">
 			<header className="z-10">
@@ -192,7 +189,7 @@ export default function Index({ loaderData }: Route.ComponentProps) {
 							</div>
 						</div>
 						<div className="hidden w-125 shrink-0 cursor-pointer min-[1120px]:block">
-							{showGlobe && <GlobeComponent latestDevices={latestDevices} />}
+							<GlobeComponent latestDevices={latestDevices} />
 						</div>
 					</div>
 					<div>

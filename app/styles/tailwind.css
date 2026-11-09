@@ -477,7 +477,7 @@
 	}
 
 	@font-face {
-		font-family: 'Matter';
+		font-family: 'RobotoSlab';
 		src:
 			url('/fonts/RobotoSlab-Regular.woff2') format('woff2'),
 			url('/fonts/RobotoSlab-Regular.woff') format('woff');
@@ -497,7 +497,7 @@
 	}
 
 	@font-face {
-		font-family: 'Matter';
+		font-family: 'Urbanist';
 		src:
 			url('/fonts/Urbanist-Regular.woff2') format('woff2'),
 			url('/fonts/Urbanist-Regular.woff') format('woff');
