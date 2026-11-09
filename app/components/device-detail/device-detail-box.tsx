@@ -493,6 +493,7 @@ export default function DeviceDetailBox() {
 															{t('sensor_order_hint')}{' '}
 															<Link
 																to={`/device/${data.device.id}/edit/sensors`}
+																prefetch="intent"
 																className="font-medium underline underline-offset-4"
 															>
 																{t('sensor_order_hint_link')}
