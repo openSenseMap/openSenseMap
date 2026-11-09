@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { useLoaderData } from 'react-router'
 import { type Route } from './+types/settings.preferences'
 import { AutosaveStatusText } from '~/components/autosave-status.text'
 import { UnsavedChangesBlocker } from '~/components/unsaved-changes-blocker'
@@ -263,12 +262,14 @@ function normalizeMapPreferenceValues(
 	}
 }
 
-export default function PreferencesSettingsPage() {
+export default function PreferencesSettingsPage({
+	loaderData,
+}: Route.ComponentProps) {
 	const {
 		profile,
 		newsletterOptIn: initialNewsletterOptIn,
 		newsletterOptInPending: initialNewsletterOptInPending,
-	} = useLoaderData<typeof loader>()
+	} = loaderData
 	const { toast } = useToast()
 	const { t } = useTranslation('settings')
 

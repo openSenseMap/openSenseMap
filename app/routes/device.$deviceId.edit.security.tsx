@@ -8,14 +8,7 @@ import {
 } from 'lucide-react'
 import { useCallback, useEffect, useState } from 'react'
 import { Trans, useTranslation } from 'react-i18next'
-import {
-	data,
-	Link,
-	redirect,
-	useFetcher,
-	useLoaderData,
-	useNavigation,
-} from 'react-router'
+import { data, Link, redirect, useFetcher, useNavigation } from 'react-router'
 import { type Route } from './+types/device.$deviceId.edit.security'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Callout } from '~/components/ui/alert'
@@ -169,9 +162,9 @@ export async function action({ request, params }: Route.ActionArgs) {
 	)
 }
 
-export default function EditBoxSecurity() {
+export default function EditBoxSecurity({ loaderData }: Route.ComponentProps) {
 	const { t } = useTranslation('settings')
-	const { key, deviceAuthEnabled } = useLoaderData<typeof loader>()
+	const { key, deviceAuthEnabled } = loaderData
 	const generateKeyFetcher = useFetcher<typeof action>()
 	const navigation = useNavigation()
 

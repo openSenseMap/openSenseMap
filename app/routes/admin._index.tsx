@@ -7,13 +7,19 @@ export default function AdminIndexRoute() {
 
 			<div className="mt-6 flex gap-4">
 				<div className="rounded border p-4">
-					<Link to="/admin/users">Edit users</Link>
+					<Link to="/admin/users" prefetch="intent">
+						Edit users
+					</Link>
 				</div>
 				<div className="rounded border p-4">
-					<Link to="/admin/devices">Edit devices</Link>
+					<Link to="/admin/devices" prefetch="intent">
+						Edit devices
+					</Link>
 				</div>
 				<div className="rounded border p-4">
-					<Link to="/admin/integrations">Integration services</Link>
+					<Link to="/admin/integrations" prefetch="intent">
+						Integration services
+					</Link>
 				</div>
 			</div>
 		</div>

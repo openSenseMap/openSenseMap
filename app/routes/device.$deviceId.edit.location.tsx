@@ -5,7 +5,7 @@ import {
 	Marker,
 	NavigationControl,
 } from 'react-map-gl/maplibre'
-import { data, Link, redirect, useLoaderData } from 'react-router'
+import { data, Link, redirect } from 'react-router'
 
 import invariant from 'tiny-invariant'
 import { type Route } from './+types/device.$deviceId.edit.location'
@@ -211,8 +211,9 @@ export async function action({ request, params }: Route.ActionArgs) {
 }
 
 //**********************************
-export default function EditLocation() {
-	const { device, hasElevationConsent } = useLoaderData<typeof loader>()
+export default function EditLocation({
+	loaderData: { device, hasElevationConsent },
+}: Route.ComponentProps) {
 	const { t } = useTranslation('edit-device-general')
 	const initialHeightAboveGround = device.heightAboveGround
 

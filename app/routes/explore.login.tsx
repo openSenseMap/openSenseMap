@@ -5,10 +5,8 @@ import {
 	redirect,
 	Form,
 	Link,
-	useActionData,
 	useNavigation,
 	useSearchParams,
-	useLoaderData,
 } from 'react-router'
 import { type Route } from './+types/explore.login'
 import { Input } from '@/components/ui/input'
@@ -110,10 +108,11 @@ export async function action({ request }: Route.ActionArgs) {
 	})
 }
 
-export default function LoginPage() {
+export default function LoginPage({
+	loaderData,
+	actionData,
+}: Route.ComponentProps) {
 	const [searchParams] = useSearchParams()
-	const loaderData = useLoaderData<typeof loader>()
-	const actionData = useActionData<typeof action>()
 	const identifierRef = React.useRef<HTMLInputElement>(null)
 	const passwordRef = React.useRef<HTMLInputElement>(null)
 
@@ -193,7 +192,11 @@ export default function LoginPage() {
 						<div className="space-y-2">
 							<div className="flex flex-col items-start gap-1 sm:flex-row sm:items-center sm:justify-between">
 								<Label htmlFor="password"> {t('password_label')}</Label>
-								<Link to="/explore/forgot" className="text-sm underline">
+								<Link
+									to="/explore/forgot"
+									prefetch="intent"
+									className="text-sm underline"
+								>
 									{t('forgot_password')}
 								</Link>
 							</div>
@@ -231,6 +234,7 @@ export default function LoginPage() {
 									pathname: '/explore/register',
 									search: searchParams.toString(),
 								}}
+								prefetch="intent"
 							>
 								{t('register_label')}
 							</Link>
