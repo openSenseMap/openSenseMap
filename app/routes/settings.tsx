@@ -19,15 +19,21 @@ export default function SettingsLayoutPage() {
 						<div className="w-full overflow-x-auto pb-1">
 							<TabsList className="h-auto w-full min-w-max justify-evenly">
 								<TabsTrigger value="profile" className="shrink-0" asChild>
-									<Link to="/settings/profile">{t('public_profile')}</Link>
+									<Link to="/settings/profile" prefetch="intent">
+										{t('public_profile')}
+									</Link>
 								</TabsTrigger>
 
 								<TabsTrigger value="account" className="shrink-0" asChild>
-									<Link to="/settings/account">{t('account')}</Link>
+									<Link to="/settings/account" prefetch="intent">
+										{t('account')}
+									</Link>
 								</TabsTrigger>
 
 								<TabsTrigger value="preferences" className="shrink-0" asChild>
-									<Link to="/settings/preferences">{t('preferences')}</Link>
+									<Link to="/settings/preferences" prefetch="intent">
+										{t('preferences')}
+									</Link>
 								</TabsTrigger>
 
 								<TabsTrigger
