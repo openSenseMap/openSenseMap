@@ -42,7 +42,7 @@
     "@react-router/node": "8.5.1",
     "@react-router/serve": "8.5.1",
     "@rjsf/core": "^6.11.0",
-    "@rjsf/utils": "^6.11.0",
+    "@rjsf/utils": "^6.11.1",
     "@rjsf/validator-ajv8": "^6.11.0",
     "@sensebox/sketch-templater": "^1.13.6",
     "@stepperize/react": "^8.0.1",
