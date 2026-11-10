@@ -457,7 +457,7 @@ export default function EditLocation({
 
 	return (
 		<div className="grid grid-rows-1">
-			<UnsavedChangesBlocker when={autosave.shouldBlockNavigation} />
+			<UnsavedChangesBlocker autosaveState={autosave.navigationState} />
 			<div className="flex min-h-full items-center justify-center">
 				<div className="font-helvetica mx-auto w-full text-[14px]">
 					<div>

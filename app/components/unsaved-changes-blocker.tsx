@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import { type BlockerFunction, useBeforeUnload, useBlocker } from 'react-router'
+import { type AutosaveNavigationState } from '~/hooks/use-autosave-fetcher'
 import {
 	AlertDialog,
 	AlertDialogAction,
@@ -13,7 +14,8 @@ import {
 } from '~/components/ui/alert-dialog'
 
 type UnsavedChangesBlockerProps = {
-	when: boolean
+	when?: boolean
+	autosaveState?: AutosaveNavigationState
 }
 
 export const shouldBlockUnsavedChangesNavigation = (
@@ -25,24 +27,30 @@ export const shouldBlockUnsavedChangesNavigation = (
 		currentLocation.search !== nextLocation.search ||
 		currentLocation.hash !== nextLocation.hash)
 
-export function UnsavedChangesBlocker({ when }: UnsavedChangesBlockerProps) {
+export function UnsavedChangesBlocker({
+	when = false,
+	autosaveState = 'idle',
+}: UnsavedChangesBlockerProps) {
 	const { t } = useTranslation('common')
 	const proceedingRef = useRef(false)
+	const needsConfirmation = when || autosaveState === 'blocked'
+	const isWaitingForAutosave = !when && autosaveState === 'pending'
+	const shouldBlockNavigation = needsConfirmation || isWaitingForAutosave
 	const shouldBlock = useCallback<BlockerFunction>(
-		(args) => shouldBlockUnsavedChangesNavigation(when, args),
-		[when],
+		(args) => shouldBlockUnsavedChangesNavigation(shouldBlockNavigation, args),
+		[shouldBlockNavigation],
 	)
 	const blocker = useBlocker(shouldBlock)
 
 	useBeforeUnload(
 		useCallback(
 			(event) => {
-				if (!when) return
+				if (!shouldBlockNavigation) return
 
 				event.preventDefault()
 				event.returnValue = ''
 			},
-			[when],
+			[shouldBlockNavigation],
 		),
 		{ capture: true },
 	)
@@ -55,10 +63,10 @@ export function UnsavedChangesBlocker({ when }: UnsavedChangesBlockerProps) {
 	}, [blocker])
 
 	useEffect(() => {
-		if (when || blocker.state !== 'blocked') return
+		if (shouldBlockNavigation || blocker.state !== 'blocked') return
 
 		proceed()
-	}, [blocker.state, proceed, when])
+	}, [blocker.state, proceed, shouldBlockNavigation])
 
 	useEffect(() => {
 		if (blocker.state === 'blocked') return
@@ -73,11 +81,10 @@ export function UnsavedChangesBlocker({ when }: UnsavedChangesBlockerProps) {
 		blocker.reset()
 	}
 
+	const isDialogOpen = blocker.state === 'blocked' && needsConfirmation
+
 	return (
-		<AlertDialog
-			open={blocker.state === 'blocked'}
-			onOpenChange={handleOpenChange}
-		>
+		<AlertDialog open={isDialogOpen} onOpenChange={handleOpenChange}>
 			<AlertDialogContent>
 				<AlertDialogHeader>
 					<AlertDialogTitle>{t('unsaved_changes_title')}</AlertDialogTitle>

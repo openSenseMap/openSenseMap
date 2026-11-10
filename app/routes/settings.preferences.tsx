@@ -13,6 +13,7 @@ import { Label } from '~/components/ui/label'
 import { useToast } from '~/components/ui/use-toast'
 import {
 	AUTOSAVE_DELAY_MS,
+	combineAutosaveNavigationStates,
 	useAutosaveFetcher,
 } from '~/hooks/use-autosave-fetcher'
 import { getProfileByUserId, updateProfile } from '~/db/models/profile.server'
@@ -542,10 +543,10 @@ export default function PreferencesSettingsPage({
 	return (
 		<Card className="border-border bg-card text-card-foreground">
 			<UnsavedChangesBlocker
-				when={
-					mapAutosave.shouldBlockNavigation ||
-					newsletterAutosave.shouldBlockNavigation
-				}
+				autosaveState={combineAutosaveNavigationStates(
+					mapAutosave.navigationState,
+					newsletterAutosave.navigationState,
+				)}
 			/>
 			<CardHeader>
 				<CardTitle>{t('preferences')}</CardTitle>

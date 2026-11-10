@@ -256,7 +256,7 @@ export default function EditBoxSecurity({ loaderData }: Route.ComponentProps) {
 
 	return (
 		<div className="font-helvetica min-w-0 text-[14px]">
-			<UnsavedChangesBlocker when={autosave.shouldBlockNavigation} />
+			<UnsavedChangesBlocker autosaveState={autosave.navigationState} />
 			<div className="mt-2 flex min-w-0 justify-between">
 				<div className="min-w-0">
 					<h1 className="text-3xl wrap-anywhere sm:text-4xl">

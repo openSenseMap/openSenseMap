@@ -399,7 +399,7 @@ export default function EditUserProfilePage({
 
 	return (
 		<div className="space-y-6">
-			<UnsavedChangesBlocker when={autosave.shouldBlockNavigation} />
+			<UnsavedChangesBlocker autosaveState={autosave.navigationState} />
 			<Card className="space-y-6">
 				<CardHeader>
 					<CardTitle>{t('profile_settings')}</CardTitle>

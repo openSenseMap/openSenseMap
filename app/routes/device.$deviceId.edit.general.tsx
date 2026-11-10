@@ -706,11 +706,8 @@ export default function EditDeviceGeneral({
 	return (
 		<div className="grid grid-rows-1">
 			<UnsavedChangesBlocker
-				when={
-					autosave.shouldBlockNavigation ||
-					imageFile !== null ||
-					newTag.trim().length > 0
-				}
+				autosaveState={autosave.navigationState}
+				when={imageFile !== null || newTag.trim().length > 0}
 			/>
 			<div className="flex min-h-full items-center justify-center">
 				<div className="font-helvetica mx-auto w-full">
