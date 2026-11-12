@@ -97,8 +97,8 @@ function redactSensitiveText(value) {
 		.replace(/\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/gi, '[Filtered email]')
 		.replace(/\b(?:Bearer|Basic)\s+[A-Za-z0-9._~+/=-]+/gi, '[Filtered auth]')
 		.replace(
-			/(["']?)\b(password|passwd|secret|token|api[-_. ]?key|session)\1\s*[:=]\s*[^\s,;]+/gi,
-			'$1=[Filtered]',
+			/(["']?)(password|passwd|secret|token|api[-_. ]?key|session)\1\s*[:=]\s*[^\s,;]+/gi,
+			'$1$2=[Filtered]',
 		)
 		.replace(
 			/\beyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\b/g,
