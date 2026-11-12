@@ -76,6 +76,8 @@ const MAX_MY_AREA_LONGITUDE_SPAN = 60
 const DEVICE_SOURCE_ID = 'osem-devices'
 const DEVICE_CLUSTER_LAYER_ID = 'devices-clusters-layer'
 const MIN_CLUSTER_SIZE = 5
+// Keep full-screen 5K and high-DPI maps above MapLibre's 4096px downscaling threshold.
+const EXPLORE_MAX_CANVAS_SIZE: [number, number] = [8192, 8192]
 
 type MyAreaTarget =
 	| {
@@ -1050,6 +1052,7 @@ export default function Explore({ loaderData }: Route.ComponentProps) {
 				)}
 
 				<Map
+					maxCanvasSize={EXPLORE_MAX_CANVAS_SIZE}
 					interactiveLayerIds={
 						selectedPheno
 							? ['phenomenon-layer']
