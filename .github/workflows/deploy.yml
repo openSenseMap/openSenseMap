@@ -159,6 +159,7 @@ jobs:
           build-args: |
             COMMIT_SHA=${{ github.sha }}
             NODE_VERSION=${{ steps.node-version.outputs.NODE_VERSION }}
+            ALLOWED_ACTION_ORIGINS=${{ vars.ALLOWED_ACTION_ORIGINS }}
           cache-from: type=local,src=/tmp/.buildx-cache
           cache-to: type=local,mode=max,dest=/tmp/.buildx-cache-new
 
