@@ -1,6 +1,16 @@
+# syntax=docker/dockerfile:1
+
 FROM ghcr.io/voidzero-dev/vite-plus:latest AS build
 
 WORKDIR /myapp
+
+ARG COMMIT_SHA
+ARG SENTRY_ORG
+ARG SENTRY_PROJECT
+
+ENV SENTRY_ORG=$SENTRY_ORG \
+	SENTRY_PROJECT=$SENTRY_PROJECT \
+	SENTRY_RELEASE=$COMMIT_SHA
 
 COPY --chown=vp:vp package.json package-lock.json .node-version* ./
 RUN vp install --frozen-lockfile
@@ -8,7 +18,7 @@ RUN vp install --frozen-lockfile
 COPY --chown=vp:vp . .
 ARG ALLOWED_ACTION_ORIGINS
 RUN test -n "${ALLOWED_ACTION_ORIGINS}"
-RUN vp run build
+RUN --mount=type=secret,id=SENTRY_AUTH_TOKEN,env=SENTRY_AUTH_TOKEN vp run build
 
 # Migration script needs to be compiled to js to be run at startup
 RUN vp pack ./scripts/db/migrate.ts --out-dir build/scripts
@@ -29,7 +39,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends dumb-init
 
 WORKDIR /myapp
 
-ENV NODE_ENV=production
+ARG COMMIT_SHA
+ENV NODE_ENV=production \
+	SENTRY_RELEASE=$COMMIT_SHA
 
 COPY --from=deps /myapp/node_modules /myapp/node_modules
 COPY --from=build /tmp/node /usr/local/bin/node

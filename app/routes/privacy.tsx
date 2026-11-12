@@ -5,6 +5,7 @@ import { Link, useRevalidator } from 'react-router'
 import { type Route } from './+types/privacy'
 import LanguageSelector from '~/components/landing/header/language-selector'
 import { MarkdownContent } from '~/components/markdown-content'
+import { SentryPerformanceConsentSettings } from '~/components/sentry-performance-consent'
 import { i18nextOptions, type SupportedLanguage } from '~/i18next-config'
 import {
 	getDirectusClient,
@@ -12,6 +13,7 @@ import {
 	type StaticPage,
 } from '~/lib/directus'
 import { getLocale } from '~/middleware/i18next'
+import { useRootRouteLoaderData } from '~/root'
 
 export const loader = async ({ context }: Route.LoaderArgs) => {
 	const locale = getLocale(context) as SupportedLanguage
@@ -60,6 +62,7 @@ export default function Privacy({
 }: Route.ComponentProps) {
 	const [, i18n] = useTranslation()
 	const revalidator = useRevalidator()
+	const { ENV, sentryPerformanceConsent } = useRootRouteLoaderData()
 
 	const reloadOnLanguageChanged = useEffectEvent(async () => {
 		await revalidator.revalidate()
@@ -98,6 +101,10 @@ export default function Privacy({
 			<main className="mx-auto mt-8 flex max-w-7xl flex-col justify-center px-4 sm:px-6 lg:px-8">
 				<h1 className="my-4 text-4xl">{title}</h1>
 				<MarkdownContent>{content}</MarkdownContent>
+				<SentryPerformanceConsentSettings
+					consent={sentryPerformanceConsent}
+					sentryEnabled={Boolean(ENV.SENTRY_DSN)}
+				/>
 			</main>
 		</>
 	)

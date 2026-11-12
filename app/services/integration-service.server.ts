@@ -1,4 +1,5 @@
 import { getIntegrations } from '~/db/models/integration.server'
+import { logServerError } from '~/lib/sentry.server'
 
 interface IntegrationResult {
 	integration: string
@@ -163,6 +164,10 @@ export async function createDeviceIntegrations(
 				status: 'success',
 			})
 		} catch (error) {
+			logServerError('Device integration provisioning failed', error, {
+				'app.operation': 'integration.create',
+				'integration.slug': intg.slug,
+			})
 			const message = error instanceof Error ? error.message : String(error)
 
 			results.push({
@@ -216,6 +221,10 @@ export async function deleteDeviceIntegrations(
 				status: 'success',
 			})
 		} catch (error) {
+			logServerError('Device integration removal failed', error, {
+				'app.operation': 'integration.delete',
+				'integration.slug': intg.slug,
+			})
 			const message = error instanceof Error ? error.message : String(error)
 
 			results.push({

@@ -7,6 +7,7 @@ import {
 	CreateBucketCommand,
 } from '@aws-sdk/client-s3'
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner'
+import { logServerError } from '~/lib/sentry.server'
 
 const S3_ENDPOINT = (
 	process.env.S3_ENDPOINT || 'http://localhost:9000'
@@ -23,6 +24,21 @@ const s3Client = new S3Client({
 	},
 	forcePathStyle: true,
 })
+
+async function runDeviceImageStorageOperation<T>(
+	operation: 'delete' | 'presign' | 'upload',
+	callback: () => Promise<T>,
+): Promise<T> {
+	try {
+		return await callback()
+	} catch (error) {
+		logServerError('Device image storage operation failed', error, {
+			'app.operation': `device_image.${operation}`,
+			'storage.provider': 's3',
+		})
+		throw error
+	}
+}
 
 async function ensureBucketExists() {
 	try {
@@ -54,45 +70,51 @@ export async function uploadDeviceImage(
 	deviceId: string,
 	file: File,
 ): Promise<string> {
-	await ensureBucketExists()
+	return runDeviceImageStorageOperation('upload', async () => {
+		await ensureBucketExists()
 
-	const fileExtension = file.name.split('.').pop()
-	const key = `devices/${deviceId}.${fileExtension}`
+		const fileExtension = file.name.split('.').pop()
+		const key = `devices/${deviceId}.${fileExtension}`
 
-	const buffer = Buffer.from(await file.arrayBuffer())
+		const buffer = Buffer.from(await file.arrayBuffer())
 
-	await s3Client.send(
-		new PutObjectCommand({
-			Bucket: BUCKET_NAME,
-			Key: key,
-			Body: buffer,
-			ContentType: file.type,
-		}),
-	)
+		await s3Client.send(
+			new PutObjectCommand({
+				Bucket: BUCKET_NAME,
+				Key: key,
+				Body: buffer,
+				ContentType: file.type,
+			}),
+		)
 
-	return key
+		return key
+	})
 }
 
 export async function getDeviceImageUrl(key: string): Promise<string> {
-	return getSignedUrl(
-		s3Client,
-		new GetObjectCommand({
-			Bucket: BUCKET_NAME,
-			Key: key,
-		}),
-		{
-			expiresIn: 60 * 60, // 1 hour
-		},
+	return runDeviceImageStorageOperation('presign', () =>
+		getSignedUrl(
+			s3Client,
+			new GetObjectCommand({
+				Bucket: BUCKET_NAME,
+				Key: key,
+			}),
+			{
+				expiresIn: 60 * 60, // 1 hour
+			},
+		),
 	)
 }
 
 export async function deleteDeviceImage(key: string): Promise<void> {
 	if (!key) return
 
-	await s3Client.send(
-		new DeleteObjectCommand({
-			Bucket: BUCKET_NAME,
-			Key: key,
-		}),
+	await runDeviceImageStorageOperation('delete', () =>
+		s3Client.send(
+			new DeleteObjectCommand({
+				Bucket: BUCKET_NAME,
+				Key: key,
+			}),
+		),
 	)
 }
