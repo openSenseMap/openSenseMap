@@ -11,5 +11,9 @@
 	"go_back": "Zurück",
 	"go_home": "Zur Startseite",
 	"try_again": "Erneut versuchen",
-	"map_cluster_marker_label": "In eine Gruppe von {{total}} Geräten hineinzoomen: {{active}} aktiv, {{inactive}} inaktiv, {{old}} alt."
+	"map_cluster_marker_label": "In eine Gruppe von {{total}} Geräten hineinzoomen: {{active}} aktiv, {{inactive}} inaktiv, {{old}} alt.",
+	"unsaved_changes_title": "Ungespeicherte Änderungen",
+	"unsaved_changes_description": "Deine letzten Änderungen wurden noch nicht gespeichert. Wenn du die Seite jetzt verlässt, können sie verloren gehen.",
+	"stay_on_page": "Auf dieser Seite bleiben",
+	"leave_without_saving": "Ohne Speichern verlassen"
 }

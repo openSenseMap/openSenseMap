@@ -39,6 +39,7 @@ import {
 import { getInitials } from '~/lib/strings'
 import { requireUserId } from '~/services/session-service.server'
 import { AutosaveStatusText } from '~/components/autosave-status.text'
+import { UnsavedChangesBlocker } from '~/components/unsaved-changes-blocker'
 
 export async function loader({ request }: Route.LoaderArgs) {
 	const userId = await requireUserId(request)
@@ -398,6 +399,7 @@ export default function EditUserProfilePage({
 
 	return (
 		<div className="space-y-6">
+			<UnsavedChangesBlocker autosaveState={autosave.navigationState} />
 			<Card className="space-y-6">
 				<CardHeader>
 					<CardTitle>{t('profile_settings')}</CardTitle>

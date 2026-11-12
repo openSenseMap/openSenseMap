@@ -13,6 +13,7 @@ import { type Route } from './+types/device.$deviceId.edit.security'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Callout } from '~/components/ui/alert'
 import { AutosaveStatusText } from '~/components/autosave-status.text'
+import { UnsavedChangesBlocker } from '~/components/unsaved-changes-blocker'
 import { useAutosaveFetcher } from '~/hooks/use-autosave-fetcher'
 import {
 	addOrReplaceDeviceApiKey,
@@ -255,6 +256,7 @@ export default function EditBoxSecurity({ loaderData }: Route.ComponentProps) {
 
 	return (
 		<div className="font-helvetica min-w-0 text-[14px]">
+			<UnsavedChangesBlocker autosaveState={autosave.navigationState} />
 			<div className="mt-2 flex min-w-0 justify-between">
 				<div className="min-w-0">
 					<h1 className="text-3xl wrap-anywhere sm:text-4xl">
