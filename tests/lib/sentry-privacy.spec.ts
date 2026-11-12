@@ -138,7 +138,7 @@ describe('Sentry privacy controls', () => {
 			attributes: {
 				'sentry.op': 'http.server',
 				'http.response.status_code': 200,
-				'url.full': 'https://example.org/device/507f1f77bcf86cd799439011',
+				'url.full': 'https://example.org/device/507f1f77bcf86cd799439011?token=secret&detail=something&password=verysecret',
 				'user.id': 'user-123',
 			},
 		})
@@ -147,7 +147,6 @@ describe('Sentry privacy controls', () => {
 		expect(span.attributes).toEqual({
 			'sentry.op': 'http.server',
 			'http.response.status_code': 200,
-			'url.full': 'https://example.org/device/507f1f77bcf86cd799439011',
 			'user.id': 'user-123',
 		})
 	})

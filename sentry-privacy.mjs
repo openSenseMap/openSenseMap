@@ -75,7 +75,7 @@ function sanitizeAttributes(attributes = {}) {
 		// consoleLoggingIntegration stores the original console arguments in
 		// parameter.* attributes. The redacted message is sufficient and avoids
 		// sending raw Error objects or other arbitrary values twice.
-		if (key.startsWith('parameter.') || isSensitiveAttributeName(key)) continue
+		if (key.startsWith('parameter.') || key === 'url.full' || isSensitiveAttributeName(key)) continue
 		sanitized[key] = value
 	}
 
