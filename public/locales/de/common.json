@@ -21,5 +21,9 @@
 	"sentry_performance_consent_settings_title": "Leistungsdiagnose",
 	"sentry_performance_consent_status_granted": "Leistungsmessungen sind derzeit erlaubt.",
 	"sentry_performance_consent_status_denied": "Leistungsmessungen sind derzeit deaktiviert.",
-	"sentry_performance_consent_status_undecided": "Du hast noch nicht entschieden, ob Leistungsmessungen verwendet werden dürfen."
+	"sentry_performance_consent_status_undecided": "Du hast noch nicht entschieden, ob Leistungsmessungen verwendet werden dürfen.",
+	"unsaved_changes_title": "Ungespeicherte Änderungen",
+	"unsaved_changes_description": "Deine letzten Änderungen wurden noch nicht gespeichert. Wenn du die Seite jetzt verlässt, können sie verloren gehen.",
+	"stay_on_page": "Auf dieser Seite bleiben",
+	"leave_without_saving": "Ohne Speichern verlassen"
 }

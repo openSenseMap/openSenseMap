@@ -3,7 +3,7 @@ import validator from '@rjsf/validator-ajv8'
 import { eq } from 'drizzle-orm'
 import { Save } from 'lucide-react'
 import React from 'react'
-import { data, redirect, useFetcher, useLoaderData } from 'react-router'
+import { data, redirect, useFetcher } from 'react-router'
 import { type Route } from './+types/device.$deviceId.edit.$integrationSlug'
 import {
 	ArrayFieldItemTemplate,
@@ -176,8 +176,8 @@ export async function action({ request, params }: Route.ActionArgs) {
 	return data({ success: true })
 }
 
-export default function EditIntegration() {
-	const { intg, schema, uiSchema, integration } = useLoaderData<typeof loader>()
+export default function EditIntegration({ loaderData }: Route.ComponentProps) {
+	const { intg, schema, uiSchema, integration } = loaderData
 
 	const [formData, setFormData] = React.useState(() => {
 		if (!integration) {

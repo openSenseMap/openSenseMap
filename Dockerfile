@@ -16,6 +16,8 @@ COPY --chown=vp:vp package.json package-lock.json .node-version* ./
 RUN vp install --frozen-lockfile
 
 COPY --chown=vp:vp . .
+ARG ALLOWED_ACTION_ORIGINS
+RUN test -n "${ALLOWED_ACTION_ORIGINS}"
 RUN --mount=type=secret,id=SENTRY_AUTH_TOKEN,env=SENTRY_AUTH_TOKEN vp run build
 
 # Migration script needs to be compiled to js to be run at startup

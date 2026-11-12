@@ -21,5 +21,9 @@
 	"sentry_performance_consent_settings_title": "Performance diagnostics",
 	"sentry_performance_consent_status_granted": "Performance measurements are currently allowed.",
 	"sentry_performance_consent_status_denied": "Performance measurements are currently disabled.",
-	"sentry_performance_consent_status_undecided": "You have not chosen whether performance measurements may be used."
+	"sentry_performance_consent_status_undecided": "You have not chosen whether performance measurements may be used.",
+	"unsaved_changes_title": "Unsaved changes",
+	"unsaved_changes_description": "Your latest changes have not been saved yet. If you leave now, they may be lost.",
+	"stay_on_page": "Stay on this page",
+	"leave_without_saving": "Leave without saving"
 }

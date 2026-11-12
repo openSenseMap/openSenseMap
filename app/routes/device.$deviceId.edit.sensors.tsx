@@ -14,8 +14,6 @@ import React, { useState } from 'react'
 import {
 	redirect,
 	Form,
-	useActionData,
-	useLoaderData,
 	useNavigation,
 	useOutletContext,
 	useSubmit,
@@ -255,9 +253,10 @@ export async function action({ request, params }: Route.ActionArgs) {
 }
 
 //**********************************
-export default function EditBoxSensors() {
-	const data = useLoaderData<typeof loader>()
-	const actionData = useActionData<typeof action>()
+export default function EditBoxSensors({
+	loaderData: data,
+	actionData,
+}: Route.ComponentProps) {
 	const navigation = useNavigation()
 	const submit = useSubmit()
 	const isSubmitting = navigation.state !== 'idle'

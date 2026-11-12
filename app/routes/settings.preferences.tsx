@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { useLoaderData } from 'react-router'
 import { type Route } from './+types/settings.preferences'
 import { AutosaveStatusText } from '~/components/autosave-status.text'
+import { UnsavedChangesBlocker } from '~/components/unsaved-changes-blocker'
 import { LanguageSelect } from '~/components/language-select'
 import { ThemeSelect } from '~/components/theme-select'
 import { Button } from '~/components/ui/button'
@@ -13,6 +13,7 @@ import { Label } from '~/components/ui/label'
 import { useToast } from '~/components/ui/use-toast'
 import {
 	AUTOSAVE_DELAY_MS,
+	combineAutosaveNavigationStates,
 	useAutosaveFetcher,
 } from '~/hooks/use-autosave-fetcher'
 import { getProfileByUserId, updateProfile } from '~/db/models/profile.server'
@@ -262,12 +263,14 @@ function normalizeMapPreferenceValues(
 	}
 }
 
-export default function PreferencesSettingsPage() {
+export default function PreferencesSettingsPage({
+	loaderData,
+}: Route.ComponentProps) {
 	const {
 		profile,
 		newsletterOptIn: initialNewsletterOptIn,
 		newsletterOptInPending: initialNewsletterOptInPending,
-	} = useLoaderData<typeof loader>()
+	} = loaderData
 	const { toast } = useToast()
 	const { t } = useTranslation('settings')
 
@@ -539,6 +542,12 @@ export default function PreferencesSettingsPage() {
 
 	return (
 		<Card className="border-border bg-card text-card-foreground">
+			<UnsavedChangesBlocker
+				autosaveState={combineAutosaveNavigationStates(
+					mapAutosave.navigationState,
+					newsletterAutosave.navigationState,
+				)}
+			/>
 			<CardHeader>
 				<CardTitle>{t('preferences')}</CardTitle>
 				<AutosaveStatusText status={mapAutosave.status} namespace="settings" />
