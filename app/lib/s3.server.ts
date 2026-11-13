@@ -1,4 +1,4 @@
-import { createHash } from 'node:crypto'
+import { randomUUID } from 'node:crypto'
 import {
 	DeleteObjectCommand,
 	GetObjectCommand,
@@ -15,6 +15,11 @@ const PROFILE_IMAGE_EXTENSIONS: Record<string, string> = {
 	'image/jpeg': 'jpg',
 	'image/png': 'png',
 	'image/webp': 'webp',
+}
+
+const DEVICE_IMAGE_EXTENSIONS: Record<string, string> = {
+	...PROFILE_IMAGE_EXTENSIONS,
+	'image/gif': 'gif',
 }
 
 function hasExpectedImageSignature(contentType: string, buffer: Buffer) {
@@ -38,6 +43,11 @@ function hasExpectedImageSignature(contentType: string, buffer: Buffer) {
 				buffer.length >= 12 &&
 				buffer.toString('ascii', 0, 4) === 'RIFF' &&
 				buffer.toString('ascii', 8, 12) === 'WEBP'
+			)
+		case 'image/gif':
+			return (
+				buffer.length >= 6 &&
+				['GIF87a', 'GIF89a'].includes(buffer.toString('ascii', 0, 6))
 			)
 		default:
 			return false
@@ -82,7 +92,7 @@ async function runImageStorageOperation<T>(
 	} catch (error) {
 		logServerError('Image storage operation failed', error, {
 			'app.operation': `${imageKind}_image.${operation}`,
-			'storage.bucket.type': imageKind,
+			'storage.image.kind': imageKind,
 			'storage.provider': 's3',
 		})
 		throw error
@@ -120,9 +130,18 @@ export async function uploadDeviceImage(
 	file: File,
 ): Promise<string> {
 	return runImageStorageOperation('device', 'upload', async () => {
-		const fileExtension = file.name.split('.').pop()
-		const key = `devices/${deviceId}.${fileExtension}`
+		const extension = DEVICE_IMAGE_EXTENSIONS[file.type]
+		if (!extension) {
+			throw new Error(
+				`Unsupported device image type: ${file.type || 'unknown'}`,
+			)
+		}
+
 		const buffer = Buffer.from(await file.arrayBuffer())
+		if (!hasExpectedImageSignature(file.type, buffer)) {
+			throw new Error('Device image content does not match its declared type')
+		}
+		const key = `devices/${deviceId}/${randomUUID()}.${extension}`
 
 		await getS3Client().send(
 			new PutObjectCommand({
@@ -130,6 +149,7 @@ export async function uploadDeviceImage(
 				Key: key,
 				Body: buffer,
 				ContentType: file.type,
+				CacheControl: 'private, max-age=31536000, immutable',
 			}),
 		)
 
@@ -142,6 +162,7 @@ export async function getDeviceImageUrl(key: string): Promise<string> {
 }
 
 export async function deleteDeviceImage(key: string): Promise<void> {
+	if (!key.startsWith('devices/')) return
 	await deleteImage('device', key)
 }
 
@@ -161,8 +182,7 @@ export async function uploadProfileImage(
 		if (!hasExpectedImageSignature(file.type, buffer)) {
 			throw new Error('Profile image content does not match its declared type')
 		}
-		const digest = createHash('sha256').update(buffer).digest('hex')
-		const key = `profiles/${profileId}/${digest}.${extension}`
+		const key = `profiles/${profileId}/${randomUUID()}.${extension}`
 
 		await getS3Client().send(
 			new PutObjectCommand({
@@ -183,5 +203,6 @@ export async function getProfileImageUrl(key: string): Promise<string> {
 }
 
 export async function deleteProfileImage(key: string): Promise<void> {
+	if (!key.startsWith('profiles/')) return
 	await deleteImage('profile', key)
 }
