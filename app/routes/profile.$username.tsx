@@ -145,10 +145,10 @@ export default function ProfilePage({ loaderData }: Route.ComponentProps) {
 				<div className="border-border bg-card text-card-foreground flex w-full min-w-0 flex-col gap-6 rounded-xl border p-4 shadow-sm sm:p-6 lg:w-1/3">
 					<div className="flex items-center gap-4">
 						<Avatar className="h-16 w-16 shrink-0">
-							{profile?.profileImage?.id ? (
+							{profile?.image ? (
 								<AvatarImage
 									className="aspect-auto h-full w-full rounded-full object-cover"
-									src={`/resources/file/${profile.profileImage.id}`}
+									src={`/resources/profile-image/${profile.id}?v=${encodeURIComponent(profile.image)}`}
 								/>
 							) : null}
 							<AvatarFallback>

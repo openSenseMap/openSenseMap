@@ -22,18 +22,3 @@ services:
     ports:
       - '8025:8025'
       - '1025:1025'
-
-  rustfs:
-    image: rustfs/rustfs:latest
-    container_name: rustfs
-    environment:
-      RUSTFS_ACCESS_KEY: rustfsadmin
-      RUSTFS_SECRET_KEY: rustfsadmin123
-      RUSTFS_CONSOLE_ENABLE: 'true'
-      RUSTFS_ADDRESS: ':9000'
-    ports:
-      - '9000:9000' # S3 API
-      - '9001:9001' # Admin UI
-    volumes:
-      - ./rustfs-data:/data
-    command: ['/data']

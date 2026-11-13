@@ -11,7 +11,9 @@ import {
 	device,
 } from '~/db/schema'
 import { drizzleClient } from '~/db.server'
-import { ThemePreference } from '~/lib/theme'
+import { deleteDeviceImage, deleteProfileImage } from '~/lib/s3.server'
+import { logServerWarning } from '~/lib/sentry.server'
+import { type ThemePreference } from '~/lib/theme'
 
 export async function getUserById(id: User['id']) {
 	return drizzleClient.query.user.findFirst({
@@ -67,11 +69,77 @@ export async function getUserByUsername(username: User['name']) {
 // }
 
 export async function deleteUserByEmail(email: User['email']) {
-	return drizzleClient.delete(user).where(eq(user.email, email))
+	const userToDelete = await drizzleClient.query.user.findFirst({
+		where: (user, { eq }) => eq(user.email, email),
+		columns: { id: true },
+	})
+	const imageKeys = userToDelete
+		? await getStoredImageKeys(userToDelete.id)
+		: { device: [], profile: null }
+	const result = await drizzleClient.delete(user).where(eq(user.email, email))
+	await cleanUpDeletedUserImages(imageKeys, userToDelete?.id)
+	return result
 }
 
 export async function deleteUserById(id: User['id']) {
-	return drizzleClient.delete(user).where(eq(user.id, id))
+	const imageKeys = await getStoredImageKeys(id)
+	const result = await drizzleClient.delete(user).where(eq(user.id, id))
+	await cleanUpDeletedUserImages(imageKeys, id)
+	return result
+}
+
+async function getStoredImageKeys(userId: User['id']) {
+	const [profile, devices] = await Promise.all([
+		drizzleClient.query.profile.findFirst({
+			where: (profile, { eq }) => eq(profile.userId, userId),
+			columns: { image: true },
+		}),
+		drizzleClient.query.device.findMany({
+			where: (device, { eq }) => eq(device.userId, userId),
+			columns: { image: true },
+		}),
+	])
+
+	return {
+		device: devices.flatMap(({ image }) => (image ? [image] : [])),
+		profile: profile?.image ?? null,
+	}
+}
+
+async function cleanUpDeletedUserImages(
+	imageKeys: Awaited<ReturnType<typeof getStoredImageKeys>>,
+	userId?: User['id'],
+) {
+	const cleanups = imageKeys.device.map(async (imageKey) => {
+		try {
+			await deleteDeviceImage(imageKey)
+		} catch (error) {
+			logServerWarning(
+				'Failed to delete device image after user deletion',
+				error,
+				{ 'user.id': userId ?? 'unknown' },
+			)
+		}
+	})
+
+	const profileImageKey = imageKeys.profile
+	if (profileImageKey) {
+		cleanups.push(
+			(async () => {
+				try {
+					await deleteProfileImage(profileImageKey)
+				} catch (error) {
+					logServerWarning(
+						'Failed to delete profile image after user deletion',
+						error,
+						{ 'user.id': userId ?? 'unknown' },
+					)
+				}
+			})(),
+		)
+	}
+
+	await Promise.all(cleanups)
 }
 
 //* user name shouldn't be unique
