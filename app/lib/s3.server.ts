@@ -68,10 +68,8 @@ function getS3Client(): S3Client {
 	return s3Client
 }
 
-function getBucketName(imageKind: ImageKind): string {
-	return requireStorageVariable(
-		imageKind === 'device' ? 'S3_BUCKET' : 'S3_PROFILE_IMAGES_BUCKET',
-	)
+function getBucketName(): string {
+	return requireStorageVariable('S3_BUCKET')
 }
 
 async function runImageStorageOperation<T>(
@@ -96,7 +94,7 @@ async function getImageUrl(imageKind: ImageKind, key: string) {
 		getSignedUrl(
 			getS3Client(),
 			new GetObjectCommand({
-				Bucket: getBucketName(imageKind),
+				Bucket: getBucketName(),
 				Key: key,
 			}),
 			{ expiresIn: 60 * 60 },
@@ -110,7 +108,7 @@ async function deleteImage(imageKind: ImageKind, key: string): Promise<void> {
 	await runImageStorageOperation(imageKind, 'delete', () =>
 		getS3Client().send(
 			new DeleteObjectCommand({
-				Bucket: getBucketName(imageKind),
+				Bucket: getBucketName(),
 				Key: key,
 			}),
 		),
@@ -128,7 +126,7 @@ export async function uploadDeviceImage(
 
 		await getS3Client().send(
 			new PutObjectCommand({
-				Bucket: getBucketName('device'),
+				Bucket: getBucketName(),
 				Key: key,
 				Body: buffer,
 				ContentType: file.type,
@@ -168,7 +166,7 @@ export async function uploadProfileImage(
 
 		await getS3Client().send(
 			new PutObjectCommand({
-				Bucket: getBucketName('profile'),
+				Bucket: getBucketName(),
 				Key: key,
 				Body: buffer,
 				ContentType: file.type,
