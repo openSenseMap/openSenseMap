@@ -183,7 +183,7 @@ export default function PhotoChooserModal({
 								newImageSrc
 									? newImageSrc
 									: data.profile?.image
-										? `/resources/profile-image/${data.profile.id}`
+										? `/resources/profile-image/${data.profile.id}?v=${encodeURIComponent(data.profile.image)}`
 										: undefined
 							}
 						/>

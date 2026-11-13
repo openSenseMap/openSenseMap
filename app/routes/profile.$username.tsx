@@ -148,7 +148,7 @@ export default function ProfilePage({ loaderData }: Route.ComponentProps) {
 							{profile?.image ? (
 								<AvatarImage
 									className="aspect-auto h-full w-full rounded-full object-cover"
-									src={`/resources/profile-image/${profile.id}`}
+									src={`/resources/profile-image/${profile.id}?v=${encodeURIComponent(profile.image)}`}
 								/>
 							) : null}
 							<AvatarFallback>

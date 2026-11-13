@@ -504,7 +504,7 @@ export default function EditUserProfilePage({
 									className="aspect-auto h-full w-full rounded-full object-cover"
 									src={
 										data.profile.image
-											? `/resources/profile-image/${data.profile.id}`
+											? `/resources/profile-image/${data.profile.id}?v=${encodeURIComponent(data.profile.image)}`
 											: undefined
 									}
 								/>

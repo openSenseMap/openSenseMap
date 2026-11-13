@@ -32,7 +32,7 @@ export function UserAvatar() {
 				className="aspect-auto h-full w-full rounded-full object-cover"
 				src={
 					fetcher.data?.profile.image
-						? `/resources/profile-image/${fetcher.data.profile.id}`
+						? `/resources/profile-image/${fetcher.data.profile.id}?v=${encodeURIComponent(fetcher.data.profile.image)}`
 						: undefined
 				}
 				alt={fetcher.data?.profile.displayName}
