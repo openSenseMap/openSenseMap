@@ -1,86 +1,134 @@
+import { createHash } from 'node:crypto'
 import {
-	S3Client,
-	PutObjectCommand,
 	DeleteObjectCommand,
 	GetObjectCommand,
-	HeadBucketCommand,
-	CreateBucketCommand,
+	PutObjectCommand,
+	S3Client,
 } from '@aws-sdk/client-s3'
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner'
 import { logServerError } from '~/lib/sentry.server'
 
-const S3_ENDPOINT = (
-	process.env.S3_ENDPOINT || 'http://localhost:9000'
-).replace(/\/$/, '')
-const S3_REGION = process.env.S3_REGION || 'eu-north-1'
-const BUCKET_NAME = process.env.S3_BUCKET || 'images'
+type ImageKind = 'device' | 'profile'
+type StorageOperation = 'delete' | 'presign' | 'upload'
 
-const s3Client = new S3Client({
-	endpoint: S3_ENDPOINT,
-	region: S3_REGION,
-	credentials: {
-		accessKeyId: process.env.S3_ACCESS_KEY!,
-		secretAccessKey: process.env.S3_SECRET_KEY!,
-	},
-	forcePathStyle: true,
-})
+const PROFILE_IMAGE_EXTENSIONS: Record<string, string> = {
+	'image/jpeg': 'jpg',
+	'image/png': 'png',
+	'image/webp': 'webp',
+}
 
-async function runDeviceImageStorageOperation<T>(
-	operation: 'delete' | 'presign' | 'upload',
+function hasExpectedImageSignature(contentType: string, buffer: Buffer) {
+	switch (contentType) {
+		case 'image/jpeg':
+			return (
+				buffer.length >= 3 &&
+				buffer[0] === 0xff &&
+				buffer[1] === 0xd8 &&
+				buffer[2] === 0xff
+			)
+		case 'image/png':
+			return (
+				buffer.length >= 8 &&
+				buffer
+					.subarray(0, 8)
+					.equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]))
+			)
+		case 'image/webp':
+			return (
+				buffer.length >= 12 &&
+				buffer.toString('ascii', 0, 4) === 'RIFF' &&
+				buffer.toString('ascii', 8, 12) === 'WEBP'
+			)
+		default:
+			return false
+	}
+}
+
+let s3Client: S3Client | undefined
+
+function requireStorageVariable(name: keyof NodeJS.ProcessEnv): string {
+	const value = process.env[name]
+	if (!value) throw new Error(`${name} must be configured`)
+	return value
+}
+
+function getS3Client(): S3Client {
+	if (s3Client) return s3Client
+
+	s3Client = new S3Client({
+		endpoint: requireStorageVariable('S3_ENDPOINT').replace(/\/$/, ''),
+		region: requireStorageVariable('S3_REGION'),
+		credentials: {
+			accessKeyId: requireStorageVariable('S3_ACCESS_KEY'),
+			secretAccessKey: requireStorageVariable('S3_SECRET_KEY'),
+		},
+		forcePathStyle: process.env.S3_FORCE_PATH_STYLE === 'true',
+	})
+
+	return s3Client
+}
+
+function getBucketName(imageKind: ImageKind): string {
+	return requireStorageVariable(
+		imageKind === 'device' ? 'S3_BUCKET' : 'S3_PROFILE_IMAGES_BUCKET',
+	)
+}
+
+async function runImageStorageOperation<T>(
+	imageKind: ImageKind,
+	operation: StorageOperation,
 	callback: () => Promise<T>,
 ): Promise<T> {
 	try {
 		return await callback()
 	} catch (error) {
-		logServerError('Device image storage operation failed', error, {
-			'app.operation': `device_image.${operation}`,
+		logServerError('Image storage operation failed', error, {
+			'app.operation': `${imageKind}_image.${operation}`,
+			'storage.bucket.type': imageKind,
 			'storage.provider': 's3',
 		})
 		throw error
 	}
 }
 
-async function ensureBucketExists() {
-	try {
-		await s3Client.send(
-			new HeadBucketCommand({
-				Bucket: BUCKET_NAME,
+async function getImageUrl(imageKind: ImageKind, key: string) {
+	return runImageStorageOperation(imageKind, 'presign', () =>
+		getSignedUrl(
+			getS3Client(),
+			new GetObjectCommand({
+				Bucket: getBucketName(imageKind),
+				Key: key,
 			}),
-		)
-	} catch (error: any) {
-		const code = error?.name || error?.Code
-		if (
-			code === 'NotFound' ||
-			code === 'NoSuchBucket' ||
-			error?.$metadata?.httpStatusCode === 404
-		) {
-			await s3Client.send(
-				new CreateBucketCommand({
-					Bucket: BUCKET_NAME,
-				}),
-			)
-			return
-		}
+			{ expiresIn: 60 * 60 },
+		),
+	)
+}
 
-		throw error
-	}
+async function deleteImage(imageKind: ImageKind, key: string): Promise<void> {
+	if (!key) return
+
+	await runImageStorageOperation(imageKind, 'delete', () =>
+		getS3Client().send(
+			new DeleteObjectCommand({
+				Bucket: getBucketName(imageKind),
+				Key: key,
+			}),
+		),
+	)
 }
 
 export async function uploadDeviceImage(
 	deviceId: string,
 	file: File,
 ): Promise<string> {
-	return runDeviceImageStorageOperation('upload', async () => {
-		await ensureBucketExists()
-
+	return runImageStorageOperation('device', 'upload', async () => {
 		const fileExtension = file.name.split('.').pop()
 		const key = `devices/${deviceId}.${fileExtension}`
-
 		const buffer = Buffer.from(await file.arrayBuffer())
 
-		await s3Client.send(
+		await getS3Client().send(
 			new PutObjectCommand({
-				Bucket: BUCKET_NAME,
+				Bucket: getBucketName('device'),
 				Key: key,
 				Body: buffer,
 				ContentType: file.type,
@@ -92,29 +140,50 @@ export async function uploadDeviceImage(
 }
 
 export async function getDeviceImageUrl(key: string): Promise<string> {
-	return runDeviceImageStorageOperation('presign', () =>
-		getSignedUrl(
-			s3Client,
-			new GetObjectCommand({
-				Bucket: BUCKET_NAME,
-				Key: key,
-			}),
-			{
-				expiresIn: 60 * 60, // 1 hour
-			},
-		),
-	)
+	return getImageUrl('device', key)
 }
 
 export async function deleteDeviceImage(key: string): Promise<void> {
-	if (!key) return
+	await deleteImage('device', key)
+}
 
-	await runDeviceImageStorageOperation('delete', () =>
-		s3Client.send(
-			new DeleteObjectCommand({
-				Bucket: BUCKET_NAME,
+export async function uploadProfileImage(
+	profileId: string,
+	file: File,
+): Promise<string> {
+	return runImageStorageOperation('profile', 'upload', async () => {
+		const extension = PROFILE_IMAGE_EXTENSIONS[file.type]
+		if (!extension) {
+			throw new Error(
+				`Unsupported profile image type: ${file.type || 'unknown'}`,
+			)
+		}
+
+		const buffer = Buffer.from(await file.arrayBuffer())
+		if (!hasExpectedImageSignature(file.type, buffer)) {
+			throw new Error('Profile image content does not match its declared type')
+		}
+		const digest = createHash('sha256').update(buffer).digest('hex')
+		const key = `profiles/${profileId}/${digest}.${extension}`
+
+		await getS3Client().send(
+			new PutObjectCommand({
+				Bucket: getBucketName('profile'),
 				Key: key,
+				Body: buffer,
+				ContentType: file.type,
+				CacheControl: 'private, max-age=31536000, immutable',
 			}),
-		),
-	)
+		)
+
+		return key
+	})
+}
+
+export async function getProfileImageUrl(key: string): Promise<string> {
+	return getImageUrl('profile', key)
+}
+
+export async function deleteProfileImage(key: string): Promise<void> {
+	await deleteImage('profile', key)
 }

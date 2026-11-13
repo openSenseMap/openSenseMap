@@ -502,7 +502,11 @@ export default function EditUserProfilePage({
 							<Avatar className="h-full w-full">
 								<AvatarImage
 									className="aspect-auto h-full w-full rounded-full object-cover"
-									src={'/resources/file/' + data.profile.profileImage?.id}
+									src={
+										data.profile.image
+											? `/resources/profile-image/${data.profile.id}`
+											: undefined
+									}
 								/>
 								<AvatarFallback>
 									{getInitials(data.profile?.displayName ?? '')}

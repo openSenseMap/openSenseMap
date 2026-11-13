@@ -11,7 +11,9 @@ import {
 	device,
 } from '~/db/schema'
 import { drizzleClient } from '~/db.server'
-import { ThemePreference } from '~/lib/theme'
+import { deleteProfileImage } from '~/lib/s3.server'
+import { logServerWarning } from '~/lib/sentry.server'
+import { type ThemePreference } from '~/lib/theme'
 
 export async function getUserById(id: User['id']) {
 	return drizzleClient.query.user.findFirst({
@@ -67,11 +69,50 @@ export async function getUserByUsername(username: User['name']) {
 // }
 
 export async function deleteUserByEmail(email: User['email']) {
-	return drizzleClient.delete(user).where(eq(user.email, email))
+	const userToDelete = await drizzleClient.query.user.findFirst({
+		where: (user, { eq }) => eq(user.email, email),
+		columns: { id: true },
+	})
+	const imageKey = userToDelete
+		? await getProfileImageKey(userToDelete.id)
+		: null
+	const result = await drizzleClient.delete(user).where(eq(user.email, email))
+	await cleanUpDeletedProfileImage(imageKey, userToDelete?.id)
+	return result
 }
 
 export async function deleteUserById(id: User['id']) {
-	return drizzleClient.delete(user).where(eq(user.id, id))
+	const imageKey = await getProfileImageKey(id)
+	const result = await drizzleClient.delete(user).where(eq(user.id, id))
+	await cleanUpDeletedProfileImage(imageKey, id)
+	return result
+}
+
+async function getProfileImageKey(userId: User['id']) {
+	const profile = await drizzleClient.query.profile.findFirst({
+		where: (profile, { eq }) => eq(profile.userId, userId),
+		columns: { image: true },
+	})
+	return profile?.image ?? null
+}
+
+async function cleanUpDeletedProfileImage(
+	imageKey: string | null,
+	userId?: User['id'],
+) {
+	if (!imageKey) return
+
+	try {
+		await deleteProfileImage(imageKey)
+	} catch (error) {
+		logServerWarning(
+			'Failed to delete profile image after user deletion',
+			error,
+			{
+				'user.id': userId ?? 'unknown',
+			},
+		)
+	}
 }
 
 //* user name shouldn't be unique

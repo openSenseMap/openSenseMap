@@ -15,7 +15,6 @@ export async function getProfileByUserId(userId: User['id']) {
 	return drizzleClient.query.profile.findFirst({
 		where: (profile, { eq }) => eq(profile.userId, userId),
 		with: {
-			profileImage: true,
 			user: {
 				with: {
 					devices: true,
