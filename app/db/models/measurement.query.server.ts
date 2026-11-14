@@ -10,18 +10,38 @@ import {
 } from '~/db/schema'
 import { drizzleClient } from '~/db.server'
 
+export const MAX_CHART_MEASUREMENTS_PER_SENSOR = 3600
+
+export function getChartMeasurement(
+	sensorId: string,
+	aggregation: string,
+	startDate?: Date,
+	endDate?: Date,
+) {
+	// Fetch one extra row so the graph can distinguish a complete result from
+	// a range that needs a coarser aggregation without loading the full range.
+	return getMeasurement(
+		sensorId,
+		aggregation,
+		startDate,
+		endDate,
+		MAX_CHART_MEASUREMENTS_PER_SENSOR + 1,
+	)
+}
+
 // This function retrieves measurements from the database based on the provided parameters.
 export function getMeasurement(
 	sensorId: string,
 	aggregation: string,
 	startDate?: Date,
 	endDate?: Date,
+	rowLimit?: number,
 ) {
 	// If both start date and end date are provided, filter measurements within the specified time range.
 	if (startDate && endDate) {
 		// Check the aggregation level for measurements and fetch accordingly.
 		if (aggregation === '10m') {
-			return drizzleClient
+			const query = drizzleClient
 				.select()
 				.from(measurements10minView)
 				.where(
@@ -32,8 +52,9 @@ export function getMeasurement(
 					),
 				)
 				.orderBy(desc(measurements10minView.time))
+			return rowLimit ? query.limit(rowLimit) : query
 		} else if (aggregation === '1h') {
-			return drizzleClient
+			const query = drizzleClient
 				.select()
 				.from(measurements1hourView)
 				.where(
@@ -44,8 +65,9 @@ export function getMeasurement(
 					),
 				)
 				.orderBy(desc(measurements1hourView.time))
+			return rowLimit ? query.limit(rowLimit) : query
 		} else if (aggregation === '1d') {
-			return drizzleClient
+			const query = drizzleClient
 				.select()
 				.from(measurements1dayView)
 				.where(
@@ -56,8 +78,9 @@ export function getMeasurement(
 					),
 				)
 				.orderBy(desc(measurements1dayView.time))
+			return rowLimit ? query.limit(rowLimit) : query
 		} else if (aggregation === '1m') {
-			return drizzleClient
+			const query = drizzleClient
 				.select()
 				.from(measurements1monthView)
 				.where(
@@ -68,8 +91,9 @@ export function getMeasurement(
 					),
 				)
 				.orderBy(desc(measurements1monthView.time))
+			return rowLimit ? query.limit(rowLimit) : query
 		} else if (aggregation === '1y') {
-			return drizzleClient
+			const query = drizzleClient
 				.select()
 				.from(measurements1yearView)
 				.where(
@@ -80,8 +104,9 @@ export function getMeasurement(
 					),
 				)
 				.orderBy(desc(measurements1yearView.time))
+			return rowLimit ? query.limit(rowLimit) : query
 		}
-		// If aggregation is not specified or different from "15m" and "1d", fetch default measurements.
+		// Use raw measurements for the selected time range.
 		return drizzleClient.query.measurement.findMany({
 			where: (measurement, { eq, gte, lte }) =>
 				and(
@@ -90,6 +115,7 @@ export function getMeasurement(
 					lte(measurement.time, endDate),
 				),
 			orderBy: [desc(measurement.time)],
+			limit: rowLimit,
 			with: {
 				location: {
 					// https://github.com/drizzle-team/drizzle-orm/pull/2778
@@ -110,38 +136,43 @@ export function getMeasurement(
 
 	// If only aggregation is provided, fetch measurements without considering time range.
 	if (aggregation === '10m') {
-		return drizzleClient
+		const query = drizzleClient
 			.select()
 			.from(measurements10minView)
 			.where(eq(measurements10minView.sensorId, sensorId))
 			.orderBy(desc(measurements10minView.time))
+		return rowLimit ? query.limit(rowLimit) : query
 	} else if (aggregation === '1h') {
-		return drizzleClient
+		const query = drizzleClient
 			.select()
 			.from(measurements1hourView)
 			.where(eq(measurements1hourView.sensorId, sensorId))
 			.orderBy(desc(measurements1hourView.time))
+		return rowLimit ? query.limit(rowLimit) : query
 	} else if (aggregation === '1d') {
-		return drizzleClient
+		const query = drizzleClient
 			.select()
 			.from(measurements1dayView)
 			.where(eq(measurements1dayView.sensorId, sensorId))
 			.orderBy(desc(measurements1dayView.time))
+		return rowLimit ? query.limit(rowLimit) : query
 	} else if (aggregation === '1m') {
-		return drizzleClient
+		const query = drizzleClient
 			.select()
 			.from(measurements1monthView)
 			.where(eq(measurements1monthView.sensorId, sensorId))
 			.orderBy(desc(measurements1monthView.time))
+		return rowLimit ? query.limit(rowLimit) : query
 	} else if (aggregation === '1y') {
-		return drizzleClient
+		const query = drizzleClient
 			.select()
 			.from(measurements1yearView)
 			.where(eq(measurements1yearView.sensorId, sensorId))
 			.orderBy(desc(measurements1yearView.time))
+		return rowLimit ? query.limit(rowLimit) : query
 	}
 
-	// If neither start date nor aggregation are specified, fetch default measurements with a limit of 20000.
+	// By default, show only the latest 3,600 raw measurements.
 	return drizzleClient.query.measurement.findMany({
 		where: (measurement, { eq }) => eq(measurement.sensorId, sensorId),
 		orderBy: [desc(measurement.time)],
@@ -160,6 +191,6 @@ export function getMeasurement(
 				},
 			},
 		},
-		limit: 3600, // 60 measurements per hour * 24 hours * 2.5 days
+		limit: rowLimit ?? 3600, // 60 measurements per hour * 24 hours * 2.5 days
 	})
 }
