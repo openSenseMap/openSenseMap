@@ -1,15 +1,16 @@
-import {
-	eq,
-	type ExtractTablesWithRelations,
-	count,
-	inArray,
-} from 'drizzle-orm'
+import { eq, inArray, sql, type ExtractTablesWithRelations } from 'drizzle-orm'
 import { type PgTransaction } from 'drizzle-orm/pg-core'
 import { type PostgresJsQueryResultHKT } from 'drizzle-orm/postgres-js'
-import { type User, type Profile, profile, measurement } from '~/db/schema'
+import {
+	type User,
+	type Profile,
+	profile,
+	device,
+	sensor,
+	measurements10minView,
+} from '~/db/schema'
 import type * as schema from '~/db/schema'
 import { drizzleClient } from '~/db.server'
-import { formatCount } from '~/lib/numbers'
 
 export async function getProfileByUserId(userId: User['id']) {
 	return drizzleClient.query.profile.findFirst({
@@ -25,12 +26,43 @@ export async function getProfileByUserId(userId: User['id']) {
 	})
 }
 
+export async function getProfileMapPreferencesByUserId(userId: User['id']) {
+	return drizzleClient.query.profile.findFirst({
+		where: (profile, { eq }) => eq(profile.userId, userId),
+		columns: {
+			homeLatitude: true,
+			homeLongitude: true,
+			homeZoom: true,
+		},
+	})
+}
+
 export async function getProfileByUsername(username: string) {
 	const userRecord = await drizzleClient.query.user.findFirst({
 		where: (u, { eq }) => eq(u.name, username),
 	})
 	if (!userRecord) return null
 	return getProfileByUserId(userRecord.id)
+}
+
+export async function getProfileSensorCount(deviceIds: string[]) {
+	if (deviceIds.length === 0) return 0
+	return drizzleClient.$count(sensor, inArray(sensor.deviceId, deviceIds))
+}
+
+// The ten-minute aggregate stores raw measurement counts per bucket. Recent
+// measurements and historical buckets awaiting backfill may be absent.
+export async function getProfileEstimatedMeasurementCount(userId: User['id']) {
+	const [result] = await drizzleClient
+		.select({
+			count: sql<string>`coalesce(sum(${measurements10minView.total_values}), 0)`,
+		})
+		.from(measurements10minView)
+		.innerJoin(sensor, eq(measurements10minView.sensorId, sensor.id))
+		.innerJoin(device, eq(sensor.deviceId, device.id))
+		.where(eq(device.userId, userId))
+
+	return Number(result?.count ?? 0)
 }
 
 export async function updateProfile(
@@ -85,43 +117,4 @@ export async function createProfileWithTransaction(
 		public: false,
 		userId,
 	})
-}
-
-// function to get sensors and measurements count for a profile
-export async function getProfileSensorsAndMeasurementsCount(profile: Profile) {
-	const userId = profile.userId
-	if (userId == null) return { sensorsCount: '0', measurementsCount: '0' }
-
-	const devices = await drizzleClient.query.device.findMany({
-		where: (device, { eq }) => eq(device.userId, userId),
-	})
-	const deviceIds = devices.map((device) => device.id)
-
-	if (deviceIds.length === 0) {
-		return { sensorsCount: '0', measurementsCount: '0' }
-	}
-
-	// Get sensor IDs for measurements count
-	const sensors = await drizzleClient.query.sensor.findMany({
-		where: (s, { inArray }) => inArray(s.deviceId, deviceIds),
-		columns: { id: true },
-	})
-	const sensorsCount = sensors.length
-	const sensorIds = sensors.map((s) => s.id)
-
-	// Count measurements using COUNT query
-	let measurementsCount = 0
-	if (sensorIds.length > 0) {
-		const [measurementsResult] = await drizzleClient
-			.select({ count: count(measurement.value) })
-			.from(measurement)
-			.where(inArray(measurement.sensorId, sensorIds))
-
-		measurementsCount = measurementsResult.count
-	}
-
-	return {
-		sensorsCount: formatCount(sensorsCount),
-		measurementsCount: formatCount(measurementsCount),
-	}
 }

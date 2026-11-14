@@ -11,6 +11,9 @@ import {
 	categorizeIntoTrips,
 	type LocationPoint,
 } from '~/lib/mobile-box-helper'
+import { shouldRevalidateExceptRootPreferences } from '~/lib/root-preference-revalidation'
+
+export { shouldRevalidateExceptRootPreferences as shouldRevalidate }
 
 interface SensorWithColor extends SensorWithMeasurementData {
 	color: string

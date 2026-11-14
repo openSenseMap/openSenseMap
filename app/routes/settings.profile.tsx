@@ -37,9 +37,12 @@ import {
 	useAutosaveFetcher,
 } from '~/hooks/use-autosave-fetcher'
 import { getInitials } from '~/lib/strings'
+import { shouldRevalidateExceptRootPreferences } from '~/lib/root-preference-revalidation'
 import { requireUserId } from '~/services/session-service.server'
 import { AutosaveStatusText } from '~/components/autosave-status.text'
 import { UnsavedChangesBlocker } from '~/components/unsaved-changes-blocker'
+
+export { shouldRevalidateExceptRootPreferences as shouldRevalidate }
 
 export async function loader({ request }: Route.LoaderArgs) {
 	const userId = await requireUserId(request)

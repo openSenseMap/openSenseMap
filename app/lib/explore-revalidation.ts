@@ -1,4 +1,5 @@
 import { type ShouldRevalidateFunctionArgs } from 'react-router'
+import { isRootPreferenceSubmission } from './root-preference-revalidation'
 
 export function shouldRevalidate({
 	currentUrl,
@@ -12,15 +13,15 @@ export function shouldRevalidate({
 	// Check this first because a preference fetcher may finish during a pending filter navigation.
 	if (currentUrl.search !== nextUrl.search) return true
 
-	const formActionUrl = formAction ? new URL(formAction, currentUrl) : null
-	const isPreferenceSubmission =
-		formMethod === 'POST' &&
-		formActionUrl?.origin === currentUrl.origin &&
-		formActionUrl.pathname === '/' &&
-		(formData?.has('set-language') === true ||
-			formData?.has('set-theme') === true)
-
-	if (isPreferenceSubmission) return false
+	if (
+		isRootPreferenceSubmission({
+			currentUrl,
+			formMethod,
+			formAction,
+			formData,
+		})
+	)
+		return false
 
 	// Opening, closing, or switching an Explore child overlay should reuse the
 	// already loaded map data when its filters have not changed.

@@ -8,10 +8,11 @@ import { getDevice } from '~/db/models/device.server'
 import { getSensorsWithLastMeasurement } from '~/db/models/sensor.server'
 import { categorizeIntoTrips } from '~/lib/mobile-box-helper'
 import { getDeviceImageUrl } from '~/lib/s3.server'
-import { getLocale } from '~/middleware/i18next'
+import { shouldRevalidateExceptRootPreferences } from '~/lib/root-preference-revalidation'
 
-export async function loader({ context, params, request }: Route.LoaderArgs) {
-	const locale = getLocale(context)
+export { shouldRevalidateExceptRootPreferences as shouldRevalidate }
+
+export async function loader({ params, request }: Route.LoaderArgs) {
 	// Extracting the selected sensors from the URL query parameters using the stringToArray function
 	const url = new URL(request.url)
 
@@ -71,7 +72,6 @@ export async function loader({ context, params, request }: Route.LoaderArgs) {
 		fromDate: startDate,
 		toDate: endDate,
 		OSEM_API_URL: process.env.OSEM_API_URL,
-		locale,
 	}
 
 	return data

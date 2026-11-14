@@ -26,7 +26,7 @@ import {
 	getUserDeviceLocations,
 } from '~/db/models/device.server'
 import { getMeasurement } from '~/db/models/measurement.query.server'
-import { getProfileByUserId } from '~/db/models/profile.server'
+import { getProfileMapPreferencesByUserId } from '~/db/models/profile.server'
 import { getSensors } from '~/db/models/sensor.server'
 import { type Device } from '~/db/schema'
 import { getCSV, getJSON, getTXT } from '~/lib/file-exports'
@@ -473,7 +473,7 @@ export async function loader({ context, request }: Route.LoaderArgs) {
 
 	if (user) {
 		const [profile, userDeviceLocations] = await Promise.all([
-			getProfileByUserId(user.id),
+			getProfileMapPreferencesByUserId(user.id),
 			getUserDeviceLocations(user.id),
 		])
 		const userLocale = user.language

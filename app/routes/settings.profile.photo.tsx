@@ -21,7 +21,10 @@ import { profileImage } from '~/db/schema'
 import { drizzleClient } from '~/db.server'
 import { uploadHandler } from '~/lib/file-upload.server'
 import { getInitials } from '~/lib/strings'
+import { shouldRevalidateExceptRootPreferences } from '~/lib/root-preference-revalidation'
 import { requireUserId } from '~/services/session-service.server'
+
+export { shouldRevalidateExceptRootPreferences as shouldRevalidate }
 
 const MAX_SIZE = 1024 * 1024 * 3 // 3MB
 
