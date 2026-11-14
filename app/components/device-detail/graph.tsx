@@ -30,6 +30,7 @@ import { AggregationFilter } from '../aggregation-filter'
 import { ClientOnly } from '../client-only'
 import { ColorPicker } from '../color-picker'
 import { DateRangeFilter } from '../daterange-filter'
+import { Alert, AlertDescription, AlertTitle } from '../ui/alert'
 import { HoveredPointContext } from '../map/layers/mobile/mobile-box-layer'
 import Spinner from '../spinner'
 import {
@@ -126,6 +127,8 @@ interface GraphProps {
 	sensors: any[]
 	startDate?: string
 	endDate?: string
+	limitExceeded: boolean
+	showingLatestOnly: boolean
 }
 
 export default function Graph({
@@ -133,6 +136,8 @@ export default function Graph({
 	sensors,
 	startDate,
 	endDate,
+	limitExceeded,
+	showingLatestOnly,
 }: GraphProps) {
 	const { hoveredPoint, setHoveredPoint } = useContext(HoveredPointContext)
 	const navigation = useNavigation()
@@ -569,21 +574,23 @@ export default function Graph({
 									</Tooltip>
 								)}
 
-							<DropdownMenu>
-								<DropdownMenuTrigger>
-									<Download />
-								</DropdownMenuTrigger>
-								<DropdownMenuContent>
-									<DropdownMenuItem onClick={handlePngDownloadClick}>
-										PNG
-									</DropdownMenuItem>
-									{sensors.length < 2 && (
-										<DropdownMenuItem onClick={handleCsvDownloadClick}>
-											CSV
+							{(!limitExceeded || showingLatestOnly) && (
+								<DropdownMenu>
+									<DropdownMenuTrigger>
+										<Download />
+									</DropdownMenuTrigger>
+									<DropdownMenuContent>
+										<DropdownMenuItem onClick={handlePngDownloadClick}>
+											PNG
 										</DropdownMenuItem>
-									)}
-								</DropdownMenuContent>
-							</DropdownMenu>
+										{sensors.length < 2 && (
+											<DropdownMenuItem onClick={handleCsvDownloadClick}>
+												CSV
+											</DropdownMenuItem>
+										)}
+									</DropdownMenuContent>
+								</DropdownMenu>
+							)}
 							<X
 								className="cursor-pointer"
 								onClick={() => {
@@ -599,9 +606,24 @@ export default function Graph({
 							/>
 						</div>
 					</div>
+					{showingLatestOnly && (
+						<p
+							role="status"
+							className="px-2 text-sm text-amber-800 dark:text-amber-300"
+						>
+							{t('showing_latest_only')}
+						</p>
+					)}
 					<div className="flex min-h-0 w-full flex-1 items-center justify-center">
-						{(sensors[0].data.length === 0 && sensors[1] === undefined) ||
-						(sensors[0].data.length === 0 && sensors[1].data.length === 0) ? (
+						{limitExceeded && !showingLatestOnly ? (
+							<Alert variant="warning" className="max-w-xl">
+								<AlertTitle>{t('limit_exceeded_title')}</AlertTitle>
+								<AlertDescription>
+									{t('limit_exceeded_description')}
+								</AlertDescription>
+							</Alert>
+						) : (sensors[0].data.length === 0 && sensors[1] === undefined) ||
+						  (sensors[0].data.length === 0 && sensors[1].data.length === 0) ? (
 							<div>{t('no_data_in_range')}</div>
 						) : (
 							<ClientOnly fallback={<Spinner />}>
