@@ -16,7 +16,10 @@ import {
 	combineAutosaveNavigationStates,
 	useAutosaveFetcher,
 } from '~/hooks/use-autosave-fetcher'
-import { getProfileByUserId, updateProfile } from '~/db/models/profile.server'
+import {
+	getSettingsProfileByUserId,
+	updateProfile,
+} from '~/db/models/profile.server'
 import { shouldRevalidateExceptRootPreferences } from '~/lib/root-preference-revalidation'
 import { getUserById } from '~/db/models/user.server'
 import {
@@ -78,7 +81,7 @@ export type PreferencesActionData =
 export async function loader({ request }: Route.LoaderArgs) {
 	const userId = await requireUserId(request)
 	const [profile, user] = await Promise.all([
-		getProfileByUserId(userId),
+		getSettingsProfileByUserId(userId),
 		getUserById(userId),
 	])
 
@@ -193,7 +196,7 @@ async function handleMapPreferencesAction(
 	userId: string,
 	formData: FormData,
 ): Promise<MapPreferencesActionData> {
-	const profile = await getProfileByUserId(userId)
+	const profile = await getSettingsProfileByUserId(userId)
 
 	if (!profile) {
 		return {

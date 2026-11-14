@@ -26,6 +26,15 @@ export async function getProfileByUserId(userId: User['id']) {
 	})
 }
 
+export async function getSettingsProfileByUserId(userId: User['id']) {
+	return drizzleClient.query.profile.findFirst({
+		where: (profile, { eq }) => eq(profile.userId, userId),
+		with: {
+			profileImage: { columns: { id: true } },
+		},
+	})
+}
+
 export async function getProfileMapPreferencesByUserId(userId: User['id']) {
 	return drizzleClient.query.profile.findFirst({
 		where: (profile, { eq }) => eq(profile.userId, userId),

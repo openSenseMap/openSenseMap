@@ -15,7 +15,7 @@ import {
 	DialogHeader,
 	DialogTitle,
 } from '~/components/ui/dialog'
-import { getProfileByUserId } from '~/db/models/profile.server'
+import { getSettingsProfileByUserId } from '~/db/models/profile.server'
 import { getUserById } from '~/db/models/user.server'
 import { profileImage } from '~/db/schema'
 import { drizzleClient } from '~/db.server'
@@ -51,7 +51,7 @@ const PhotoFormSchema = z.object({
 export async function loader({ request }: Route.LoaderArgs) {
 	const userId = await requireUserId(request)
 	const user = await getUserById(userId)
-	const profile = await getProfileByUserId(userId)
+	const profile = await getSettingsProfileByUserId(userId)
 	if (!user) {
 		throw new Error()
 		// throw await authenticator.logout(request, { redirectTo: "/" });
