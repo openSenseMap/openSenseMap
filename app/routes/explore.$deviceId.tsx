@@ -1,5 +1,9 @@
 import { useState } from 'react'
-import { Outlet, useMatches } from 'react-router'
+import {
+	Outlet,
+	useMatches,
+	type ShouldRevalidateFunctionArgs,
+} from 'react-router'
 import { type Route } from './+types/explore.$deviceId'
 import DeviceDetailBox from '~/components/device-detail/device-detail-box'
 import { HoveredPointContext } from '~/components/map/layers/mobile/mobile-box-layer'
@@ -10,20 +14,28 @@ import { categorizeIntoTrips } from '~/lib/mobile-box-helper'
 import { getDeviceImageUrl } from '~/lib/s3.server'
 import { shouldRevalidateExceptRootPreferences } from '~/lib/root-preference-revalidation'
 
-export { shouldRevalidateExceptRootPreferences as shouldRevalidate }
+export function shouldRevalidate(args: ShouldRevalidateFunctionArgs) {
+	// The device summary is independent of map filters and chart controls.
+	if (
+		args.currentParams.deviceId === args.nextParams.deviceId &&
+		args.currentUrl.search !== args.nextUrl.search &&
+		(!args.formMethod || args.formMethod.toUpperCase() === 'GET')
+	) {
+		return false
+	}
 
-export async function loader({ params, request }: Route.LoaderArgs) {
-	// Extracting the selected sensors from the URL query parameters using the stringToArray function
-	const url = new URL(request.url)
+	return shouldRevalidateExceptRootPreferences(args)
+}
 
+export async function loader({ params }: Route.LoaderArgs) {
 	if (!params.deviceId) {
 		throw new Response('Device not found', { status: 502 })
 	}
 
-	const device = await getDevice({ id: params.deviceId })
-	const sensorsWithLastestMeasurement = await getSensorsWithLastMeasurement(
-		params.deviceId,
-	)
+	const [device, sensorsWithLastestMeasurement] = await Promise.all([
+		getDevice({ id: params.deviceId, locationLimit: 1000 }),
+		getSensorsWithLastMeasurement(params.deviceId),
+	])
 
 	// get only locations from the last 5 trips
 	if (device?.exposure === 'mobile' && device?.locations) {
@@ -36,22 +48,15 @@ export async function loader({ params, request }: Route.LoaderArgs) {
 		// Now you can safely pass the formattedLocations to categorizeIntoTrips
 		const filteredLocations = categorizeIntoTrips(formattedLocations, 60) // 60 seconds as time threshold
 
-		// get the last time of the 5th trip
-		const lastTime =
-			filteredLocations[4]?.points[filteredLocations[4].points.length - 1]?.time
-		// cut all locations from the device to the last time of the 5th trip
-		const cutLocations = device.locations.filter((location) => {
-			const locationTime = String(location.time) // Ensure time is treated as a string
-			return locationTime <= lastTime
-		})
-		// set the locations to the device
-		device.locations = cutLocations
+		// Keep the latest five trips from the bounded location history.
+		const firstRecentTripTime = filteredLocations.at(-5)?.points[0]?.time
+		if (firstRecentTripTime) {
+			const cutoff = new Date(firstRecentTripTime).getTime()
+			device.locations = device.locations.filter(
+				(location) => new Date(location.time).getTime() >= cutoff,
+			)
+		}
 	}
-
-	// Find all sensors from the device response that have the same id as one of the sensor array value
-	const aggregation = url.searchParams.get('aggregation') || 'raw'
-	const startDate = url.searchParams.get('date_from') || undefined
-	const endDate = url.searchParams.get('date_to') || undefined
 
 	let deviceImageUrl: string | null = null
 
@@ -68,9 +73,6 @@ export async function loader({ params, request }: Route.LoaderArgs) {
 		device,
 		deviceImageUrl,
 		sensors: sensorsWithLastestMeasurement,
-		aggregation,
-		fromDate: startDate,
-		toDate: endDate,
 		OSEM_API_URL: process.env.OSEM_API_URL,
 	}
 

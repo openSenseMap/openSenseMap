@@ -1,6 +1,14 @@
 import { type ShouldRevalidateFunctionArgs } from 'react-router'
 import { isRootPreferenceSubmission } from './root-preference-revalidation'
 
+const CHART_SEARCH_PARAMS = ['aggregation', 'date_from', 'date_to']
+
+function searchWithoutChartParams(url: URL) {
+	const params = new URLSearchParams(url.search)
+	for (const key of CHART_SEARCH_PARAMS) params.delete(key)
+	return params.toString()
+}
+
 export function shouldRevalidate({
 	currentUrl,
 	nextUrl,
@@ -9,9 +17,14 @@ export function shouldRevalidate({
 	formData,
 	defaultShouldRevalidate,
 }: ShouldRevalidateFunctionArgs) {
-	// Always revalidate when query params change
-	// Check this first because a preference fetcher may finish during a pending filter navigation.
-	if (currentUrl.search !== nextUrl.search) return true
+	// Chart controls only affect the sensor route, not the map data.
+	// Still revalidate map filters if a preference fetcher finishes during navigation.
+	if (currentUrl.search !== nextUrl.search) {
+		return (
+			(formMethod !== undefined && formMethod.toUpperCase() !== 'GET') ||
+			searchWithoutChartParams(currentUrl) !== searchWithoutChartParams(nextUrl)
+		)
+	}
 
 	if (
 		isRootPreferenceSubmission({

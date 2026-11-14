@@ -3,7 +3,7 @@ import { redirect } from 'react-router'
 import { type Route } from './+types/explore.$deviceId.$sensorId.$'
 import Graph from '~/components/device-detail/graph'
 import MobileBoxView from '~/components/map/layers/mobile/mobile-box-view'
-import { getDevice } from '~/db/models/device.server'
+import { getDeviceExposure } from '~/db/models/device.server'
 import { getMeasurement } from '~/db/models/measurement.query.server'
 import { getSensor } from '~/db/models/sensor.server'
 import { type SensorWithMeasurementData } from '~/db/schema'
@@ -27,7 +27,7 @@ export async function loader({ params, request }: Route.LoaderArgs) {
 		return redirect('/explore')
 	}
 
-	const device = await getDevice({ id: deviceId })
+	const device = await getDeviceExposure({ id: deviceId })
 
 	if (!device) {
 		return redirect('/explore')
