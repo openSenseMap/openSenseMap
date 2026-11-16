@@ -60,13 +60,11 @@ jobs:
       - name: 🔎 Type check
         run: vp run typecheck
 
-  vitest:
+  test:
     name: ⚡ Test
     runs-on: ubuntu-latest
     permissions:
-      # Required to checkout the code
       contents: read
-      # Required to put a comment into the pull-request
       pull-requests: write
     steps:
       - name: ⬇️ Checkout repo
@@ -101,8 +99,8 @@ jobs:
           retry_on: error
           command: vp run db:migrate
 
-      - name: ⚡ Run vitest
-        run: vp run test:coverage
+      - name: ⚡ Run tests
+        run: vp test --coverage
 
       - name: 🧐 Report Coverage
         uses: davelosert/vitest-coverage-report-action@v2
@@ -161,6 +159,11 @@ jobs:
           build-args: |
             COMMIT_SHA=${{ github.sha }}
             NODE_VERSION=${{ steps.node-version.outputs.NODE_VERSION }}
+            SENTRY_ORG=${{ vars.SENTRY_ORG }}
+            SENTRY_PROJECT=${{ vars.SENTRY_PROJECT }}
+            ALLOWED_ACTION_ORIGINS=${{ vars.ALLOWED_ACTION_ORIGINS }}
+          secrets: |
+            SENTRY_AUTH_TOKEN=${{ secrets.SENTRY_AUTH_TOKEN }}
           cache-from: type=local,src=/tmp/.buildx-cache
           cache-to: type=local,mode=max,dest=/tmp/.buildx-cache-new
 

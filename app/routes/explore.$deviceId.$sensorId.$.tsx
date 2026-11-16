@@ -1,5 +1,5 @@
 import { addDays } from 'date-fns'
-import { redirect, useLoaderData } from 'react-router'
+import { redirect } from 'react-router'
 import { type Route } from './+types/explore.$deviceId.$sensorId.$'
 import Graph from '~/components/device-detail/graph'
 import MobileBoxView from '~/components/map/layers/mobile/mobile-box-view'
@@ -210,9 +210,7 @@ export async function loader({ params, request }: Route.LoaderArgs) {
 	}
 }
 
-export default function SensorView() {
-	const loaderData = useLoaderData<typeof loader>()
-
+export default function SensorView({ loaderData }: Route.ComponentProps) {
 	return (
 		<>
 			<Graph

@@ -1,5 +1,5 @@
 import { useTranslation } from 'react-i18next'
-import { redirect, useLoaderData } from 'react-router'
+import { redirect } from 'react-router'
 import { type Route } from './+types/profile.$username'
 import { getColumns, type SenseBox } from '~/components/mydevices/dt/columns'
 import {
@@ -123,14 +123,14 @@ export async function action({ request, params }: Route.ActionArgs) {
 	}
 }
 
-export default function ProfilePage() {
+export default function ProfilePage({ loaderData }: Route.ComponentProps) {
 	const {
 		profile,
 		sensorsCount,
 		measurementsCount,
 		requestingUserId,
 		deviceSchemas,
-	} = useLoaderData<typeof loader>()
+	} = loaderData
 
 	const { t, i18n } = useTranslation('profile')
 	const columnsTranslation = useTranslation('data-table')
