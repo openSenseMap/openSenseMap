@@ -1,14 +1,7 @@
 import { Save, Trash } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import {
-	data,
-	redirect,
-	Form,
-	useActionData,
-	useLoaderData,
-	useSubmit,
-} from 'react-router'
+import { data, redirect, Form, useSubmit } from 'react-router'
 
 import invariant from 'tiny-invariant'
 import { type Route } from './+types/device.$deviceId.edit.logs'
@@ -91,9 +84,10 @@ export async function action({ request, params }: Route.ActionArgs) {
 	}
 }
 
-export default function Logs() {
-	const { logEntries } = useLoaderData<typeof loader>()
-	const actionData = useActionData<typeof action>()
+export default function Logs({
+	loaderData: { logEntries },
+	actionData,
+}: Route.ComponentProps) {
 	const { toast } = useToast()
 	const { t, i18n } = useTranslation('edit-device-logs')
 	const [newLogContent, setNewLogContent] = useState('')

@@ -16,6 +16,7 @@ import {
 	hasCurrentElevationConsent,
 } from '~/db/models/elevation-consent.server'
 import { sensorWikiAliasEntries } from '~/lib/sensor-wiki/alias-catalog'
+import { logServerError, logServerWarning } from '~/lib/sentry.server'
 
 export type NewDeviceActionData = {
 	ok: false
@@ -90,6 +91,11 @@ export async function action({ request }: Route.ActionArgs) {
 			terrainElevation = elevationResult.elevation
 			terrainElevationDataset = elevationResult.dataset
 		} catch (error) {
+			logServerWarning('Terrain elevation lookup failed', error, {
+				'app.operation': 'device.create',
+				'elevation.error_code':
+					error instanceof ElevationLookupError ? error.code : 'unexpected',
+			})
 			console.warn(
 				'Could not calculate device height above sea level:',
 				error instanceof ElevationLookupError ? error.code : error,
@@ -141,6 +147,11 @@ export async function action({ request }: Route.ActionArgs) {
 
 		return redirect('/profile/me')
 	} catch (error) {
+		logServerError('Device creation failed', error, {
+			'app.operation': 'device.create',
+			'device.model': model,
+			'sensor.count': selectedSensors.length,
+		})
 		console.error('Error creating device:', error)
 		return responseData<NewDeviceActionData>(
 			{ ok: false, error: 'device_creation_failed' },

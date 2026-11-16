@@ -2,7 +2,45 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { useFetcher } from 'react-router'
 
 export type AutosaveStatus = 'idle' | 'dirty' | 'saving' | 'saved' | 'error'
+export type AutosaveNavigationState = 'idle' | 'pending' | 'blocked'
 export const AUTOSAVE_DELAY_MS = 700
+
+export function shouldBlockAutosaveNavigation({
+	hasChanges,
+	isSaving,
+}: {
+	hasChanges: boolean
+	isSaving: boolean
+}) {
+	return hasChanges || isSaving
+}
+
+export function getAutosaveNavigationState({
+	hasChanges,
+	isSaving,
+	canAutosave,
+	hasError,
+}: {
+	hasChanges: boolean
+	isSaving: boolean
+	canAutosave: boolean
+	hasError: boolean
+}): AutosaveNavigationState {
+	if (!shouldBlockAutosaveNavigation({ hasChanges, isSaving })) return 'idle'
+	if (isSaving) return 'pending'
+	if (hasError || !canAutosave) return 'blocked'
+
+	return 'pending'
+}
+
+export function combineAutosaveNavigationStates(
+	...states: AutosaveNavigationState[]
+): AutosaveNavigationState {
+	if (states.includes('blocked')) return 'blocked'
+	if (states.includes('pending')) return 'pending'
+
+	return 'idle'
+}
 
 function getAutosaveStatus({
 	isSaving,
@@ -51,42 +89,58 @@ export function useAutosaveFetcher<TValues, TData>({
 	const fetcher = useFetcher()
 
 	const lastSavedRef = useRef(lastSavedValues)
-	const lastSubmittedRef = useRef<TValues | null>(null)
 	const processedDataRef = useRef<TData | null>(null)
 
 	const [saveCount, setSaveCount] = useState(0)
-	const [hasError, setHasError] = useState(false)
+	const [lastSubmittedValues, setLastSubmittedValues] =
+		useState<TValues | null>(null)
+	const [failedValues, setFailedValues] = useState<TValues | null>(null)
 
 	const valuesJson = JSON.stringify(values)
 	const lastSavedJson = JSON.stringify(lastSavedRef.current)
-
+	const lastSubmittedJson = JSON.stringify(lastSubmittedValues)
+	const failedValuesJson = JSON.stringify(failedValues)
 	const hasChanges = valuesJson !== lastSavedJson
 
 	const isSaving = fetcher.state === 'submitting' || fetcher.state === 'loading'
+	const currentValuesHaveFailed =
+		failedValues !== null && valuesJson === failedValuesJson
+	const currentValuesWereSubmitted =
+		lastSubmittedValues !== null && valuesJson === lastSubmittedJson
+	const canAutosave =
+		(enabled && (!validate || validate(values))) || currentValuesWereSubmitted
 
 	const status: AutosaveStatus = getAutosaveStatus({
 		isSaving,
-		hasError,
+		hasError: currentValuesHaveFailed,
 		hasChanges,
 		saveCount,
 	})
+	const navigationState = getAutosaveNavigationState({
+		hasChanges,
+		isSaving,
+		canAutosave,
+		hasError: currentValuesHaveFailed,
+	})
+	const shouldBlockNavigation = navigationState !== 'idle'
 
 	const submit = useCallback(
 		(nextValues: TValues) => {
-			lastSubmittedRef.current = nextValues
-			setHasError(false)
+			setLastSubmittedValues(() => nextValues)
+			setFailedValues(null)
 
 			fetcher.submit(getPayload(nextValues), {
 				method: 'post',
 			})
 		},
-		[fetcher, getPayload],
+		[fetcher, getPayload, setFailedValues, setLastSubmittedValues],
 	)
 
 	useEffect(() => {
 		if (!enabled) return
 		if (!hasChanges) return
 		if (isSaving) return
+		if (currentValuesHaveFailed) return
 		if (validate && !validate(values)) return
 
 		const timeout = window.setTimeout(() => {
@@ -98,6 +152,7 @@ export function useAutosaveFetcher<TValues, TData>({
 		enabled,
 		hasChanges,
 		isSaving,
+		currentValuesHaveFailed,
 		valuesJson,
 		values,
 		debounceMs,
@@ -113,7 +168,7 @@ export function useAutosaveFetcher<TValues, TData>({
 		processedDataRef.current = fetcher.data
 
 		const data = fetcher.data
-		const submittedValues = lastSubmittedRef.current
+		const submittedValues = lastSubmittedValues
 
 		if (!submittedValues) return
 
@@ -122,16 +177,17 @@ export function useAutosaveFetcher<TValues, TData>({
 				? getSavedValues(data, submittedValues)
 				: submittedValues
 
-			setHasError(false)
+			setFailedValues(null)
 			setSaveCount((count) => count + 1)
 			onSuccess?.(data)
 		} else {
-			setHasError(true)
+			setFailedValues(() => submittedValues)
 			onError?.(data)
 		}
 	}, [
 		fetcher.state,
 		fetcher.data,
+		lastSubmittedValues,
 		getSavedValues,
 		isSuccess,
 		onSuccess,
@@ -146,7 +202,7 @@ export function useAutosaveFetcher<TValues, TData>({
 			},
 		) => {
 			lastSavedRef.current = nextValues
-			setHasError(false)
+			setFailedValues(null)
 
 			if (options?.markSaved) {
 				setSaveCount((count) => count + 1)
@@ -161,6 +217,8 @@ export function useAutosaveFetcher<TValues, TData>({
 		status,
 		isSaving,
 		hasChanges,
+		navigationState,
+		shouldBlockNavigation,
 		resetLastSaved,
 		lastSavedRef,
 	}

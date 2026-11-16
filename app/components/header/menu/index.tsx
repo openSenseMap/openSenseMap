@@ -97,14 +97,14 @@ export default function Menu() {
 									</div>
 								)}
 
-								<Link to="/about">
+								<Link to="/about" prefetch="intent">
 									<DropdownMenuItem className="cursor-pointer">
 										<Info className="mr-2 h-5 w-5" />
 										<span>{t('about_label')}</span>
 									</DropdownMenuItem>
 								</Link>
 								{!isExplore && (
-									<Link to="/explore">
+									<Link to="/explore" prefetch="intent">
 										<DropdownMenuItem className="cursor-pointer">
 											<Compass className="mr-2 h-5 w-5" />
 											<span>{t('explore_label')}</span>
@@ -113,7 +113,7 @@ export default function Menu() {
 								)}
 
 								{matches[1]?.pathname !== '/settings' && (
-									<Link to="/settings/profile">
+									<Link to="/settings/profile" prefetch="intent">
 										<DropdownMenuItem className="cursor-pointer">
 											<Settings className="mr-2 h-5 w-5" />
 											{t('settings_label')}
@@ -122,7 +122,7 @@ export default function Menu() {
 								)}
 
 								{matches[1]?.pathname !== '/profile' && (
-									<Link to="/profile/me">
+									<Link to="/profile/me" prefetch="intent">
 										<DropdownMenuItem className="cursor-pointer">
 											<User2 className="mr-2 h-5 w-5" />
 											{t('my_devices_label')}
@@ -131,7 +131,7 @@ export default function Menu() {
 								)}
 
 								{matches[1]?.pathname !== '/profile' && (
-									<Link to="/device/new">
+									<Link to="/device/new" prefetch="intent">
 										<DropdownMenuItem className="cursor-pointer">
 											<PlusIcon className="mr-2 h-5 w-5" />
 											{t('add_device_label')}
@@ -153,6 +153,7 @@ export default function Menu() {
 											pathname: 'login',
 											search: searchParams.toString(),
 										}}
+										prefetch="intent"
 										onClick={() => setOpen(false)}
 										className="w-full cursor-pointer"
 									>
