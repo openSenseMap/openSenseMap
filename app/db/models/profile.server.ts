@@ -59,8 +59,7 @@ export async function getProfileSensorCount(deviceIds: string[]) {
 	return drizzleClient.$count(sensor, inArray(sensor.deviceId, deviceIds))
 }
 
-// The ten-minute aggregate stores raw measurement counts per bucket. Recent
-// measurements and historical buckets awaiting backfill may be absent.
+// The ten-minute aggregate stores raw measurement counts per bucket. 
 export async function getProfileEstimatedMeasurementCount(userId: User['id']) {
 	const [result] = await drizzleClient
 		.select({
