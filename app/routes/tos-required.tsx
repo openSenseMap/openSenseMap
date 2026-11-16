@@ -1,13 +1,6 @@
 import * as React from 'react'
 import { useTranslation, Trans } from 'react-i18next'
-import {
-	Form,
-	Link,
-	data,
-	redirect,
-	useActionData,
-	useLoaderData,
-} from 'react-router'
+import { Form, Link, data, redirect } from 'react-router'
 import { type Route } from './+types/tos-required'
 import { Button } from '~/components/ui/button'
 import {
@@ -91,9 +84,10 @@ export async function action({ request }: Route.ActionArgs) {
 	throw redirect(redirectTo)
 }
 
-export default function TosRequiredModal() {
-	const { tos, redirectTo } = useLoaderData<typeof loader>()
-	const actionData = useActionData<typeof action>()
+export default function TosRequiredModal({
+	loaderData: { tos, redirectTo },
+	actionData,
+}: Route.ComponentProps) {
 	const [checked, setChecked] = React.useState(false)
 
 	const { t } = useTranslation('tos')

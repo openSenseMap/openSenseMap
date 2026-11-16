@@ -1,8 +1,8 @@
 import { useCallback, useState } from 'react'
-import { useLoaderData } from 'react-router'
 import SwaggerUI from 'swagger-ui-react'
 import 'swagger-ui-react/swagger-ui.css'
 import { createDocument } from 'zod-openapi'
+import { type Route } from './+types/docs'
 import {
 	Select,
 	SelectContent,
@@ -37,8 +37,8 @@ export const loader = () => {
 	return { spec: doc, integrationSpec: integration }
 }
 
-export default function ApiDocumentation() {
-	const { spec, integrationSpec } = useLoaderData<typeof loader>()
+export default function ApiDocumentation({ loaderData }: Route.ComponentProps) {
+	const { spec, integrationSpec } = loaderData
 	const [currentSpec, setCurrentSpec] = useState(spec)
 
 	const handleSpecSelect = useCallback(
