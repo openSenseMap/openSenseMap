@@ -21,7 +21,8 @@ export function isExpectedServerError(error: unknown, request: Request) {
 		return false
 	}
 
-	const message = error.data instanceof Error ? error.data.message : ''
+	const message =
+		'error' in error && error.error instanceof Error ? error.error.message : ''
 
 	if (error.status === 404) return message.startsWith('No route matches URL ')
 	if (error.status === 405) {
