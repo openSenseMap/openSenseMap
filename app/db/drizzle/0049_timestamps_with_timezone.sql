@@ -1,5 +1,4 @@
 -- Existing timestamp-without-time-zone values are UTC wall-clock values.
--- Interpret them explicitly so the migration does not depend on the session TimeZone.
 ALTER TABLE "device"
 	ALTER COLUMN "created_at" SET DATA TYPE timestamp with time zone USING "created_at" AT TIME ZONE 'UTC',
 	ALTER COLUMN "updated_at" SET DATA TYPE timestamp with time zone USING "updated_at" AT TIME ZONE 'UTC',
