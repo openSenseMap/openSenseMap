@@ -1,6 +1,6 @@
 import { isRouteErrorResponse } from 'react-router'
 
-export function isExpectedServerError(error: unknown, request: Request) {
+export function isSentryDenylisted(error: unknown, request: Request) {
 	if (
 		request.signal.aborted &&
 		(error === request.signal.reason ||
