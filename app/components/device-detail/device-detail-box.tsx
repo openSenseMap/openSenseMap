@@ -40,15 +40,6 @@ import {
 	AccordionTrigger,
 } from '../ui/accordion'
 import { Alert, AlertDescription, AlertTitle } from '../ui/alert'
-import {
-	AlertDialog,
-	AlertDialogCancel,
-	AlertDialogContent,
-	AlertDialogFooter,
-	AlertDialogHeader,
-	AlertDialogTitle,
-	AlertDialogTrigger,
-} from '../ui/alert-dialog'
 import { Badge } from '../ui/badge'
 import { Button } from '../ui/button'
 import {
@@ -70,9 +61,9 @@ import { Separator } from '../ui/separator'
 import { Tooltip, TooltipContent, TooltipTrigger } from '../ui/tooltip'
 import { useToast } from '../ui/use-toast'
 import EntryLogs from './entry-logs'
-import ShareLink from './share-link'
 import { useGlobalCompareMode } from './useGlobalCompareMode'
 import { type SensorWithLatestMeasurement } from '~/db/schema'
+import { useCopyToClipboard } from '~/hooks/use-copy-to-clipboard'
 import { getArchiveLink } from '~/lib/archive-link'
 import { type loader } from '~/routes/explore.$deviceId'
 import { dateDiffToNowInWords } from '~/lib/date'
@@ -91,6 +82,7 @@ export default function DeviceDetailBox() {
 	const navigate = useNavigate()
 	const matches = useMatches()
 	const { toast } = useToast()
+	const { copyToClipboard } = useCopyToClipboard()
 	const { t, i18n } = useTranslation('device-detail-box')
 	const dateFormatter = new Intl.DateTimeFormat(i18n.resolvedLanguage, {
 		year: 'numeric',
@@ -128,6 +120,26 @@ export default function DeviceDetailBox() {
 	const [searchParams] = useSearchParams()
 
 	const { deviceId } = useParams() // Get the deviceId from the URL params
+	const handleCopyDeviceUrl = async () => {
+		if (!deviceId) return
+
+		try {
+			const deviceUrl = new URL(
+				`/explore/${encodeURIComponent(deviceId)}`,
+				window.location.origin,
+			).href
+			const copied = await copyToClipboard(deviceUrl)
+			if (!copied) return
+
+			toast({
+				title: t('copied_to_clipboard'),
+				description: t('share_link_hint'),
+				variant: 'success',
+			})
+		} catch {
+			toast({ title: t('copy_failed'), variant: 'destructive' })
+		}
+	}
 
 	const createSensorLink = (sensorIdToBeSelected: string) => {
 		const lastSegment = matches[matches.length - 1]?.params?.['*']
@@ -233,20 +245,17 @@ export default function DeviceDetailBox() {
 								<div className="min-w-0 flex-1 truncate text-center text-xl text-zinc-600 dark:dark:text-zinc-100">
 									{data.device.name}
 								</div>
-								<AlertDialog>
-									<AlertDialogTrigger asChild>
-										<Share2 className="cursor-pointer" />
-									</AlertDialogTrigger>
-									<AlertDialogContent>
-										<AlertDialogHeader>
-											<AlertDialogTitle>{t('share_link')}</AlertDialogTitle>
-											<ShareLink />
-										</AlertDialogHeader>
-										<AlertDialogFooter>
-											<AlertDialogCancel>{t('close')}</AlertDialogCancel>
-										</AlertDialogFooter>
-									</AlertDialogContent>
-								</AlertDialog>
+								<Button
+									type="button"
+									variant="ghost"
+									size="icon"
+									className="h-8 w-8 p-0"
+									onClick={handleCopyDeviceUrl}
+									aria-label={t('copy_device_link')}
+									title={t('copy_device_link')}
+								>
+									<Share2 className="h-4 w-4" />
+								</Button>
 								<DropdownMenu>
 									<DropdownMenuTrigger asChild>
 										<Button variant="ghost" className="h-8 w-8 p-0">

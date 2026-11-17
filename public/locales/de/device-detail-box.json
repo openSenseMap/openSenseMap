@@ -1,6 +1,6 @@
 {
-	"share_link": "Teile diesen Link.",
-	"close": "Schließen",
+	"copy_device_link": "Gerätelink kopieren",
+	"copy_failed": "Gerätelink konnte nicht kopiert werden",
 	"open_menu": "Menü öffnen",
 	"actions": "Aktionen",
 	"compare": "Vergleichen",
@@ -35,6 +35,5 @@
 	"device_logs": "Geräteprotokoll",
 	"logs_owner_hint": "Wenn dies dein Gerät ist, kannst du Änderungen in den Geräteeinstellungen vornehmen.",
 	"copied_to_clipboard": "In die Zwischenablage kopiert",
-	"share_link_hint": "Jetzt kannst du deinen Link teilen! 🎉",
-	"copy": "Kopieren"
+	"share_link_hint": "Du kannst diesen Link jetzt teilen."
 }
