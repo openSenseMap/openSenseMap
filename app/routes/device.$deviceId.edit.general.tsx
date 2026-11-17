@@ -11,6 +11,7 @@ import {
 import invariant from 'tiny-invariant'
 import { type Route } from './+types/device.$deviceId.edit.general'
 import { MarkdownContent } from '~/components/markdown-content'
+import { UnsavedChangesBlocker } from '~/components/unsaved-changes-blocker'
 import { Button } from '~/components/ui/button'
 import { getDevice, getDeviceWithoutSensors } from '~/db/models/device.server'
 import { verifyLogin } from '~/db/models/user.server'
@@ -704,6 +705,10 @@ export default function EditDeviceGeneral({
 
 	return (
 		<div className="grid grid-rows-1">
+			<UnsavedChangesBlocker
+				autosaveState={autosave.navigationState}
+				when={imageFile !== null || newTag.trim().length > 0}
+			/>
 			<div className="flex min-h-full items-center justify-center">
 				<div className="font-helvetica mx-auto w-full">
 					<div>
