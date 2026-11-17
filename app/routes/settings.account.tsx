@@ -3,9 +3,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { Trans, useTranslation } from 'react-i18next'
 import {
 	Form,
-	useActionData,
 	useFetcher,
-	useLoaderData,
 	data,
 	redirect,
 	useSearchParams,
@@ -26,6 +24,7 @@ import {
 } from '~/components/ui/card'
 import { Input } from '~/components/ui/input'
 import { Label } from '~/components/ui/label'
+import { PasswordInput } from '~/components/ui/password-input'
 import { useToast } from '~/components/ui/use-toast'
 import {
 	getUserById,
@@ -253,9 +252,10 @@ export async function action({ request }: Route.ActionArgs) {
 	)
 }
 
-export default function EditUserProfilePage() {
-	const userData = useLoaderData<typeof loader>()
-	const actionData = useActionData<typeof action>()
+export default function EditUserProfilePage({
+	loaderData: userData,
+	actionData,
+}: Route.ComponentProps) {
 	const resendFetcher = useFetcher<typeof action>()
 	const passwordFetcher = useFetcher<typeof action>()
 	const { toast } = useToast()
@@ -550,11 +550,10 @@ export default function EditUserProfilePage() {
 
 					<div className="grid gap-2">
 						<Label htmlFor="passwordUpdate">{t('confirm_password')}</Label>
-						<Input
+						<PasswordInput
 							ref={passwordUpdRef}
 							id="passwordUpdate"
 							name="passwordUpdate"
-							type="password"
 							autoComplete="current-password"
 							placeholder={t('enter_current_password')}
 							value={emailPassword}
@@ -609,24 +608,22 @@ export default function EditUserProfilePage() {
 
 						<div className="space-y-2">
 							<Label htmlFor="currentPassword">{t('current_password')}</Label>
-							<Input
+							<PasswordInput
 								ref={currPassRef}
 								id="currentPassword"
 								name="currentPassword"
 								placeholder={t('enter_current_password')}
-								type="password"
 								autoComplete="current-password"
 							/>
 						</div>
 
 						<div className="space-y-2">
 							<Label htmlFor="newPassword">{t('new_password')}</Label>
-							<Input
+							<PasswordInput
 								ref={newPassRef}
 								id="newPassword"
 								name="newPassword"
 								placeholder={t('enter_new_password')}
-								type="password"
 								autoComplete="new-password"
 							/>
 						</div>
@@ -635,12 +632,11 @@ export default function EditUserProfilePage() {
 							<Label htmlFor="newPasswordConfirm">
 								{t('confirm_password')}
 							</Label>
-							<Input
+							<PasswordInput
 								ref={confirmPassRef}
 								id="newPasswordConfirm"
 								name="newPasswordConfirm"
 								placeholder={t('confirm_new_password')}
-								type="password"
 								autoComplete="new-password"
 							/>
 						</div>

@@ -5,14 +5,13 @@ import {
 	data,
 	redirect,
 	Form,
-	useActionData,
-	useLoaderData,
 	useNavigation,
 	useOutletContext,
 } from 'react-router'
 import invariant from 'tiny-invariant'
 import { type Route } from './+types/device.$deviceId.edit.general'
 import { MarkdownContent } from '~/components/markdown-content'
+import { UnsavedChangesBlocker } from '~/components/unsaved-changes-blocker'
 import { Button } from '~/components/ui/button'
 import { getDevice, getDeviceWithoutSensors } from '~/db/models/device.server'
 import { verifyLogin } from '~/db/models/user.server'
@@ -35,6 +34,7 @@ import {
 	parseDeviceExposure,
 } from '~/lib/device-enums'
 import { AutosaveStatusText } from '~/components/autosave-status.text'
+import { PasswordInput } from '~/components/ui/password-input'
 
 type GeneralAutosaveValues = {
 	name: string
@@ -460,9 +460,10 @@ export async function action({ request, params }: Route.ActionArgs) {
 }
 
 //**********************************
-export default function EditDeviceGeneral() {
-	const { device, imageUrl } = useLoaderData<typeof loader>()
-	const actionData = useActionData<typeof action>()
+export default function EditDeviceGeneral({
+	loaderData: { device, imageUrl },
+	actionData,
+}: Route.ComponentProps) {
 	const navigation = useNavigation()
 
 	const [passwordDelVal, setPasswordVal] = useState('')
@@ -704,6 +705,10 @@ export default function EditDeviceGeneral() {
 
 	return (
 		<div className="grid grid-rows-1">
+			<UnsavedChangesBlocker
+				autosaveState={autosave.navigationState}
+				when={imageFile !== null || newTag.trim().length > 0}
+			/>
 			<div className="flex min-h-full items-center justify-center">
 				<div className="font-helvetica mx-auto w-full">
 					<div>
@@ -1001,13 +1006,12 @@ Installed on the school roof.
 							</div>
 
 							<div>
-								<input
+								<PasswordInput
 									id="passwordDelete"
 									name="passwordDelete"
-									type="password"
 									placeholder="Password"
 									ref={passwordDelRef}
-									className="w-full rounded border border-gray-200 px-2 py-2 text-base placeholder-[#999]"
+									className="text-base placeholder-[#999]"
 									value={passwordDelVal}
 									onChange={(e) => setPasswordVal(e.target.value)}
 								/>

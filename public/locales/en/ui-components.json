@@ -1,13 +1,17 @@
 {
-	"callout": {
-		"callout_title_note": "Note",
-		"callout_title_tip": "Tip",
-		"callout_title_important": "Important",
-		"callout_title_warning": "Warning",
-		"callout_title_caution": "Caution"
-	},
-	"array_field": {
-		"add_item": "Add item",
-		"remove_item": "Remove item"
-	}
+  "callout": {
+    "callout_title_note": "Note",
+    "callout_title_tip": "Tip",
+    "callout_title_important": "Important",
+    "callout_title_warning": "Warning",
+    "callout_title_caution": "Caution"
+  },
+  "array_field": {
+    "add_item": "Add item",
+    "remove_item": "Remove item"
+  },
+  "password": {
+    "show": "Show password",
+    "hide": "Hide password"
+  }
 }

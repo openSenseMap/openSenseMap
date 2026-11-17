@@ -70,7 +70,7 @@ export default function MapHeader({
 
 					<div className="flex items-center gap-1 lg:gap-2">
 						<Info />
-						<Menu devices={devices} />
+						<Menu />
 					</div>
 				</div>
 			</div>

@@ -1,3 +1,5 @@
+import { escapeCSVValue } from '~/lib/csv'
+
 let contentType = ''
 let fileName = ''
 const formatter = new Intl.DateTimeFormat('en-US', {
@@ -8,36 +10,61 @@ const formatter = new Intl.DateTimeFormat('en-US', {
 // function to return CSV data
 
 export const getCSV = (measurements: any, includeFields: any) => {
-	let content = ''
-	let rows = ''
-	let csvrows: any = []
 	contentType = 'text/csv'
 	fileName = 'measurements.csv'
 
-	// Generate CSV headers
-	const headers = [
-		'SensorId',
-		includeFields.title ? 'Title' : null,
-		includeFields.value ? 'Value' : null,
-		includeFields.unit ? 'Unit' : null,
-		includeFields.timestamp ? 'Timestamp' : null,
-	]
+	const columns = [
+		{ header: 'SensorId', value: (measurement: any) => measurement.sensorId },
+		includeFields.title
+			? { header: 'Title', value: (measurement: any) => measurement.title }
+			: null,
+		includeFields.value
+			? { header: 'Value', value: (measurement: any) => measurement.value }
+			: null,
+		includeFields.unit
+			? { header: 'Unit', value: (measurement: any) => measurement.unit }
+			: null,
+		includeFields.timestamp
+			? {
+					header: 'Timestamp',
+					value: (measurement: any) =>
+						formatter.format(new Date(measurement.time)),
+				}
+			: null,
+		includeFields.coordinates
+			? {
+					header: 'Latitude',
+					value: (measurement: any) => measurement.location?.y ?? null,
+				}
+			: null,
+		includeFields.coordinates
+			? {
+					header: 'Longitude',
+					value: (measurement: any) => measurement.location?.x ?? null,
+				}
+			: null,
+	].filter(
+		(
+			column,
+		): column is {
+			header: string
+			value: (measurement: any) => unknown
+		} => column !== null,
+	)
 
-	// Generate CSV rows
-	measurements.map((measure: any) => {
-		measure.map((m: any) => {
-			rows = [
-				m.sensorId,
-				includeFields.title ? m.title : null,
-				includeFields.value ? m.value : null,
-				includeFields.unit ? m.unit : null,
-				includeFields.timestamp ? formatter.format(new Date(m.time)) : null,
-			].join(',')
-			csvrows.push(rows)
-		})
-	})
+	const rows = measurements.flatMap((measurementGroup: any[]) =>
+		measurementGroup.map((measurement) =>
+			columns
+				.map((column) => escapeCSVValue(column.value(measurement), ','))
+				.join(','),
+		),
+	)
+	const headers = columns
+		.map((column) => escapeCSVValue(column.header, ','))
+		.join(',')
 	const utf8BOM = '\uFEFF'
-	content = utf8BOM + [headers.join(','), ...csvrows].join('\n')
+	const content = utf8BOM + [headers, ...rows].join('\n')
+
 	return { content, fileName, contentType }
 }
 
@@ -67,6 +94,10 @@ export const getJSON = (measurements: any, includeFields: any) => {
 			if (includeFields.unit) filteredItem.unit = m.unit
 			if (includeFields.timestamp)
 				filteredItem.timestamp = formatter.format(new Date(m.time))
+			if (includeFields.coordinates) {
+				filteredItem.latitude = m.location?.y ?? null
+				filteredItem.longitude = m.location?.x ?? null
+			}
 
 			groupData.push(filteredItem)
 		})
@@ -103,6 +134,10 @@ export const getTXT = (measurements: any, includeFields: any) => {
 			}
 			if (includeFields.timestamp) {
 				rows += `Timestamp: ${formatter.format(new Date(m.time))}\n`
+			}
+			if (includeFields.coordinates) {
+				rows += `Latitude: ${m.location?.y ?? ''}\n`
+				rows += `Longitude: ${m.location?.x ?? ''}\n`
 			}
 			rows += `\n`
 			textrows.push(rows)

@@ -1,12 +1,6 @@
 import { ArrowLeft } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
-import {
-	Form,
-	Link,
-	redirect,
-	useActionData,
-	useNavigation,
-} from 'react-router'
+import { Form, Link, redirect, useNavigation } from 'react-router'
 import { type Route } from './+types/device.transfer'
 import Home from '~/components/header/home'
 import { Separator } from '~/components/ui/separator'
@@ -49,8 +43,7 @@ export async function action({ request }: Route.ActionArgs) {
 	}
 }
 
-export default function DeviceTransfer() {
-	const actionData = useActionData<typeof action>()
+export default function DeviceTransfer({ actionData }: Route.ComponentProps) {
 	const navigation = useNavigation()
 	const { t } = useTranslation('profile')
 	const isSubmitting = navigation.state === 'submitting'
@@ -64,7 +57,9 @@ export default function DeviceTransfer() {
 			<div className="font-helvetica mx-auto max-w-5xl space-y-6 p-4 pb-14 sm:p-6 sm:pb-14 lg:p-10 lg:pb-14">
 				<div className="rounded text-[#676767]">
 					<ArrowLeft className="mr-2 inline h-5 w-5" />
-					<Link to="/profile/me">{t('back_to_dashboard')}</Link>
+					<Link to="/profile/me" prefetch="intent">
+						{t('back_to_dashboard')}
+					</Link>
 				</div>
 
 				<div className="space-y-0.5">

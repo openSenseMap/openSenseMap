@@ -5,7 +5,7 @@ import {
 	Marker,
 	NavigationControl,
 } from 'react-map-gl/maplibre'
-import { data, Link, redirect, useLoaderData } from 'react-router'
+import { data, Link, redirect } from 'react-router'
 
 import invariant from 'tiny-invariant'
 import { type Route } from './+types/device.$deviceId.edit.location'
@@ -29,6 +29,7 @@ import {
 	AUTOSAVE_DELAY_MS,
 } from '~/hooks/use-autosave-fetcher'
 import { AutosaveStatusText } from '~/components/autosave-status.text'
+import { UnsavedChangesBlocker } from '~/components/unsaved-changes-blocker'
 import Spinner from '~/components/spinner'
 import { useTerrainElevation } from '~/hooks/use-terrain-elevation'
 import {
@@ -210,8 +211,9 @@ export async function action({ request, params }: Route.ActionArgs) {
 }
 
 //**********************************
-export default function EditLocation() {
-	const { device, hasElevationConsent } = useLoaderData<typeof loader>()
+export default function EditLocation({
+	loaderData: { device, hasElevationConsent },
+}: Route.ComponentProps) {
 	const { t } = useTranslation('edit-device-general')
 	const initialHeightAboveGround = device.heightAboveGround
 
@@ -455,6 +457,7 @@ export default function EditLocation() {
 
 	return (
 		<div className="grid grid-rows-1">
+			<UnsavedChangesBlocker autosaveState={autosave.navigationState} />
 			<div className="flex min-h-full items-center justify-center">
 				<div className="font-helvetica mx-auto w-full text-[14px]">
 					<div>

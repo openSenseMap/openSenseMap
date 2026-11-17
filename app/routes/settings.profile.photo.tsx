@@ -4,14 +4,7 @@ import { type FileUpload, parseFormData } from '@mjackson/form-data-parser'
 import { eq } from 'drizzle-orm'
 import { useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import {
-	data,
-	redirect,
-	Form,
-	useActionData,
-	useLoaderData,
-	useNavigate,
-} from 'react-router'
+import { data, redirect, Form, useNavigate } from 'react-router'
 import { z } from 'zod'
 import { type Route } from './+types/settings.profile.photo'
 import { Avatar, AvatarFallback, AvatarImage } from '~/components/ui/avatar'
@@ -114,12 +107,13 @@ export async function action({ request }: Route.ActionArgs) {
 	return redirect('/settings/profile')
 }
 
-export default function PhotoChooserModal() {
-	const data = useLoaderData<typeof loader>()
+export default function PhotoChooserModal({
+	loaderData: data,
+	actionData,
+}: Route.ComponentProps) {
 	const [newImageSrc, setNewImageSrc] = useState<string | null>(null)
 	const fileInputRef = useRef<HTMLInputElement>(null)
 	const navigate = useNavigate()
-	const actionData = useActionData<typeof action>()
 	const [form, { photoFile }] = useForm({
 		id: 'profile-photo',
 		constraint: getZodConstraint(PhotoFormSchema),

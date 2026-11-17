@@ -1,13 +1,17 @@
 {
-	"callout": {
-		"callout_title_note": "Hinweis",
-		"callout_title_tip": "Tipp",
-		"callout_title_important": "Wichtig",
-		"callout_title_warning": "Warnung",
-		"callout_title_caution": "Achtung"
-	},
-	"array_field": {
-		"add_item": "Eintrag hinzufügen",
-		"remove_item": "Eintrag entfernen"
-	}
+  "callout": {
+    "callout_title_note": "Hinweis",
+    "callout_title_tip": "Tipp",
+    "callout_title_important": "Wichtig",
+    "callout_title_warning": "Warnung",
+    "callout_title_caution": "Achtung"
+  },
+  "array_field": {
+    "add_item": "Eintrag hinzufügen",
+    "remove_item": "Eintrag entfernen"
+  },
+  "password": {
+    "show": "Passwort anzeigen",
+    "hide": "Passwort ausblenden"
+  }
 }

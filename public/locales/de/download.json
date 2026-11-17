@@ -21,6 +21,8 @@
 	"unit": "Einheit",
 	"value": "Wert",
 	"timestamp": "Zeitstempel",
+	"coordinates": "Koordinaten",
+	"coordinatesRawOnly": "Koordinaten sind nur für Rohmessdaten verfügbar.",
 	"processingData": "Daten werden verarbeitet...",
 	"readyToDownload": "Bereit zum Herunterladen!",
 	"clickHere": "Hier klicken",

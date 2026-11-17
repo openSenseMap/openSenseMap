@@ -5,7 +5,6 @@ import {
 	Settings,
 	Compass,
 	PlusIcon,
-	DownloadIcon,
 	Info,
 } from 'lucide-react'
 import { useState } from 'react'
@@ -30,19 +29,12 @@ import Spinner from '~/components/spinner'
 import { toast } from '~/components/ui/use-toast'
 import { useOptionalUser } from '~/utils'
 import { Button } from '~/components/ui/button'
-import Download from '../download'
-
-interface MenuProps {
-	devices?: any
-}
-
-export default function Menu({ devices }: MenuProps) {
+export default function Menu() {
 	const [searchParams] = useSearchParams()
 	const redirectTo =
 		searchParams.size > 0 ? '/explore?' + searchParams.toString() : '/explore'
 
 	const [open, setOpen] = useState(false)
-	const [downloadOpen, setDownloadOpen] = useState(false)
 
 	const navigation = useNavigation()
 	const isLoggingOut = Boolean(navigation.state === 'submitting')
@@ -105,14 +97,14 @@ export default function Menu({ devices }: MenuProps) {
 									</div>
 								)}
 
-								<Link to="/about">
+								<Link to="/about" prefetch="intent">
 									<DropdownMenuItem className="cursor-pointer">
 										<Info className="mr-2 h-5 w-5" />
 										<span>{t('about_label')}</span>
 									</DropdownMenuItem>
 								</Link>
 								{!isExplore && (
-									<Link to="/explore">
+									<Link to="/explore" prefetch="intent">
 										<DropdownMenuItem className="cursor-pointer">
 											<Compass className="mr-2 h-5 w-5" />
 											<span>{t('explore_label')}</span>
@@ -121,7 +113,7 @@ export default function Menu({ devices }: MenuProps) {
 								)}
 
 								{matches[1]?.pathname !== '/settings' && (
-									<Link to="/settings/profile">
+									<Link to="/settings/profile" prefetch="intent">
 										<DropdownMenuItem className="cursor-pointer">
 											<Settings className="mr-2 h-5 w-5" />
 											{t('settings_label')}
@@ -130,7 +122,7 @@ export default function Menu({ devices }: MenuProps) {
 								)}
 
 								{matches[1]?.pathname !== '/profile' && (
-									<Link to="/profile/me">
+									<Link to="/profile/me" prefetch="intent">
 										<DropdownMenuItem className="cursor-pointer">
 											<User2 className="mr-2 h-5 w-5" />
 											{t('my_devices_label')}
@@ -139,31 +131,13 @@ export default function Menu({ devices }: MenuProps) {
 								)}
 
 								{matches[1]?.pathname !== '/profile' && (
-									<Link to="/device/new">
+									<Link to="/device/new" prefetch="intent">
 										<DropdownMenuItem className="cursor-pointer">
 											<PlusIcon className="mr-2 h-5 w-5" />
 											{t('add_device_label')}
 										</DropdownMenuItem>
 									</Link>
 								)}
-							</DropdownMenuGroup>
-						)}
-
-						{isExplore && (
-							<DropdownMenuGroup>
-								<DropdownMenuItem
-									className="cursor-pointer"
-									onSelect={(event) => {
-										event.preventDefault()
-										setOpen(false)
-										setDownloadOpen(true)
-									}}
-								>
-									<DownloadIcon className="mr-2 h-5 w-5" />
-									<span>{t('download_label', 'Download data')}</span>
-								</DropdownMenuItem>
-
-								<DropdownMenuSeparator />
 							</DropdownMenuGroup>
 						)}
 
@@ -179,6 +153,7 @@ export default function Menu({ devices }: MenuProps) {
 											pathname: 'login',
 											search: searchParams.toString(),
 										}}
+										prefetch="intent"
 										onClick={() => setOpen(false)}
 										className="w-full cursor-pointer"
 									>
@@ -217,13 +192,6 @@ export default function Menu({ devices }: MenuProps) {
 					</div>
 				</DropdownMenuContent>
 			</DropdownMenu>
-			{devices && (
-				<Download
-					devices={devices}
-					open={downloadOpen}
-					onOpenChange={setDownloadOpen}
-				/>
-			)}
 		</>
 	)
 }

@@ -1,8 +1,8 @@
 import { readItems } from '@directus/sdk'
 import { motion } from 'framer-motion'
 import { useTranslation } from 'react-i18next'
-import { data, Link, useLoaderData } from 'react-router'
-import { type Route } from './+types/_index'
+import { data, Link } from 'react-router'
+import { type Route } from './+types/about'
 import Footer from '~/components/landing/footer'
 import { GlobeComponent } from '~/components/landing/globe'
 import Header from '~/components/landing/header/header'
@@ -14,7 +14,7 @@ import PricingPlans from '~/components/landing/sections/pricing-plans'
 import Stats from '~/components/landing/stats'
 import { getLatestDevices } from '~/db/models/device.server'
 import { type SupportedLanguage } from '~/i18next-config'
-import { type Partner, getDirectusClient } from '~/lib/directus'
+import { getDirectusClient } from '~/lib/directus'
 import { getLocale } from '~/middleware/i18next'
 import { getUserId, getUserName } from '~/services/session-service.server'
 
@@ -95,13 +95,8 @@ export const loader = async ({ context, request }: Route.LoaderArgs) => {
 	})
 }
 
-export default function Index() {
-	const { partners, stats, latestDevices } = useLoaderData<{
-		partners: Partner[]
-		stats: number[]
-		latestDevices: any[]
-	}>()
-
+export default function Index({ loaderData }: Route.ComponentProps) {
+	const { partners, stats, latestDevices } = loaderData
 	const { t } = useTranslation('landing')
 	return (
 		<div className="min-h-screen bg-white dark:bg-black">
@@ -176,7 +171,6 @@ export default function Index() {
 										to="https://www.betterplace.org/de/projects/89947-opensensemap-org-die-freie-karte-fuer-umweltdaten"
 										target="_blank"
 										rel="noopener noreferrer"
-										prefetch="intent"
 									>
 										<motion.div
 											whileHover={{ scale: 1.1 }}

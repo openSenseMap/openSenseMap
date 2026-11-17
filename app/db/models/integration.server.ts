@@ -1,6 +1,7 @@
 import { asc, eq } from 'drizzle-orm'
 import { type Integration, integration } from '~/db/schema/integration'
 import { drizzleClient } from '~/db.server'
+import { logServerError } from '~/lib/sentry.server'
 
 export async function getIntegrations() {
 	return drizzleClient.query.integration.findMany({
@@ -61,6 +62,10 @@ export async function reconcileDeviceIntegrations({
 			)
 
 			if (!res.ok && res.status !== 404) {
+				logServerError('Device integration reconciliation failed', res, {
+					'app.operation': 'integration.reconcile_sensors',
+					'integration.slug': intg.slug,
+				})
 				const text = await res.text()
 				console.error(`Failed to reconcile ${intg.slug} integration`, {
 					status: res.status,
@@ -68,6 +73,10 @@ export async function reconcileDeviceIntegrations({
 				})
 			}
 		} catch (error) {
+			logServerError('Device integration reconciliation failed', error, {
+				'app.operation': 'integration.reconcile_sensors',
+				'integration.slug': intg.slug,
+			})
 			console.error(`Error reconciling ${intg.slug} integration`, error)
 		}
 	}

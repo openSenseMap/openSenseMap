@@ -21,6 +21,8 @@
 	"unit": "Unit",
 	"value": "Value",
 	"timestamp": "Timestamp",
+	"coordinates": "Coordinates",
+	"coordinatesRawOnly": "Coordinates are available for raw measurements only.",
 	"processingData": "Processing data...",
 	"readyToDownload": "Ready to download!",
 	"clickHere": "Click here",

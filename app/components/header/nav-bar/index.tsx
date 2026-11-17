@@ -1,13 +1,14 @@
 import { AnimatePresence, motion } from 'framer-motion'
-import { SearchIcon, XIcon } from 'lucide-react'
+import { DownloadIcon, SearchIcon, XIcon } from 'lucide-react'
 import { useState, useEffect, useRef, createContext } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useMap } from 'react-map-gl/maplibre'
 import NavbarHandler from './nav-bar-handler'
 import FilterVisualization from '~/components/map/filter-visualization'
-import { DeviceFeatureCollection } from '~/components/search/search-types'
+import { type DeviceFeatureCollection } from '~/components/search/search-types'
 import { cn } from '~/lib/utils'
-import { topbarSurface } from '~/components/map/topbar-styles'
+import { topbarSurface } from '~/components/ui/topbar-styles'
+import Download from '../download'
 
 interface NavBarProps {
 	devices: DeviceFeatureCollection
@@ -20,12 +21,14 @@ export const NavbarContext = createContext({
 
 export default function NavBar(props: NavBarProps) {
 	const [open, setOpen] = useState(false)
+	const [downloadOpen, setDownloadOpen] = useState(false)
 	const inputRef = useRef<HTMLInputElement>(null)
 	const [searchString, setSearchString] = useState('')
 
 	const { osem: mapRef } = useMap()
 
 	const { t } = useTranslation('search')
+	const { t: tDownload } = useTranslation('download')
 
 	useEffect(() => {
 		if (mapRef) {
@@ -113,6 +116,19 @@ export default function NavBar(props: NavBarProps) {
 						</span>
 					)}
 
+					<button
+						type="button"
+						onClick={() => {
+							setOpen(false)
+							setDownloadOpen(true)
+						}}
+						aria-label={tDownload('download')}
+						title={tDownload('download')}
+						className="flex size-8 shrink-0 items-center justify-center rounded-full hover:bg-black/5 dark:hover:bg-white/10"
+					>
+						<DownloadIcon className="h-5 w-5" aria-hidden="true" />
+					</button>
+
 					{open && (
 						<button
 							type="button"
@@ -171,6 +187,12 @@ export default function NavBar(props: NavBarProps) {
 					<FilterVisualization />
 				</div>
 			)}
+
+			<Download
+				devices={props.devices}
+				open={downloadOpen}
+				onOpenChange={setDownloadOpen}
+			/>
 		</div>
 	)
 }

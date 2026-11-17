@@ -15,8 +15,12 @@ export const profileImage = pgTable('profile_image', {
 	altText: text('alt_text'),
 	contentType: text('content_type').notNull(),
 	blob: bytea('blob').notNull(),
-	createdAt: timestamp('created_at').defaultNow().notNull(),
-	updatedAt: timestamp('updated_at').defaultNow().notNull(),
+	createdAt: timestamp('created_at', { withTimezone: true })
+		.defaultNow()
+		.notNull(),
+	updatedAt: timestamp('updated_at', { withTimezone: true })
+		.defaultNow()
+		.notNull(),
 	profileId: text('profile_id').references(() => profile.id, {
 		onDelete: 'cascade',
 		onUpdate: 'cascade',
