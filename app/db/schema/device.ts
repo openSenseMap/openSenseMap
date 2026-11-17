@@ -45,10 +45,14 @@ export const device = pgTable('device', {
 	status: DeviceStatusEnum('status').default('inactive'),
 	model: DeviceModelEnum('model').default('custom'),
 	public: boolean('public').default(false),
-	createdAt: timestamp('created_at').defaultNow().notNull(),
-	updatedAt: timestamp('updated_at').defaultNow().notNull(),
-	archivedAt: timestamp('archived_at'),
-	orphanedAt: timestamp('orphaned_at'),
+	createdAt: timestamp('created_at', { withTimezone: true })
+		.defaultNow()
+		.notNull(),
+	updatedAt: timestamp('updated_at', { withTimezone: true })
+		.defaultNow()
+		.notNull(),
+	archivedAt: timestamp('archived_at', { withTimezone: true }),
+	orphanedAt: timestamp('orphaned_at', { withTimezone: true }),
 	expiresAt: date('expires_at', { mode: 'date' }),
 	latitude: doublePrecision('latitude').notNull(),
 	longitude: doublePrecision('longitude').notNull(),
@@ -85,7 +89,7 @@ export const deviceToLocation = pgTable(
 		locationId: bigint('location_id', { mode: 'bigint' })
 			.notNull()
 			.references(() => location.id),
-		time: timestamp('time').defaultNow().notNull(),
+		time: timestamp('time', { withTimezone: true }).defaultNow().notNull(),
 	},
 	(t) => ({
 		pk: primaryKey({ columns: [t.deviceId, t.locationId, t.time] }),
