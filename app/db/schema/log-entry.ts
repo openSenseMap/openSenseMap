@@ -15,7 +15,9 @@ export const logEntry = pgTable('log_entry', {
 		.notNull()
 		.$defaultFn(() => createId()),
 	content: text('content').notNull(),
-	createdAt: timestamp('created_at').defaultNow().notNull(),
+	createdAt: timestamp('created_at', { withTimezone: true })
+		.defaultNow()
+		.notNull(),
 	public: boolean('public').default(false).notNull(),
 	deviceId: text('device_id').notNull(),
 })
