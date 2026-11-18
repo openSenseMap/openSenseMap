@@ -1,7 +1,7 @@
 import { ArrowLeft, ClipboardCopy, CopyCheck } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { redirect, Link, useLoaderData } from 'react-router'
+import { redirect, Link } from 'react-router'
 import { type Route } from './+types/device.$deviceId.overview'
 import { Table, TableBody, TableCell, TableRow } from '@/components/ui/table'
 import { NavBar } from '~/components/nav-bar'
@@ -26,8 +26,9 @@ export async function loader({ request, params }: Route.LoaderArgs) {
 	return { deviceData, sensorsData, userId }
 }
 
-export default function DeviceOverview() {
-	const { deviceData, sensorsData, userId } = useLoaderData<typeof loader>()
+export default function DeviceOverview({
+	loaderData: { deviceData, sensorsData, userId },
+}: Route.ComponentProps) {
 	const { t, i18n } = useTranslation('device-overview')
 	const [copiedToClipboard, setCopiedToClipboard] = useState<string | null>(
 		null,

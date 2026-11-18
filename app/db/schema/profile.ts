@@ -11,7 +11,6 @@ import {
 	real,
 	text,
 } from 'drizzle-orm/pg-core'
-import { profileImage } from './profile-image'
 import { user } from './user'
 
 /**
@@ -23,6 +22,7 @@ export const profile = pgTable('profile', {
 		.notNull()
 		.$defaultFn(() => createId()),
 	displayName: text('display_name').notNull(),
+	image: text('image'),
 	public: boolean('public').default(false),
 	homeLatitude: doublePrecision('home_latitude'),
 	homeLongitude: doublePrecision('home_longitude'),
@@ -43,10 +43,6 @@ export const profileRelations = relations(profile, ({ one }) => ({
 	user: one(user, {
 		fields: [profile.userId],
 		references: [user.id],
-	}),
-	profileImage: one(profileImage, {
-		fields: [profile.id],
-		references: [profileImage.profileId],
 	}),
 }))
 

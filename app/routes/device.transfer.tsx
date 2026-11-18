@@ -1,12 +1,6 @@
 import { ArrowLeft } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
-import {
-	Form,
-	Link,
-	redirect,
-	useActionData,
-	useNavigation,
-} from 'react-router'
+import { Form, Link, redirect, useNavigation } from 'react-router'
 import { type Route } from './+types/device.transfer'
 import Home from '~/components/header/home'
 import { Separator } from '~/components/ui/separator'
@@ -49,8 +43,7 @@ export async function action({ request }: Route.ActionArgs) {
 	}
 }
 
-export default function DeviceTransfer() {
-	const actionData = useActionData<typeof action>()
+export default function DeviceTransfer({ actionData }: Route.ComponentProps) {
 	const navigation = useNavigation()
 	const { t } = useTranslation('profile')
 	const isSubmitting = navigation.state === 'submitting'

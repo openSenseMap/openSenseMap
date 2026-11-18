@@ -1,5 +1,5 @@
 import { useTranslation } from 'react-i18next'
-import { redirect, useLoaderData } from 'react-router'
+import { redirect } from 'react-router'
 import { type Route } from './+types/profile.$username'
 import { getColumns, type SenseBox } from '~/components/mydevices/dt/columns'
 import {
@@ -123,14 +123,14 @@ export async function action({ request, params }: Route.ActionArgs) {
 	}
 }
 
-export default function ProfilePage() {
+export default function ProfilePage({ loaderData }: Route.ComponentProps) {
 	const {
 		profile,
 		sensorsCount,
 		measurementsCount,
 		requestingUserId,
 		deviceSchemas,
-	} = useLoaderData<typeof loader>()
+	} = loaderData
 
 	const { t, i18n } = useTranslation('profile')
 	const columnsTranslation = useTranslation('data-table')
@@ -145,10 +145,10 @@ export default function ProfilePage() {
 				<div className="border-border bg-card text-card-foreground flex w-full min-w-0 flex-col gap-6 rounded-xl border p-4 shadow-sm sm:p-6 lg:w-1/3">
 					<div className="flex items-center gap-4">
 						<Avatar className="h-16 w-16 shrink-0">
-							{profile?.profileImage?.id ? (
+							{profile?.image ? (
 								<AvatarImage
 									className="aspect-auto h-full w-full rounded-full object-cover"
-									src={`/resources/file/${profile.profileImage.id}`}
+									src={`/resources/profile-image/${profile.id}?v=${encodeURIComponent(profile.image)}`}
 								/>
 							) : null}
 							<AvatarFallback>

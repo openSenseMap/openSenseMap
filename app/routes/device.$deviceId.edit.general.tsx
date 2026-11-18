@@ -5,18 +5,21 @@ import {
 	data,
 	redirect,
 	Form,
-	useActionData,
 	useFetcher,
-	useLoaderData,
 	useNavigation,
 	useOutletContext,
 } from 'react-router'
 import invariant from 'tiny-invariant'
 import { type Route } from './+types/device.$deviceId.edit.general'
 import { MarkdownContent } from '~/components/markdown-content'
+import { UnsavedChangesBlocker } from '~/components/unsaved-changes-blocker'
 import { Button } from '~/components/ui/button'
-import { getDevice, getDeviceWithoutSensors } from '~/db/models/device.server'
 import { deleteMeasurementsForDevice } from '~/db/models/measurement.server'
+import {
+	getDevice,
+	getDeviceWithoutSensors,
+	updateDeviceImageIfUnchanged,
+} from '~/db/models/device.server'
 import { verifyLogin } from '~/db/models/user.server'
 import { type Device } from '~/db/schema'
 import {
@@ -24,6 +27,7 @@ import {
 	deleteDeviceImage,
 	getDeviceImageUrl,
 } from '~/lib/s3.server'
+import { logServerWarning } from '~/lib/sentry.server'
 import { updateDevice, deleteDevice } from '~/services/device-service.server'
 import { getUserEmail, getUserId } from '~/services/session-service.server'
 import {
@@ -31,7 +35,7 @@ import {
 	AUTOSAVE_DELAY_MS,
 } from '~/hooks/use-autosave-fetcher'
 import {
-	DeviceExposureType,
+	type DeviceExposureType,
 	DeviceExposureZodEnum,
 	getDeviceExposure,
 	parseDeviceExposure,
@@ -126,6 +130,18 @@ function parseGroupTag(value: FormDataEntryValue | null): string[] {
 
 function uniqueTags(tags: string[]) {
 	return Array.from(new Set(tags))
+}
+
+async function deleteStoredDeviceImage(
+	key: string,
+	deviceId: string,
+	message: string,
+) {
+	try {
+		await deleteDeviceImage(key)
+	} catch (error) {
+		logServerWarning(message, error, { 'device.id': deviceId })
+	}
 }
 
 //*****************************************************
@@ -352,12 +368,50 @@ export async function action({ request, params }: Route.ActionArgs) {
 				)
 			}
 
-			const result = await updateDevice(userId, device, {
-				image: imageKey,
-			})
+			let updatedDevice: Device | undefined
+			try {
+				updatedDevice = await updateDeviceImageIfUnchanged({
+					id: deviceID,
+					userId,
+					expectedImage: device.image,
+					image: imageKey,
+				})
+			} catch (error) {
+				await deleteStoredDeviceImage(
+					imageKey,
+					deviceID,
+					'Failed to clean up an unreferenced device image',
+				)
+				throw error
+			}
 
-			if (result === 'unauthorized') {
-				throw new Response('Forbidden', { status: 403 })
+			if (!updatedDevice) {
+				await deleteStoredDeviceImage(
+					imageKey,
+					deviceID,
+					'Failed to clean up an unreferenced device image',
+				)
+				return data(
+					{
+						intent,
+						errors: {
+							name: null,
+							exposure: null,
+							passwordDelete: null,
+							image: 'Device image changed during upload. Please try again.',
+						},
+						status: 409,
+					} satisfies DeviceGeneralActionData,
+					{ status: 409 },
+				)
+			}
+
+			if (device.image) {
+				await deleteStoredDeviceImage(
+					device.image,
+					deviceID,
+					'Failed to delete the previous device image',
+				)
 			}
 
 			return data(
@@ -376,24 +430,36 @@ export async function action({ request, params }: Route.ActionArgs) {
 		}
 
 		case 'removeImage': {
-			const deviceWithoutSensors = (await getDeviceWithoutSensors({
+			const updatedDevice = await updateDeviceImageIfUnchanged({
 				id: deviceID,
-			})) as Device | null
-
-			if (deviceWithoutSensors?.image) {
-				try {
-					await deleteDeviceImage(deviceWithoutSensors.image)
-				} catch (error) {
-					console.error('Failed to delete image:', error)
-				}
-			}
-
-			const result = await updateDevice(userId, device, {
-				image: '',
+				userId,
+				expectedImage: device.image,
+				image: null,
 			})
 
-			if (result === 'unauthorized') {
-				throw new Response('Forbidden', { status: 403 })
+			if (!updatedDevice) {
+				return data(
+					{
+						intent,
+						errors: {
+							name: null,
+							exposure: null,
+							passwordDelete: null,
+							image:
+								'Device image changed before it could be removed. Please try again.',
+						},
+						status: 409,
+					} satisfies DeviceGeneralActionData,
+					{ status: 409 },
+				)
+			}
+
+			if (device.image) {
+				await deleteStoredDeviceImage(
+					device.image,
+					deviceID,
+					'Failed to delete the removed device image',
+				)
 			}
 
 			return data(
@@ -412,9 +478,7 @@ export async function action({ request, params }: Route.ActionArgs) {
 		}
 
 		case 'deleteMeasurements': {
-			const password = String(
-				formData.get('passwordDeleteMeasurements') ?? '',
-			)
+			const password = String(formData.get('passwordDeleteMeasurements') ?? '')
 
 			if (!password) {
 				return data(
@@ -506,18 +570,6 @@ export async function action({ request, params }: Route.ActionArgs) {
 				)
 			}
 
-			const deviceWithoutSensors = (await getDeviceWithoutSensors({
-				id: deviceID,
-			})) as Device | null
-
-			if (deviceWithoutSensors?.image) {
-				try {
-					await deleteDeviceImage(deviceWithoutSensors.image)
-				} catch (error) {
-					console.error('Failed to delete device image:', error)
-				}
-			}
-
 			await deleteDevice(user, device, passwordDelete)
 
 			return redirect('/profile/me')
@@ -544,9 +596,10 @@ export async function action({ request, params }: Route.ActionArgs) {
 }
 
 //**********************************
-export default function EditDeviceGeneral() {
-	const { device, imageUrl } = useLoaderData<typeof loader>()
-	const actionData = useActionData<typeof action>()
+export default function EditDeviceGeneral({
+	loaderData: { device, imageUrl },
+	actionData,
+}: Route.ComponentProps) {
 	const navigation = useNavigation()
 	const deleteMeasurementsFetcher = useFetcher<typeof action>()
 	const { toast } = useToast()
@@ -829,6 +882,10 @@ export default function EditDeviceGeneral() {
 
 	return (
 		<div className="grid grid-rows-1">
+			<UnsavedChangesBlocker
+				autosaveState={autosave.navigationState}
+				when={imageFile !== null || newTag.trim().length > 0}
+			/>
 			<div className="flex min-h-full items-center justify-center">
 				<div className="font-helvetica mx-auto w-full">
 					<div>
@@ -1134,7 +1191,11 @@ Installed on the school roof.
 									}}
 								>
 									<AlertDialogTrigger asChild>
-										<Button type="button" variant="destructive" className="gap-2">
+										<Button
+											type="button"
+											variant="destructive"
+											className="gap-2"
+										>
 											<Trash2 className="h-4 w-4" />
 											{t('delete_measurements')}
 										</Button>

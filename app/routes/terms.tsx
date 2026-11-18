@@ -1,12 +1,6 @@
 import * as React from 'react'
 import { useTranslation } from 'react-i18next'
-import {
-	Form,
-	data,
-	redirect,
-	useActionData,
-	useLoaderData,
-} from 'react-router'
+import { Form, data, redirect } from 'react-router'
 import { type Route } from './+types/terms'
 import { MarkdownContent } from '~/components/markdown-content'
 import { Button } from '~/components/ui/button'
@@ -142,9 +136,10 @@ export async function action({ request }: Route.ActionArgs) {
 	})
 }
 
-export default function TermsPage() {
-	const { tos, canAcceptViaEmail, info } = useLoaderData<typeof loader>()
-	const actionData = useActionData<typeof action>()
+export default function TermsPage({
+	loaderData: { tos, canAcceptViaEmail, info },
+	actionData,
+}: Route.ComponentProps) {
 	const [checked, setChecked] = React.useState(false)
 
 	const { t, i18n } = useTranslation('terms')

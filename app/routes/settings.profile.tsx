@@ -1,7 +1,7 @@
 import { CopyIcon, CopyCheckIcon, InfoIcon } from 'lucide-react'
 import { useCallback, useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Form, Link, Outlet, useActionData, useLoaderData } from 'react-router'
+import { Form, Link, Outlet } from 'react-router'
 import { type Route } from './+types/settings.profile'
 
 import { Avatar, AvatarFallback, AvatarImage } from '~/components/ui/avatar'
@@ -39,6 +39,7 @@ import {
 import { getInitials } from '~/lib/strings'
 import { requireUserId } from '~/services/session-service.server'
 import { AutosaveStatusText } from '~/components/autosave-status.text'
+import { UnsavedChangesBlocker } from '~/components/unsaved-changes-blocker'
 
 export async function loader({ request }: Route.LoaderArgs) {
 	const userId = await requireUserId(request)
@@ -252,10 +253,10 @@ type ProfileAutosaveValues = {
 	isPublic: boolean
 }
 
-export default function EditUserProfilePage() {
-	const data = useLoaderData<typeof loader>()
-	const actionData = useActionData<typeof action>()
-
+export default function EditUserProfilePage({
+	loaderData: data,
+	actionData,
+}: Route.ComponentProps) {
 	const [displayName, setDisplayName] = useState(data.profile.displayName)
 	const [isPublic, setIsPublic] = useState(data.profile.public ?? false)
 
@@ -398,6 +399,7 @@ export default function EditUserProfilePage() {
 
 	return (
 		<div className="space-y-6">
+			<UnsavedChangesBlocker autosaveState={autosave.navigationState} />
 			<Card className="space-y-6">
 				<CardHeader>
 					<CardTitle>{t('profile_settings')}</CardTitle>
@@ -500,7 +502,11 @@ export default function EditUserProfilePage() {
 							<Avatar className="h-full w-full">
 								<AvatarImage
 									className="aspect-auto h-full w-full rounded-full object-cover"
-									src={'/resources/file/' + data.profile.profileImage?.id}
+									src={
+										data.profile.image
+											? `/resources/profile-image/${data.profile.id}?v=${encodeURIComponent(data.profile.image)}`
+											: undefined
+									}
 								/>
 								<AvatarFallback>
 									{getInitials(data.profile?.displayName ?? '')}
