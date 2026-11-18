@@ -45,7 +45,7 @@
     "@rjsf/utils": "^6.11.1",
     "@rjsf/validator-ajv8": "^6.11.0",
     "@sensebox/sketch-templater": "^1.13.6",
-    "@sentry/react-router": "^11.1.0",
+    "@sentry/react-router": "^11.12.0",
     "@stepperize/react": "^8.0.1",
     "@tanstack/react-table": "^9.3.1",
     "@turf/bbox": "^7.4.0",
