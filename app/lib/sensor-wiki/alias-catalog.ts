@@ -3,12 +3,11 @@ import rawCatalog from './aliases.json'
 import {
 	createSensorWikiAliasKey,
 	matchSensorWikiAlias,
-	type SensorWikiAliasEntry,
 } from './aliases'
 
 const nonEmptyString = z.string().trim().min(1)
 
-export const sensorWikiAliasEntrySchema = z.object({
+const sensorWikiAliasEntrySchema = z.object({
 	sensorWikiPhenomenon: nonEmptyString,
 	sensorWikiUnit: nonEmptyString.optional(),
 	title: nonEmptyString,
@@ -18,12 +17,7 @@ export const sensorWikiAliasEntrySchema = z.object({
 	sensorTypeAliases: z.array(nonEmptyString).optional(),
 })
 
-export type SensorWikiAliasCatalog = {
-	version: 1
-	entries: SensorWikiAliasEntry[]
-}
-
-export const sensorWikiAliasCatalogSchema = z
+const sensorWikiAliasCatalogSchema = z
 	.object({
 		version: z.literal(1),
 		entries: z.array(sensorWikiAliasEntrySchema).min(1),
@@ -69,11 +63,5 @@ export const sensorWikiAliasCatalogSchema = z
 		}
 	})
 
-export function parseSensorWikiAliasCatalog(
-	value: unknown,
-): SensorWikiAliasCatalog {
-	return sensorWikiAliasCatalogSchema.parse(value)
-}
-
-export const sensorWikiAliasCatalog = parseSensorWikiAliasCatalog(rawCatalog)
+export const sensorWikiAliasCatalog = sensorWikiAliasCatalogSchema.parse(rawCatalog)
 export const sensorWikiAliasEntries = sensorWikiAliasCatalog.entries

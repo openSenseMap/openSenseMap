@@ -18,7 +18,7 @@ import {
 import { cn } from '~/lib/utils'
 import { useTranslation } from 'react-i18next'
 
-export type ComboboxFilterOption = {
+type ComboboxFilterOption = {
 	value: string
 	label: string
 	description?: string
@@ -27,7 +27,7 @@ export type ComboboxFilterOption = {
 interface MultiSelectComboboxFilterProps {
 	label: string
 	values: string[]
-	options: Array<string | ComboboxFilterOption>
+	options: ComboboxFilterOption[]
 	placeholder: string
 	searchPlaceholder: string
 	emptyText: string
@@ -44,11 +44,8 @@ export default function MultiSelectComboboxFilter({
 	onChange,
 }: MultiSelectComboboxFilterProps) {
 	const { t } = useTranslation('filter')
-	const normalizedOptions = options.map((option) =>
-		typeof option === 'string' ? { value: option, label: option } : option,
-	)
 	const optionsByValue = new Map(
-		normalizedOptions.map((option) => [option.value, option]),
+		options.map((option) => [option.value, option]),
 	)
 
 	const toggleValue = (value: string) => {
@@ -100,7 +97,7 @@ export default function MultiSelectComboboxFilter({
 								<CommandEmpty>{emptyText}</CommandEmpty>
 
 								<CommandGroup>
-									{normalizedOptions.map((option) => {
+									{options.map((option) => {
 										const selected = values.includes(option.value)
 
 										return (

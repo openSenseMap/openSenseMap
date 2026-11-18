@@ -58,6 +58,19 @@ function enrichSensorWithAlias<T extends Sensor>(
 	}
 }
 
+function toSelectedSensor(sensor: Sensor): Sensor {
+	return {
+		id: sensor.id,
+		title: sensor.title,
+		unit: sensor.unit,
+		sensorType: sensor.sensorType,
+		icon: sensor.icon,
+		sensorWikiType: sensor.sensorWikiType,
+		sensorWikiPhenomenon: sensor.sensorWikiPhenomenon,
+		sensorWikiUnit: sensor.sensorWikiUnit,
+	}
+}
+
 export function CustomDeviceConfig() {
 	const { sensorWikiAliasEntries } = useLoaderData<typeof loader>()
 	const { control, setValue } = useFormContext()
@@ -101,7 +114,7 @@ export function CustomDeviceConfig() {
 		})
 
 	const sensorSuggestions = useMemo(
-		() => getSensorWikiAliasSuggestions(newSensor, sensorWikiAliasEntries, 5),
+		() => getSensorWikiAliasSuggestions(newSensor, sensorWikiAliasEntries),
 		[newSensor, sensorWikiAliasEntries],
 	)
 	const sensorWikiMatch = useMemo(
@@ -174,7 +187,7 @@ export function CustomDeviceConfig() {
 		setNewSensor((prev) => ({
 			...prev,
 			title: suggestion.title,
-			unit: prev.unit || suggestion.unit || '',
+			unit: suggestion.unit ?? prev.unit,
 			sensorWikiPhenomenon: suggestion.sensorWikiPhenomenon,
 			sensorWikiUnit: suggestion.sensorWikiUnit,
 		}))
@@ -212,16 +225,7 @@ export function CustomDeviceConfig() {
 					enrichSensorWithAlias(sensor, sensorWikiAliasEntries),
 				),
 			}
-			const schemaSensors = enrichedSchema.sensors.map((sensor) => ({
-				id: sensor.id,
-				title: sensor.title,
-				unit: sensor.unit,
-				sensorType: sensor.sensorType,
-				icon: sensor.icon,
-				sensorWikiType: sensor.sensorWikiType,
-				sensorWikiPhenomenon: sensor.sensorWikiPhenomenon,
-				sensorWikiUnit: sensor.sensorWikiUnit,
-			}))
+			const schemaSensors = enrichedSchema.sensors.map(toSelectedSensor)
 
 			setValue('deviceSchema', enrichedSchema)
 			setValue('deviceSchemaVersionId', undefined)
@@ -245,16 +249,7 @@ export function CustomDeviceConfig() {
 	}
 
 	const applyRegistrySchema = (schema: RegistryDeviceSchema) => {
-		const schemaSensors = schema.content.sensors.map((sensor) => ({
-			id: sensor.id,
-			title: sensor.title,
-			unit: sensor.unit,
-			sensorType: sensor.sensorType,
-			icon: sensor.icon,
-			sensorWikiType: sensor.sensorWikiType,
-			sensorWikiPhenomenon: sensor.sensorWikiPhenomenon,
-			sensorWikiUnit: sensor.sensorWikiUnit,
-		}))
+		const schemaSensors = schema.content.sensors.map(toSelectedSensor)
 
 		setSchemaError(null)
 		setValue('deviceSchema', undefined)
