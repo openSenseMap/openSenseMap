@@ -15,6 +15,7 @@ import {
 	useSearchParams,
 	useParams,
 	useLocation,
+	useNavigation,
 } from 'react-router'
 import { type Route } from './+types/explore'
 import Map from '~/components/map'
@@ -58,9 +59,12 @@ import {
 	type ClusterFeature,
 } from '~/components/cluster-marker'
 import MapHeader from '~/components/map/topbar'
+import { DeviceDetailPending } from '~/components/device-detail/device-detail-pending'
+import Spinner from '~/components/spinner'
 import { getTags } from '~/services/device-service.server'
 import { getPhenomena } from '~/db/models/phenomena.server'
 import { DOWNLOAD_FILTER_KEYS } from '~/components/header/download'
+import { getExplorePendingUi } from '~/lib/explore-pending-navigation'
 import { getApproximateMeasurementCount } from '~/services/statistics-service.server'
 
 export { shouldRevalidate } from '~/lib/explore-revalidation'
@@ -528,6 +532,7 @@ export default function Explore({ loaderData }: Route.ComponentProps) {
 	const clusterZoomRef = useRef<number | null>(null)
 	const navigate = useNavigate()
 	const location = useLocation()
+	const navigation = useNavigation()
 	const mapFilterSearch = useMemo(() => {
 		const params = new URLSearchParams(location.search)
 		for (const key of ['aggregation', 'date_from', 'date_to']) {
@@ -540,6 +545,11 @@ export default function Explore({ loaderData }: Route.ComponentProps) {
 		[devices, mapFilterSearch],
 	)
 	const outlet = useOutlet()
+	const pendingUi = getExplorePendingUi({
+		navigationState: navigation.state,
+		currentLocation: location,
+		nextLocation: navigation.location,
+	})
 	const [selectedPheno, setSelectedPheno] = useState<any | undefined>(undefined)
 	const [searchParams] = useSearchParams()
 	const [filteredData, setFilteredData] = useState<
@@ -1040,7 +1050,7 @@ export default function Explore({ loaderData }: Route.ComponentProps) {
 	useEffect(() => removeAllClusterMarkers, [removeAllClusterMarkers])
 
 	return (
-		<div className="h-full w-full">
+		<div className="relative h-full w-full" aria-busy={pendingUi.filters}>
 			<MapProvider>
 				<MapHeader
 					devices={filteredDevices}
@@ -1049,6 +1059,18 @@ export default function Explore({ loaderData }: Route.ComponentProps) {
 					onMyAreaClick={() => focusMyArea(myAreaTarget)}
 					canFocusMyArea={Boolean(myAreaTarget)}
 				/>
+				{pendingUi.filters && (
+					<div
+						className="pointer-events-none absolute top-20 left-1/2 z-30 flex -translate-x-1/2 items-center gap-2 rounded-full bg-white/90 px-3 py-2 text-sm text-zinc-800 shadow-lg ring-1 ring-black/5 backdrop-blur-xs dark:bg-zinc-800/90 dark:text-zinc-200 dark:ring-white/10"
+						role="status"
+						aria-live="polite"
+					>
+						<div className="scale-50">
+							<Spinner />
+						</div>
+						<span>{t('updating_map_results')}</span>
+					</div>
+				)}
 				{/* <Header devices={devices} /> */}
 				{selectedPheno && (
 					<Legend
@@ -1184,9 +1206,12 @@ export default function Explore({ loaderData }: Route.ComponentProps) {
 						/>
 					)}
 
-					{outlet && (
+					{(pendingUi.deviceDetail ||
+						(outlet && !pendingUi.dismissDeviceDetail)) && (
 						<div className="pointer-events-none absolute inset-0 z-50">
-							<div className="pointer-events-auto h-full w-full">{outlet}</div>
+							<div className="pointer-events-auto h-full w-full">
+								{pendingUi.deviceDetail ? <DeviceDetailPending /> : outlet}
+							</div>
 						</div>
 					)}
 				</Map>
