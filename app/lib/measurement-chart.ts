@@ -71,22 +71,32 @@ function toNumericValue(value: unknown) {
 	return Number.isFinite(numericValue) ? numericValue : null
 }
 
+// Aggregated averages come back with many decimals; two are enough to display.
+function roundToTwoDecimals(value: number | null) {
+	return value === null ? null : Math.round(value * 100) / 100
+}
+
 // Filters once so that value/min/max series stay index-aligned.
 function normalizeMeasurements(
 	measurements: MeasurementChartMeasurement[],
+	isAggregated: boolean,
 ): NormalizedMeasurement[] {
+	const round = isAggregated
+		? roundToTwoDecimals
+		: (value: number | null) => value
+
 	return measurements
 		.map((measurement): NormalizedMeasurement | null => {
 			const timestamp = toTimestamp(measurement.time)
-			const value = toNumericValue(measurement.value)
+			const value = round(toNumericValue(measurement.value))
 
 			if (timestamp === null || value === null) return null
 
 			return {
 				timestamp,
 				value,
-				minValue: toNumericValue(measurement.min_value),
-				maxValue: toNumericValue(measurement.max_value),
+				minValue: round(toNumericValue(measurement.min_value)),
+				maxValue: round(toNumericValue(measurement.max_value)),
 				locationId: measurement.locationId ?? null,
 			}
 		})
@@ -125,7 +135,10 @@ export function createMeasurementChartData(
 			const label = includeDeviceName
 				? `${sensor.title} (${sensor.device_name})`
 				: sensor.title
-			const normalizedMeasurements = normalizeMeasurements(sensor.data)
+			const normalizedMeasurements = normalizeMeasurements(
+				sensor.data,
+				isAggregated,
+			)
 			const createBaseDataset = (
 				measurements: NormalizedMeasurement[],
 			): MeasurementChartDataset => ({
