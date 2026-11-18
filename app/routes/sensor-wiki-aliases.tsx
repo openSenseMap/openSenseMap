@@ -1,6 +1,5 @@
 import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Link } from 'react-router'
 import { type Route } from './+types/sensor-wiki-aliases'
 import { Badge } from '~/components/ui/badge'
 import { Button } from '~/components/ui/button'
@@ -10,7 +9,7 @@ import { sensorWikiAliasCatalog } from '~/lib/sensor-wiki/alias-catalog'
 import { normalizeSensorWikiAliasValue } from '~/lib/sensor-wiki/aliases'
 
 const CONTRIBUTION_GUIDE_URL =
-	'https://github.com/openSenseMap/frontend/blob/dev/app/lib/device-schemas/SENSOR_WIKI_ALIASES.md'
+	'https://github.com/openSenseMap/openSenseMap/blob/dev/app/lib/sensor-wiki/SENSOR_WIKI_ALIASES.md'
 
 export const meta: Route.MetaFunction = () => [
 	{ title: 'Supported Sensor-Wiki mappings | openSenseMap' },
@@ -86,7 +85,7 @@ export default function SensorWikiAliasesRoute({
 							<a href={CONTRIBUTION_GUIDE_URL}>{t('contribute')}</a>
 						</Button>
 						<Button asChild variant="outline">
-							<Link to="/resources/sensor-wiki-aliases">{t('view_json')}</Link>
+							<a href="/resources/sensor-wiki-aliases">{t('view_json')}</a>
 						</Button>
 					</div>
 				</header>

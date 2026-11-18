@@ -1,7 +1,6 @@
 import { isNotNull, isNull, ne, and, asc, eq, sql } from 'drizzle-orm'
 import { drizzleClient } from '~/db.server'
 import {
-	PHENOMENON_FUZZY_MATCH_THRESHOLD,
 	getFuzzySensorWikiPhenomenonMatch,
 	getCanonicalSensorWikiPhenomenon,
 	getSensorWikiPhenomenonFilterValue,
@@ -70,7 +69,6 @@ export const getPhenomena = async function findPhenomena(): Promise<
 			getFuzzySensorWikiPhenomenonMatch(
 				row,
 				sensorWikiAliasEntries,
-				PHENOMENON_FUZZY_MATCH_THRESHOLD,
 			)?.sensorWikiPhenomenon
 
 		if (canonicalPhenomenon) {

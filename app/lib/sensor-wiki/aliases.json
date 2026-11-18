@@ -10,10 +10,15 @@
         "bodentemperatur",
         "bodentemperatur 10cm",
         "bodentemperatur 30cm",
+        "bodentemperatur 60cm",
+        "bodentemperatur 80cm",
         "bodentemperatur_1",
         "bodentemperatur_2",
         "temperatur",
+        "temperatur (aht)",
+        "temperatur (bmp)",
         "temperatur bme280",
+        "temperatur bmp280",
         "temperatur dht22",
         "temperatur heca",
         "temperatur scd30",
@@ -36,6 +41,7 @@
         "humidity",
         "luftfeuchte",
         "luftfeuchtigkeit",
+        "rel. humidity",
         "rel luftfeuchte",
         "rel luftfeuchte bme280",
         "rel luftfeuchte dht22",
@@ -89,7 +95,7 @@
       "sensorWikiUnit": "ug/m3",
       "title": "PM10",
       "unit": "µg/m³",
-      "titleAliases": ["feinstaub pm10", "particle 10", "particulate matter 10", "pm 10", "pm10"],
+      "titleAliases": ["feinstaub pm10", "finedust pm10", "particle 10", "particulate matter 10", "pm 10", "pm10"],
       "unitAliases": ["µg/m³"]
     },
     {
@@ -101,6 +107,7 @@
         "particle 2.5",
         "particulate matter 2.5",
         "feinstaub pm2.5",
+        "finedust pm2.5",
         "pm 2.5",
         "pm2.5",
         "pm25"
@@ -112,7 +119,7 @@
       "sensorWikiUnit": "lx",
       "title": "Ambient light",
       "unit": "lx",
-      "titleAliases": ["ambient light", "beleuchtungsstärke", "helligkeit", "illuminance", "light"],
+      "titleAliases": ["ambient light", "beleuchtungstärke", "beleuchtungsstärke", "helligkeit", "illuminance", "lichtintesität", "light"],
       "unitAliases": ["lux", "lx"]
     },
     {
@@ -141,6 +148,7 @@
         "bodenfeuchte 10cm",
         "bodenfeuchte 30cm",
         "bodenfeuchte 60cm",
+        "bodenfeuchte 80cm",
         "bodenfeuchte_1",
         "bodenfeuchte_2",
         "soil moisture"
@@ -152,7 +160,7 @@
       "sensorWikiUnit": "ppm",
       "title": "CO2",
       "unit": "ppm",
-      "titleAliases": ["carbon dioxide", "co2"],
+      "titleAliases": ["carbon dioxide", "co2", "co2 konzentration"],
       "unitAliases": ["parts per million", "ppm"]
     },
     {
@@ -223,7 +231,8 @@
         "noise",
         "sound level",
         "soundpresure dba",
-        "soundpressure dba"
+        "soundpressure dba",
+        "umgebungslautstärke"
       ],
       "unitAliases": ["dB", "dBA", "dBavg", "dBmin"]
     },
@@ -235,7 +244,7 @@
     {
       "sensorWikiPhenomenon": "water_temperature",
       "title": "Water temperature",
-      "titleAliases": ["water temperature"]
+      "titleAliases": ["water temperature", "wassertemperatur"]
     },
     {
       "sensorWikiPhenomenon": "wind_direction",

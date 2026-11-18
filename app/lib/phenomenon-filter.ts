@@ -7,7 +7,7 @@ import {
 
 const SENSOR_WIKI_FILTER_PREFIX = 'sensor-wiki:'
 const TITLE_FILTER_PREFIX = 'title:'
-export const PHENOMENON_FUZZY_MATCH_THRESHOLD = 0.82
+const PHENOMENON_FUZZY_MATCH_THRESHOLD = 0.82
 
 export type PhenomenonFilterOption = {
 	value: string
@@ -64,26 +64,12 @@ export function getSensorWikiPhenomenonLabel(
 	)
 }
 
-export function getSensorWikiPhenomenonAliases(
-	phenomenon: string,
-	entries: SensorWikiAliasEntry[],
-) {
-	return entries
-		.filter((entry) => entry.sensorWikiPhenomenon === phenomenon)
-		.flatMap((entry) => [entry.title, ...entry.titleAliases])
-}
-
 export function getCanonicalSensorWikiPhenomenon(
 	input: SensorWikiAliasInput & { sensorWikiPhenomenon?: string | null },
 	entries: SensorWikiAliasEntry[],
 ) {
-	const existingCanonicalPhenomenon = entries.find(
-		(entry) => entry.sensorWikiPhenomenon === input.sensorWikiPhenomenon,
-	)?.sensorWikiPhenomenon
-
 	return (
-		existingCanonicalPhenomenon ??
-		input.sensorWikiPhenomenon ??
+		input.sensorWikiPhenomenon?.trim() ||
 		matchSensorWikiAlias(input, entries)?.sensorWikiPhenomenon
 	)
 }
@@ -162,7 +148,6 @@ function aliasIncludesValue(
 export function getFuzzySensorWikiPhenomenonMatch(
 	input: SensorWikiAliasInput,
 	entries: SensorWikiAliasEntry[],
-	threshold = PHENOMENON_FUZZY_MATCH_THRESHOLD,
 ) {
 	const normalizedTitle = normalizeSensorWikiAliasValue(input.title)
 	const normalizedUnit = normalizeSensorWikiAliasValue(input.unit)
@@ -170,7 +155,7 @@ export function getFuzzySensorWikiPhenomenonMatch(
 
 	if (normalizedTitle.length < 3) return undefined
 
-	const bestMatch = entries
+	const rankedMatches = entries
 		.map((entry) => {
 			const titleScore = [entry.title, ...entry.titleAliases].reduce(
 				(bestScore, alias) =>
@@ -206,43 +191,23 @@ export function getFuzzySensorWikiPhenomenonMatch(
 				score,
 			}
 		})
-		.sort((left, right) => right.score - left.score)[0]
+		.sort((left, right) => right.score - left.score)
+	const [bestMatch] = rankedMatches
 
-	if (!bestMatch || bestMatch.score < threshold) return undefined
+	if (!bestMatch || bestMatch.score < PHENOMENON_FUZZY_MATCH_THRESHOLD) {
+		return undefined
+	}
+	if (
+		rankedMatches.some(
+			(match) =>
+				match.score === bestMatch.score &&
+				match.sensorWikiPhenomenon !== bestMatch.sensorWikiPhenomenon,
+		)
+	) {
+		return undefined
+	}
 
 	return bestMatch
-}
-
-export function sensorMatchesPhenomenonFilter(
-	sensor: SensorWikiAliasInput & { sensorWikiPhenomenon?: string | null },
-	filterValue: string,
-	entries: SensorWikiAliasEntry[],
-) {
-	const parsedFilter = parsePhenomenonFilterValue(filterValue)
-
-	if (parsedFilter.source === 'title') {
-		return (
-			normalizeSensorWikiAliasValue(sensor.title) ===
-			normalizeSensorWikiAliasValue(parsedFilter.title)
-		)
-	}
-
-	const canonicalPhenomenon = getCanonicalSensorWikiPhenomenon(sensor, entries)
-	if (canonicalPhenomenon === parsedFilter.phenomenon) return true
-
-	const fuzzyPhenomenon = getFuzzySensorWikiPhenomenonMatch(
-		sensor,
-		entries,
-		PHENOMENON_FUZZY_MATCH_THRESHOLD,
-	)
-	if (fuzzyPhenomenon?.sensorWikiPhenomenon === parsedFilter.phenomenon) {
-		return true
-	}
-
-	const normalizedTitle = normalizeSensorWikiAliasValue(sensor.title)
-	return getSensorWikiPhenomenonAliases(parsedFilter.phenomenon, entries).some(
-		(alias) => normalizeSensorWikiAliasValue(alias) === normalizedTitle,
-	)
 }
 
 export function sensorMatchesAnyPhenomenonFilter(
@@ -250,7 +215,27 @@ export function sensorMatchesAnyPhenomenonFilter(
 	filterValues: string[],
 	entries: SensorWikiAliasEntry[],
 ) {
-	return filterValues.some((filterValue) =>
-		sensorMatchesPhenomenonFilter(sensor, filterValue, entries),
+	const filters = filterValues.map(parsePhenomenonFilterValue)
+	const normalizedTitle = normalizeSensorWikiAliasValue(sensor.title)
+
+	if (
+		filters.some(
+			(filter) =>
+				filter.source === 'title' &&
+				normalizeSensorWikiAliasValue(filter.title) === normalizedTitle,
+		)
+	) {
+		return true
+	}
+
+	if (!filters.some((filter) => filter.source === 'sensor-wiki')) return false
+
+	const phenomenon =
+		getCanonicalSensorWikiPhenomenon(sensor, entries) ??
+		getFuzzySensorWikiPhenomenonMatch(sensor, entries)?.sensorWikiPhenomenon
+
+	return filters.some(
+		(filter) =>
+			filter.source === 'sensor-wiki' && filter.phenomenon === phenomenon,
 	)
 }
