@@ -70,4 +70,28 @@ describe('hackAIR decoding', () => {
 			}),
 		).rejects.toThrow('No applicable values found')
 	})
+
+	it('routes catalog sensors by definition ID after their titles are renamed', async () => {
+		const measurements = await decodeMeasurements(payload, {
+			contentType: 'hackair',
+			sensors: [
+				{
+					id: 'pm10-id',
+					title: 'Coarse particles outside',
+					data: { sensorDefinitionId: 'sds011_pm10' },
+				},
+				{
+					id: 'pm25-id',
+					title: 'PM10',
+					data: { sensorDefinitionId: 'sds011_pm25' },
+				},
+			],
+		})
+
+		expect(measurements).toHaveLength(1)
+		expect(measurements[0]).toMatchObject({
+			sensor_id: 'pm10-id',
+			value: 10.1,
+		})
+	})
 })

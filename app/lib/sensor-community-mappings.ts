@@ -23,7 +23,10 @@ export const sensorCommunityDecoderMappings = {
 	pms5003_pm10: [{ valueType: 'PMS_P1' }],
 	bme280_temperature: [{ valueType: 'BME280_temperature' }],
 	sht3x_humidity: [{ valueType: 'SHT3X_humidity' }],
-	bmp180_temperature: [{ valueType: 'BMP180_temperature' }],
+	bmp180_temperature: [
+		{ valueType: 'BMP_temperature' },
+		{ valueType: 'BMP180_temperature' },
+	],
 	sds011_pm25: [{ valueType: 'SDS_P2' }],
 	sps30_pm10: [{ valueType: 'SPS30_P1' }],
 	pms7003_pm25: [{ valueType: 'PMS_P2' }],
@@ -32,7 +35,10 @@ export const sensorCommunityDecoderMappings = {
 	pms7003_pm10: [{ valueType: 'PMS_P1' }],
 	sps30_pm25: [{ valueType: 'SPS30_P2' }],
 	bme280_pressure_hpa: [{ valueType: 'BME280_pressure', multiplier: 0.01 }],
-	bmp180_pressure_pa: [{ valueType: 'BMP180_pressure' }],
+	bmp180_pressure_pa: [
+		{ valueType: 'BMP_pressure' },
+		{ valueType: 'BMP180_pressure' },
+	],
 	sds011_pm10: [{ valueType: 'SDS_P1' }],
 	sps30_pm1: [{ valueType: 'SPS30_P0' }],
 	pms1003_pm01: [{ valueType: 'PMS_P0' }],
@@ -46,7 +52,7 @@ export const sensorCommunityDecoderMappings = {
 	sps30_nc10: [{ valueType: 'SPS30_N10' }],
 	// The Leusden SEN55 firmware defaults to emulating PM/NC values as SPS30
 	// and temperature/humidity values as SHT3X for openSenseMap and
-	// Sensor.Community compatibility. 
+	// Sensor.Community compatibility.
 	// https://github.com/FijnStofGroep/sensors-software-Leusden
 	sen55_pm1: [
 		{ valueType: 'SPS30_P0' },
@@ -112,7 +118,10 @@ export const sensorCommunityDecoderMappings = {
 	sen55_nox: [{ valueType: 'SEN5X_nox' }, { valueType: 'SEN55_nox' }],
 	pms1003_pm10: [{ valueType: 'PMS_P1' }],
 	pms3003_pm25: [{ valueType: 'PMS_P2' }],
-	bmp180_pressure_hpa: [{ valueType: 'BMP180_pressure', multiplier: 0.01 }],
+	bmp180_pressure_hpa: [
+		{ valueType: 'BMP_pressure', multiplier: 0.01 },
+		{ valueType: 'BMP180_pressure', multiplier: 0.01 },
+	],
 	pms3003_pm01: [{ valueType: 'PMS_P0' }],
 	dht11_temperature: [
 		{ valueType: 'temperature' },
@@ -120,7 +129,7 @@ export const sensorCommunityDecoderMappings = {
 	],
 	dht11_humidity: [{ valueType: 'humidity' }, { valueType: 'DHT11_humidity' }],
 	pms3003_pm10: [{ valueType: 'PMS_P1' }],
-	dnms_la_eq: [{ valueType: 'DNMS_noise_LAeq' }], 
+	dnms_la_eq: [{ valueType: 'DNMS_noise_LAeq' }],
 } as const satisfies Partial<
 	Record<SensorDefinitionId, readonly DecoderValueMapping[]>
 >

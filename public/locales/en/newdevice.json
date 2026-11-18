@@ -32,6 +32,7 @@
 	"exposure": "Exposure",
 	"selected": "Selected",
 	"select_all_phenomenons": "Select all phenomenons",
+	"select_sensors_individually": "Choose sensors individually below; some options use the same incoming value.",
 	"exposure_explaination": "This is how your device is exposed/placed.",
 	"indoor": "Indoor",
 	"outdoor": "Outdoor",

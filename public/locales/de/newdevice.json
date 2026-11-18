@@ -32,6 +32,7 @@
 	"exposure": "Standort",
 	"selected": "Ausgewählt",
 	"select_all_phenomenons": "Alle Phänomene auswählen",
+	"select_sensors_individually": "Wähle die Sensoren unten einzeln aus; einige Optionen verwenden denselben eingehenden Messwert.",
 	"exposure_explaination": "Der Standort deiner Station.",
 	"indoor": "Drinnen",
 	"outdoor": "Draußen",

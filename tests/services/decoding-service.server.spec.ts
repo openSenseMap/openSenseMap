@@ -114,7 +114,7 @@ describe('Luftdaten decoding', () => {
 		).rejects.toThrow('No applicable values found')
 	})
 
-	it('title-matches a sensor whose definition has no decoder mapping', async () => {
+	it('routes a renamed sensor whose definition has no decoder mapping', async () => {
 		const measurements = await decodeMeasurements(
 			{
 				sensordatavalues: [{ value_type: 'BME680_temperature', value: '21.5' }],
@@ -124,7 +124,7 @@ describe('Luftdaten decoding', () => {
 				sensors: [
 					{
 						id: 'temperature-id',
-						title: 'Lufttemperatur',
+						title: 'Outdoor temperature renamed',
 						sensorType: 'BME680',
 						data: { sensorDefinitionId: 'bme680_temperature' },
 					},
@@ -166,6 +166,39 @@ describe('Luftdaten decoding', () => {
 			expect(measurements[0].value).toBeCloseTo(expectedValue)
 		},
 	)
+
+	it('routes airRohr BMP aliases and converts pressure to hPa', async () => {
+		const measurements = await decodeMeasurements(
+			{
+				sensordatavalues: [
+					{ value_type: 'BMP_temperature', value: '23.5' },
+					{ value_type: 'BMP_pressure', value: '101517.36' },
+				],
+			},
+			{
+				contentType: 'luftdaten',
+				sensors: [
+					{
+						id: 'temperature-id',
+						title: 'Renamed temperature',
+						data: { sensorDefinitionId: 'bmp180_temperature' },
+					},
+					{
+						id: 'pressure-id',
+						title: 'Renamed pressure',
+						data: { sensorDefinitionId: 'bmp180_pressure_hpa' },
+					},
+				],
+			},
+		)
+
+		expect(measurements.map(({ sensor_id }) => sensor_id)).toEqual([
+			'temperature-id',
+			'pressure-id',
+		])
+		expect(measurements[0].value).toBe(23.5)
+		expect(measurements[1].value).toBeCloseTo(1015.1736)
+	})
 
 	it('keeps the first value when multiple values resolve to one sensor', async () => {
 		const measurements = await decodeMeasurements(

@@ -2,6 +2,8 @@ import {
 	type DecoderValueMapping,
 	sensorCommunityDecoderMappings,
 } from '~/lib/sensor-community-mappings'
+import { sensorDefinitions } from '~/lib/sensor-definitions'
+import { getSensorDefinitionId } from '~/lib/sensor-routing'
 import {
 	findUniqueSensorIdByTitle,
 	type SensorLike,
@@ -42,21 +44,6 @@ type LuftdatenSensorMapping = {
 type LuftdatenRouteIndex = {
 	definitionRoutes: Map<string, LuftdatenSensorMapping[]>
 	legacySensors: SensorLike[]
-}
-
-/** Reads the stable catalogue identity persisted on newly created sensors. */
-function getSensorDefinitionId(sensor: SensorLike): string | undefined {
-	if (
-		!sensor.data ||
-		typeof sensor.data !== 'object' ||
-		Array.isArray(sensor.data)
-	) {
-		return undefined
-	}
-
-	const sensorDefinitionId = (sensor.data as Record<string, unknown>)
-		.sensorDefinitionId
-	return typeof sensorDefinitionId === 'string' ? sensorDefinitionId : undefined
 }
 
 /** Splits an upload name into sensor-type and phenomenon parts. */
@@ -132,13 +119,22 @@ function buildLuftdatenRouteIndex(sensors: SensorLike[]): LuftdatenRouteIndex {
 	>
 
 	for (const sensor of sensors) {
-		const definitionId = getSensorDefinitionId(sensor)
+		const definitionId = getSensorDefinitionId(sensor.data)
 		const hasAuthoritativeMapping =
 			definitionId !== undefined &&
 			Object.prototype.hasOwnProperty.call(decoderMappings, definitionId)
 
-		if (!definitionId || !hasAuthoritativeMapping) {
+		if (!definitionId) {
 			legacySensors.push(sensor)
+			continue
+		}
+		if (!hasAuthoritativeMapping) {
+			const definition = sensorDefinitions[definitionId]
+			legacySensors.push({
+				...sensor,
+				title: definition.title,
+				sensorType: definition.sensorType,
+			})
 			continue
 		}
 
@@ -156,9 +152,10 @@ function buildLuftdatenRouteIndex(sensors: SensorLike[]): LuftdatenRouteIndex {
 /** Prefers an exact definition route and falls back to legacy title matching. */
 function findLuftdatenSensorMapping(
 	routeIndex: LuftdatenRouteIndex,
-	valueType: string,
+	valueType: unknown,
 ): LuftdatenSensorMapping | undefined {
-	const normalizedValueType = valueType?.toLowerCase()
+	if (typeof valueType !== 'string') return undefined
+	const normalizedValueType = valueType.toLowerCase()
 	if (!normalizedValueType) return undefined
 
 	const definitionMatches =

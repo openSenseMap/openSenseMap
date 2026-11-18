@@ -42,6 +42,7 @@ import {
 	getSensorTemplateValidationError,
 } from '~/lib/model-definitions'
 import { deleteDeviceImage } from '~/lib/s3.server'
+import { prepareSensorDefinitionEdit } from '~/lib/sensor-routing'
 import { logServerWarning } from '~/lib/sentry.server'
 import {
 	createOrReusePrivateDeviceSchemaVersionFromUpload,
@@ -607,11 +608,11 @@ export async function updateDevice(
 					})
 					nextSensorOrder += 1
 				} else if (hasEdited && s._id) {
-					const sensorExists = existingSensors.some(
+					const existingSensor = existingSensors.find(
 						(existing) => existing.id === s._id,
 					)
 
-					if (!sensorExists) {
+					if (!existingSensor) {
 						throw new DeviceUpdateError(
 							`Sensor with id ${s._id} not found for editing.`,
 						)
@@ -623,6 +624,15 @@ export async function updateDevice(
 						)
 					}
 
+					const routingEdit = prepareSensorDefinitionEdit(
+						existingDevice.model,
+						existingSensor,
+						{ unit: s.unit, sensorType: s.sensorType },
+					)
+					if (!routingEdit.success) {
+						throw new DeviceUpdateError(routingEdit.message)
+					}
+
 					await tx
 						.update(sensor)
 						.set({
@@ -630,6 +640,7 @@ export async function updateDevice(
 							unit: s.unit,
 							sensorType: s.sensorType,
 							icon: s.icon,
+							data: routingEdit.data,
 							updatedAt: sql`NOW()`,
 						})
 						.where(eq(sensor.id, s._id))

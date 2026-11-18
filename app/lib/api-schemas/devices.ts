@@ -60,7 +60,10 @@ export const CreateDeviceSchema = z
 		elevationLookupConsent: ElevationLookupConsentSchema.optional(),
 		grouptag: z.array(z.string()).optional().default([]),
 		model: ApiDeviceModelZodSchema.optional().default('custom'),
-		sensorTemplates: z.array(z.string()).optional(),
+		sensorTemplates: z.array(z.string()).optional().meta({
+			description:
+				'Required for model luftdaten.info so incoming values can be routed without ambiguity.',
+		}),
 		sensors: z
 			.array(
 				z.object({

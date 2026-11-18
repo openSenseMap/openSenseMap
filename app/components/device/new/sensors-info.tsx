@@ -234,6 +234,12 @@ export function SensorSelectionStep() {
 					const isFullySelected = isGroupFullySelected(group)
 					const isPartiallySelected = isGroupPartiallySelected(group)
 					const selectedCount = getSelectedCountForGroup(group)
+					const hasConflictingOptions = Boolean(
+						findSensorTemplateMappingConflict(
+							selectedDevice,
+							group.sensors.flatMap((sensor) => (sensor.id ? [sensor.id] : [])),
+						),
+					)
 
 					return (
 						<AccordionItem
@@ -274,25 +280,31 @@ export function SensorSelectionStep() {
 							</AccordionTrigger>
 							<AccordionContent className="pb-4">
 								<div className="space-y-3 pt-2">
-									<div
-										className="bg-muted/50 flex items-center space-x-3 rounded-md p-3"
-										onClick={(e) => e.stopPropagation()}
-									>
-										<Checkbox
-											id={`group-${group.sensorType}`}
-											checked={isFullySelected}
-											data-state={
-												isPartiallySelected ? 'indeterminate' : undefined
-											}
-											onCheckedChange={() => handleGroupToggle(group)}
-										/>
-										<Label
-											htmlFor={`group-${group.sensorType}`}
-											className="cursor-pointer font-medium"
+									{hasConflictingOptions ? (
+										<p className="bg-muted/50 text-muted-foreground rounded-md p-3 text-sm">
+											{t('select_sensors_individually')}
+										</p>
+									) : (
+										<div
+											className="bg-muted/50 flex items-center space-x-3 rounded-md p-3"
+											onClick={(e) => e.stopPropagation()}
 										>
-											{t('select_all_phenomenons')}
-										</Label>
-									</div>
+											<Checkbox
+												id={`group-${group.sensorType}`}
+												checked={isFullySelected}
+												data-state={
+													isPartiallySelected ? 'indeterminate' : undefined
+												}
+												onCheckedChange={() => handleGroupToggle(group)}
+											/>
+											<Label
+												htmlFor={`group-${group.sensorType}`}
+												className="cursor-pointer font-medium"
+											>
+												{t('select_all_phenomenons')}
+											</Label>
+										</div>
+									)}
 
 									{!isSenseBoxHomeV2 && (
 										<div className="border-muted ml-2 space-y-2 border-l-2 pl-4">

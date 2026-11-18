@@ -3,12 +3,21 @@ import {
 	type SensorLike,
 } from '~/services/decoders/legacy-title-matcher'
 import { decodeLuftdatenMeasurements } from '~/services/decoders/luftdaten-decoder.server'
+import { type SensorDefinitionId } from '~/lib/sensor-definitions'
+import { getSensorDefinitionId } from '~/lib/sensor-routing'
 
 const hackairMatchings: Record<string, string[]> = {
 	pm10: ['pm10', 'p10', 'p1'],
 	pm25: ['pm2.5', 'pm25', 'p2.5', 'p25', 'p2'],
 	temperature: ['temperatur'],
 	humidity: ['rel. luftfeuchte', 'luftfeuchtigkeit', 'luftfeuchte'],
+}
+
+const hackairDefinitionMappings: Partial<
+	Record<SensorDefinitionId, readonly string[]>
+> = {
+	sds011_pm10: ['pm10'],
+	sds011_pm25: ['pm25'],
 }
 
 function findHackairSensorId(
@@ -22,8 +31,27 @@ function findHackairSensorId(
 
 	if (!hackairMatchings[vt_sensortype]) return undefined
 
+	const definitionMatches = sensors.filter((sensor) => {
+		const definitionId = getSensorDefinitionId(sensor.data)
+		return definitionId
+			? hackairDefinitionMappings[definitionId]?.includes(vt_sensortype)
+			: false
+	})
+	if (definitionMatches.length > 1) {
+		console.warn(
+			`Ambiguous hackAIR sensor definition mapping for key ${readingKey}`,
+		)
+		return undefined
+	}
+	if (definitionMatches.length === 1) return definitionMatches[0].id
+
+	const legacySensors = sensors.filter((sensor) => {
+		const definitionId = getSensorDefinitionId(sensor.data)
+		return !definitionId || !hackairDefinitionMappings[definitionId]
+	})
+
 	return findUniqueSensorIdByTitle(
-		sensors,
+		legacySensors,
 		[vt_sensortype, ...hackairMatchings[vt_sensortype]],
 		hackairMatchings[vt_sensortype],
 		`Ambiguous hackAIR sensor mapping for key ${readingKey}`,
