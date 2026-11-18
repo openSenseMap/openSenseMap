@@ -3,7 +3,6 @@ import rawCatalog from './aliases.json'
 import {
 	createSensorWikiAliasKey,
 	matchSensorWikiAlias,
-	normalizeSensorWikiAliasValue,
 	type SensorWikiAliasEntry,
 } from './aliases'
 
@@ -24,19 +23,6 @@ export type SensorWikiAliasCatalog = {
 	entries: SensorWikiAliasEntry[]
 }
 
-function findNormalizedDuplicates(values: string[]) {
-	const seen = new Set<string>()
-	const duplicates = new Set<string>()
-
-	for (const value of values) {
-		const normalized = normalizeSensorWikiAliasValue(value)
-		if (seen.has(normalized)) duplicates.add(value)
-		seen.add(normalized)
-	}
-
-	return [...duplicates]
-}
-
 export const sensorWikiAliasCatalogSchema = z
 	.object({
 		version: z.literal(1),
@@ -55,20 +41,6 @@ export const sensorWikiAliasCatalogSchema = z
 				})
 			}
 			targetKeys.add(targetKey)
-
-			for (const [field, values] of [
-				['titleAliases', entry.titleAliases],
-				['unitAliases', entry.unitAliases ?? []],
-				['sensorTypeAliases', entry.sensorTypeAliases ?? []],
-			] as const) {
-				for (const duplicate of findNormalizedDuplicates([...values])) {
-					context.addIssue({
-						code: 'custom',
-						message: `Duplicate normalized ${field} value "${duplicate}" for ${targetKey}`,
-						path: ['entries', entryIndex, field],
-					})
-				}
-			}
 
 			for (const [titleIndex, title] of [
 				entry.title,

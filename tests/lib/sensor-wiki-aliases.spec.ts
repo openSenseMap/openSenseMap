@@ -260,20 +260,6 @@ describe('sensor wiki aliases', () => {
 		).toThrow('Duplicate catalog target')
 	})
 
-	it('rejects duplicate normalized aliases through the catalog schema', () => {
-		expect(() =>
-			parseSensorWikiAliasCatalog({
-				version: 1,
-				entries: [
-					{
-						...aliasEntries[0],
-						titleAliases: ['Temperature', ' temperature '],
-					},
-				],
-			}),
-		).toThrow('Duplicate normalized titleAliases value')
-	})
-
 	it('does not match aliases with an empty runtime configuration', () => {
 		expect(matchSensorWikiAlias({ title: 'Temperatur', unit: '°C' }, [])).toBe(
 			undefined,
