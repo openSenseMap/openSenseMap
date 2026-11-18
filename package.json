@@ -70,7 +70,7 @@
     "i18next-http-backend": "^4.0.10",
     "isbot": "^5.2.2",
     "jsonwebtoken": "^9.0.3",
-    "lucide-react": "^1.68.0",
+    "lucide-react": "^1.73.0",
     "maplibre-gl": "^6.16.0",
     "markdown-to-jsx": "^9.10.4",
     "nodemailer": "^10.3.1",
