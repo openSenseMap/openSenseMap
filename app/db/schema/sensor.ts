@@ -44,8 +44,12 @@ export const sensor = pgTable(
 		sensorType: text('sensor_type'),
 		icon: text('icon'),
 		status: DeviceStatusEnum('status').default('inactive'),
-		createdAt: timestamp('created_at').defaultNow().notNull(),
-		updatedAt: timestamp('updated_at').defaultNow().notNull(),
+		createdAt: timestamp('created_at', { withTimezone: true })
+			.defaultNow()
+			.notNull(),
+		updatedAt: timestamp('updated_at', { withTimezone: true })
+			.defaultNow()
+			.notNull(),
 		deviceId: text('device_id')
 			.references(() => device.id, {
 				onDelete: 'cascade',

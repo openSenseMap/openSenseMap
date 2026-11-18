@@ -13,7 +13,6 @@ import { type Device, type User } from '~/db/schema'
 import { uploadedDeviceSchemaV1 } from '~/lib/device-schemas/device-schema-v1'
 import { UiDeviceModelZodEnum } from '~/lib/device-enums'
 import { getSensorTemplateValidationError } from '~/lib/model-definitions'
-import { deleteDeviceImage } from '~/lib/s3.server'
 
 export const CreateDeviceServiceSchema = z
 	.object({
@@ -256,14 +255,7 @@ export const deleteDevice = async (
 	const verifiedUser = await verifyLogin(user.email, password)
 	if (verifiedUser === null) return 'unauthorized'
 
-	if (device.image) {
-		try {
-			await deleteDeviceImage(device.image)
-		} catch (e) {
-			console.error('Failed to delete device image:', e)
-		}
-	}
-	return (await deleteDeviceById({ id: device.id })).count > 0
+	return deleteDeviceById({ id: device.id })
 }
 
 type TagsRow = {

@@ -14,7 +14,7 @@ import {
 	type EntryContext,
 } from 'react-router'
 import { getEnv, init } from './lib/env.server'
-import { getErrorLogAttributes } from './lib/sentry.server'
+import { isSentryDenylisted } from './lib/sentry-denylist.server'
 import { getInstance } from './middleware/i18next'
 
 export const STREAM_TIMEOUT = 5_000
@@ -85,13 +85,7 @@ export default Sentry.wrapSentryHandleRequest(handleRequest)
 const sentryHandleError = Sentry.createSentryHandleError({ logErrors: true })
 
 export const handleError: HandleErrorFunction = async (error, args) => {
-	if (!args.request.signal.aborted) {
-		Sentry.logger.error('Unhandled React Router server error', {
-			...getErrorLogAttributes(error),
-			'http.request.method': args.request.method,
-		})
-	}
-
+	if (isSentryDenylisted(error, args.request)) return
 	await sentryHandleError(error, args)
 }
 

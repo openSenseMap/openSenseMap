@@ -41,6 +41,8 @@ import {
 	getSensorsForModel,
 	getSensorTemplateValidationError,
 } from '~/lib/model-definitions'
+import { deleteDeviceImage } from '~/lib/s3.server'
+import { logServerWarning } from '~/lib/sentry.server'
 import {
 	createOrReusePrivateDeviceSchemaVersionFromUpload,
 	getVisibleDeviceSchemaVersionForCreation,
@@ -645,8 +647,54 @@ export async function updateDevice(
 	return result
 }
 
-export function deleteDevice({ id }: Pick<Device, 'id'>) {
-	return drizzleClient.delete(device).where(eq(device.id, id))
+export async function updateDeviceImageIfUnchanged({
+	id,
+	userId,
+	expectedImage,
+	image,
+}: Pick<Device, 'id' | 'userId'> & {
+	expectedImage: Device['image']
+	image: Device['image']
+}) {
+	const imageHasNotChanged = expectedImage
+		? eq(device.image, expectedImage)
+		: isNull(device.image)
+
+	const [updatedDevice] = await drizzleClient
+		.update(device)
+		.set({ image, updatedAt: sql`NOW()` })
+		.where(
+			and(
+				eq(device.id, id),
+				eq(device.userId, userId),
+				isNull(device.archivedAt),
+				imageHasNotChanged,
+			),
+		)
+		.returning()
+
+	return updatedDevice
+}
+
+export async function deleteDevice({ id }: Pick<Device, 'id'>) {
+	const [deletedDevice] = await drizzleClient
+		.delete(device)
+		.where(eq(device.id, id))
+		.returning({ id: device.id, image: device.image })
+
+	if (!deletedDevice) return false
+
+	if (deletedDevice.image) {
+		try {
+			await deleteDeviceImage(deletedDevice.image)
+		} catch (error) {
+			logServerWarning('Failed to delete image for deleted device', error, {
+				'device.id': deletedDevice.id,
+			})
+		}
+	}
+
+	return true
 }
 
 export function getUserDevices(userId: Device['userId']) {
