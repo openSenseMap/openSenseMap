@@ -431,7 +431,7 @@ export function CustomDeviceConfig() {
 						<Callout variant="tip">
 							{t('manual_sensors_sensor_wiki_hint')}{' '}
 							<Link
-								to="/sensor-wiki-aliases"
+								to="/phenomenon-catalog"
 								target="_blank"
 								rel="noreferrer"
 								className="font-medium underline underline-offset-2"

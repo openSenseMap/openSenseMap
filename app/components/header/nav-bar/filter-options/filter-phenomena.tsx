@@ -49,7 +49,7 @@ export default function FilterPhenomena({
 				onChange={onPhenomenaChange}
 			/>
 			<Link
-				to="/sensor-wiki-aliases"
+				to="/phenomenon-catalog"
 				target="_blank"
 				rel="noreferrer"
 				className="text-muted-foreground block text-xs underline underline-offset-2"

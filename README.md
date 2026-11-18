@@ -110,6 +110,16 @@ Afterwards follow these steps:
 5. Create a new pull request against this repository's `dev` branch, linking
    your issue.
 
+#### Phenomenon metadata
+
+Sensor records and device schemas may include `sensorWikiType` (sensor type
+metadata), `sensorWikiPhenomenon` (canonical phenomenon ID), and
+`sensorWikiUnit` (canonical unit ID). Despite their historical names, new-device
+matching can fill the latter two from the bundled
+[phenomenon catalog](./app/lib/sensor-wiki/aliases.json) (see its
+[contribution guide](./app/lib/sensor-wiki/PHENOMENON_CATALOG.md)), and Explore
+uses the same catalog for filtering without a live Sensor-Wiki service.
+
 #### How the repository is organized
 
 ```shell

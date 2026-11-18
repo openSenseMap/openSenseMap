@@ -1,9 +1,9 @@
-# Contributing Sensor-Wiki mappings
+# Contributing to the phenomenon catalog
 
-The [alias catalog](./aliases.json) is the source of truth for the Sensor-Wiki
-phenomena and aliases supported by openSenseMap. It powers sensor suggestions
-and enrichment during device creation, as well as phenomenon filtering in
-Explore. The public catalog is available at `/sensor-wiki-aliases`.
+The [phenomenon catalog](./aliases.json) defines the phenomena, units, and
+aliases recognized by openSenseMap. It powers sensor suggestions and enrichment
+during device creation, as well as phenomenon filtering in Explore. Browse it at
+`/phenomenon-catalog`.
 
 ## Add or update a mapping
 
@@ -24,10 +24,10 @@ Explore. The public catalog is available at `/sensor-wiki-aliases`.
    potentially ambiguous names or units.
 
 Standard contributions may introduce new phenomena. A real legacy sensor
-example, an existing Sensor-Wiki API entry, and an ontology reference are not
-required. Reviewers should check that the identifier, unit, and aliases are
-clear and that the mapping does not make an existing alias ambiguous.
+example or an ontology reference is not required. Reviewers should check that
+the identifier, unit, and aliases are clear and that the mapping does not make
+an existing alias ambiguous.
 
-Exact aliases are used when canonical Sensor-Wiki metadata is assigned to a
+Exact aliases are used when canonical phenomenon metadata is assigned to a
 sensor. Explore also uses fuzzy matching to group older sensors without that
 metadata; fuzzy matches are not automatically persisted as canonical values.

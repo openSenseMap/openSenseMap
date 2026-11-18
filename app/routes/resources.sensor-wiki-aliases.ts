@@ -1,9 +1,1 @@
-import { sensorWikiAliasCatalog } from '~/lib/sensor-wiki/alias-catalog'
-
-export function loader() {
-	return Response.json(sensorWikiAliasCatalog, {
-		headers: {
-			'Cache-Control': 'public, max-age=300, s-maxage=3600',
-		},
-	})
-}
+export { loader } from './resources.phenomenon-catalog'
