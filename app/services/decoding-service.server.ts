@@ -29,7 +29,8 @@ function findHackairSensorId(
 	// Old behavior: use first token before underscore, remove dots
 	const [vt_sensortype] = readingKey.toLowerCase().replace('.', '').split('_')
 
-	if (!hackairMatchings[vt_sensortype]) return undefined
+	if (!Object.hasOwn(hackairMatchings, vt_sensortype)) return undefined
+	const aliases = hackairMatchings[vt_sensortype]
 
 	const definitionMatches = sensors.filter((sensor) => {
 		const definitionId = getSensorDefinitionId(sensor.data)
@@ -52,8 +53,8 @@ function findHackairSensorId(
 
 	return findUniqueSensorIdByTitle(
 		legacySensors,
-		[vt_sensortype, ...hackairMatchings[vt_sensortype]],
-		hackairMatchings[vt_sensortype],
+		[vt_sensortype, ...aliases],
+		aliases,
 		`Ambiguous hackAIR sensor mapping for key ${readingKey}`,
 	)
 }

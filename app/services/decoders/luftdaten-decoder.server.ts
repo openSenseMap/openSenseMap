@@ -88,8 +88,8 @@ function findLuftdatenSensorIdByTitle(
 	if (!valueType) return undefined
 
 	const { sensorType, phenomenon } = parseLuftdatenValueType(valueType)
+	if (!Object.hasOwn(luftdatenMatchings, phenomenon)) return undefined
 	const aliases = luftdatenMatchings[phenomenon]
-	if (!aliases) return undefined
 
 	const compatibleSensors = sensors.filter((sensor) => {
 		if (!sensor.id || !sensor.title) return false
