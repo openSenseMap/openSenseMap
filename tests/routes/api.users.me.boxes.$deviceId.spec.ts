@@ -18,6 +18,7 @@ const BOX_TEST_USER_BOX = {
 	latitude: 0,
 	longitude: 0,
 	model: 'luftdaten.info',
+	sensorTemplates: ['sds011_pm10'],
 	mqttEnabled: false,
 	ttnEnabled: false,
 }

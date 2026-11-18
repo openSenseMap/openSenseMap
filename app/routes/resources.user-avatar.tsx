@@ -30,7 +30,11 @@ export function UserAvatar() {
 		<Avatar className="h-8 w-8">
 			<AvatarImage
 				className="aspect-auto h-full w-full rounded-full object-cover"
-				src={'/resources/file/' + fetcher.data?.profile?.profileImage?.id}
+				src={
+					fetcher.data?.profile.image
+						? `/resources/profile-image/${fetcher.data.profile.id}?v=${encodeURIComponent(fetcher.data.profile.image)}`
+						: undefined
+				}
 				alt={fetcher.data?.profile.displayName}
 			/>
 			<AvatarFallback>

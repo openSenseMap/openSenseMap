@@ -163,7 +163,7 @@ export default function EditDeviceTransfer({
 			await navigator.clipboard.writeText(transferToken)
 			setCopied(true)
 		} catch (err) {
-			console.error('Failed to copy token:', err)
+			console.warn('Failed to copy token:', err)
 		}
 	}
 

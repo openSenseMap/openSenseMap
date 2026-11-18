@@ -24,5 +24,4 @@ measurements.csv
 /coverage
 
 /minio-data
-/rustfs-data
 .vitest/
