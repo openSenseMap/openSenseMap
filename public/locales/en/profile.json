@@ -4,6 +4,8 @@
 	"devices": "Devices",
 	"sensors": "Sensors",
 	"measurements": "Measurements",
+	"loading_measurements": "Loading estimated measurement count",
+	"measurements_estimate_hint": "Approximate count from ten-minute aggregates; recent or unprocessed measurements may be missing.",
 	"device_schemas": "Device schemas",
 	"download": "Download",
 	"badges": "Badges",

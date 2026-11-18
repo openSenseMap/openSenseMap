@@ -116,7 +116,12 @@ export function assertDeviceIsMutable(
 	}
 }
 
-export function getDevice({ id }: Pick<Device, 'id'>) {
+export function getDevice({
+	id,
+	locationLimit,
+}: Pick<Device, 'id'> & {
+	locationLimit?: number
+}) {
 	return drizzleClient.query.device.findFirst({
 		where: (device, { eq }) => eq(device.id, id),
 		columns: BASE_DEVICE_COLUMNS,
@@ -138,6 +143,9 @@ export function getDevice({ id }: Pick<Device, 'id'>) {
 				},
 			},
 			locations: {
+				...(locationLimit === undefined
+					? {}
+					: { orderBy: desc(deviceToLocation.time), limit: locationLimit }),
 				// https://github.com/drizzle-team/drizzle-orm/pull/2778
 				// with: {
 				//   geometry: true
@@ -157,10 +165,16 @@ export function getDevice({ id }: Pick<Device, 'id'>) {
 						},
 					},
 				},
-				// limit: 1000,
 			},
 			sensors: true,
 		},
+	})
+}
+
+export function getDeviceExposure({ id }: Pick<Device, 'id'>) {
+	return drizzleClient.query.device.findFirst({
+		where: (device, { eq }) => eq(device.id, id),
+		columns: { exposure: true },
 	})
 }
 

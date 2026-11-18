@@ -26,7 +26,7 @@ import {
 	getUserDeviceLocations,
 } from '~/db/models/device.server'
 import { getMeasurement } from '~/db/models/measurement.query.server'
-import { getProfileByUserId } from '~/db/models/profile.server'
+import { getProfileMapPreferencesByUserId } from '~/db/models/profile.server'
 import { getSensors } from '~/db/models/sensor.server'
 import { type Device } from '~/db/schema'
 import { getCSV, getJSON, getTXT } from '~/lib/file-exports'
@@ -445,7 +445,6 @@ export async function loader({ context, request }: Route.LoaderArgs) {
 	//* Get filter params
 	let locale = getLocale(context)
 	const url = new URL(request.url)
-	const filterParams = url.search
 	const urlFilterParams = new URLSearchParams(url.search)
 
 	const measurementTimeRange =
@@ -455,25 +454,24 @@ export async function loader({ context, request }: Route.LoaderArgs) {
 	const needsSensors =
 		Boolean(urlFilterParams.get('phenomenon')) || Boolean(measurementTimeRange)
 
-	const devices = needsSensors
-		? await getDevicesWithSensors({ measurementTimeRange })
-		: await getDevices('geojson')
-
-	const availableTags = await getTags()
-
-	const measurementCount = await getApproximateMeasurementCount()
-
-	const session = await getUserSession(request)
+	const [devices, availableTags, measurementCount, session, user, phenomena] =
+		await Promise.all([
+			needsSensors
+				? getDevicesWithSensors({ measurementTimeRange })
+				: getDevices('geojson'),
+			getTags(),
+			getApproximateMeasurementCount(),
+			getUserSession(request),
+			getUser(request),
+			getPhenomena(),
+		])
 	const message = session.get('global_message') || null
-
-	var filteredDevices = getFilteredDevices(devices, urlFilterParams)
-
-	const user = await getUser(request)
-	const phenomena = await getPhenomena()
+	const filteredDeviceCount = getFilteredDevices(devices, urlFilterParams)
+		.features.length
 
 	if (user) {
 		const [profile, userDeviceLocations] = await Promise.all([
-			getProfileByUserId(user.id),
+			getProfileMapPreferencesByUserId(user.id),
 			getUserDeviceLocations(user.id),
 		])
 		const userLocale = user.language
@@ -485,11 +483,10 @@ export async function loader({ context, request }: Route.LoaderArgs) {
 			availableTags,
 			phenomena,
 			measurementCount,
+			filteredDeviceCount,
 			user,
 			profile,
 			userDeviceLocations,
-			filteredDevices,
-			filterParams,
 			locale: userLocale,
 		}
 	}
@@ -498,11 +495,10 @@ export async function loader({ context, request }: Route.LoaderArgs) {
 		availableTags,
 		phenomena,
 		measurementCount,
+		filteredDeviceCount,
 		user,
 		profile: null,
 		userDeviceLocations: [],
-		filterParams,
-		filteredDevices,
 		message,
 		locale,
 	}
@@ -519,7 +515,6 @@ export default function Explore({ loaderData }: Route.ComponentProps) {
 	const {
 		devices,
 		availableTags,
-		filteredDevices,
 		measurementCount,
 		user,
 		profile,
@@ -533,6 +528,17 @@ export default function Explore({ loaderData }: Route.ComponentProps) {
 	const clusterZoomRef = useRef<number | null>(null)
 	const navigate = useNavigate()
 	const location = useLocation()
+	const mapFilterSearch = useMemo(() => {
+		const params = new URLSearchParams(location.search)
+		for (const key of ['aggregation', 'date_from', 'date_to']) {
+			params.delete(key)
+		}
+		return params.toString()
+	}, [location.search])
+	const filteredDevices = useMemo(
+		() => getFilteredDevices(devices, new URLSearchParams(mapFilterSearch)),
+		[devices, mapFilterSearch],
+	)
 	const outlet = useOutlet()
 	const [selectedPheno, setSelectedPheno] = useState<any | undefined>(undefined)
 	const [searchParams] = useSearchParams()
