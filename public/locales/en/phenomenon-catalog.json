@@ -1,0 +1,13 @@
+{
+	"title": "Phenomenon catalog",
+	"intro": "Browse the phenomena, units, and aliases used for sensor suggestions and Explore filtering on openSenseMap.",
+	"catalog_summary": "Catalog version {{version}} · {{count}} mappings",
+	"contribute": "Contribute a mapping",
+	"view_json": "View catalog as JSON",
+	"search_label": "Search catalog",
+	"search_placeholder": "Search phenomena, units, or aliases",
+	"no_results": "No catalog entries match your search.",
+	"title_aliases": "Phenomenon aliases",
+	"unit_aliases": "Unit aliases",
+	"sensor_type_aliases": "Sensor type aliases"
+}

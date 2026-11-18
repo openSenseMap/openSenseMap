@@ -15,6 +15,7 @@ import {
 	applyElevationConsentChoice,
 	hasCurrentElevationConsent,
 } from '~/db/models/elevation-consent.server'
+import { sensorWikiAliasEntries } from '~/lib/sensor-wiki/alias-catalog'
 import { logServerError, logServerWarning } from '~/lib/sentry.server'
 
 export type NewDeviceActionData = {
@@ -27,10 +28,12 @@ export async function loader({ request }: Route.LoaderArgs) {
 	if (!user) {
 		return redirect('/explore/login')
 	}
-	const integrations = await getIntegrations()
-	const hasElevationConsent = await hasCurrentElevationConsent(user.id)
+	const [integrations, hasElevationConsent] = await Promise.all([
+		getIntegrations(),
+		hasCurrentElevationConsent(user.id),
+	])
 
-	return { integrations, hasElevationConsent }
+	return { integrations, sensorWikiAliasEntries, hasElevationConsent }
 }
 
 export async function action({ request }: Route.ActionArgs) {
@@ -113,7 +116,6 @@ export async function action({ request }: Route.ActionArgs) {
 			terrainElevation,
 			terrainElevationDataset,
 		}
-
 		const devicePayload =
 			model === 'custom'
 				? {
@@ -124,6 +126,9 @@ export async function action({ request }: Route.ActionArgs) {
 							sensorType: sensor.sensorType,
 							unit: sensor.unit,
 							icon: sensor.icon,
+							sensorWikiType: sensor.sensorWikiType,
+							sensorWikiPhenomenon: sensor.sensorWikiPhenomenon,
+							sensorWikiUnit: sensor.sensorWikiUnit,
 						})),
 						deviceSchema: sensorSelection.deviceSchema,
 						deviceSchemaVersionId: sensorSelection.deviceSchemaVersionId,

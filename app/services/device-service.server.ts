@@ -42,6 +42,9 @@ export const CreateDeviceServiceSchema = z
 					unit: z.string().min(1, 'Sensor unit is required'),
 					sensorType: z.string().min(1, 'Sensor type is required'),
 					icon: z.string().optional(),
+					sensorWikiType: z.string().optional(),
+					sensorWikiPhenomenon: z.string().optional(),
+					sensorWikiUnit: z.string().optional(),
 				}),
 			)
 			.optional(),

@@ -64,6 +64,8 @@ import Spinner from '~/components/spinner'
 import { getTags } from '~/services/device-service.server'
 import { getPhenomena } from '~/db/models/phenomena.server'
 import { DOWNLOAD_FILTER_KEYS } from '~/components/header/download'
+import { sensorMatchesAnyPhenomenonFilter } from '~/lib/phenomenon-filter'
+import { sensorWikiAliasEntries } from '~/lib/sensor-wiki/alias-catalog'
 import { getExplorePendingUi } from '~/lib/explore-pending-navigation'
 import { getApproximateMeasurementCount } from '~/services/statistics-service.server'
 
@@ -314,10 +316,7 @@ export async function action({ request }: { request: Request }) {
 
 	const filterParams = getDownloadFilterParams(formdata)
 
-	const selectedPhenomena = parseCsv(formdata.get('phenomenon')).map(
-		(phenomenon) => phenomenon.toLowerCase(),
-	)
-
+	const selectedPhenomena = parseCsv(formdata.get('phenomenon'))
 	const measurementTimeRange =
 		getMeasurementTimeRangeFromSearchParams(filterParams)
 
@@ -340,7 +339,11 @@ export async function action({ request }: { request: Request }) {
 		const filteredSensors =
 			selectedPhenomena.length > 0
 				? sensors.filter((sensor) =>
-						selectedPhenomena.includes(sensor.title?.toLowerCase() ?? ''),
+						sensorMatchesAnyPhenomenonFilter(
+							sensor,
+							selectedPhenomena,
+							sensorWikiAliasEntries,
+						),
 					)
 				: sensors
 
@@ -470,8 +473,11 @@ export async function loader({ context, request }: Route.LoaderArgs) {
 			getPhenomena(),
 		])
 	const message = session.get('global_message') || null
-	const filteredDeviceCount = getFilteredDevices(devices, urlFilterParams)
-		.features.length
+	const filteredDeviceCount = getFilteredDevices(
+		devices,
+		urlFilterParams,
+		sensorWikiAliasEntries,
+	).features.length
 
 	if (user) {
 		const [profile, userDeviceLocations] = await Promise.all([
@@ -541,8 +547,13 @@ export default function Explore({ loaderData }: Route.ComponentProps) {
 		return params.toString()
 	}, [location.search])
 	const filteredDevices = useMemo(
-		() => getFilteredDevices(devices, new URLSearchParams(mapFilterSearch)),
-		[devices, mapFilterSearch],
+		() =>
+			getFilteredDevices(
+				devices,
+				new URLSearchParams(mapFilterSearch),
+				sensorWikiAliasEntries,
+			),
+		[devices, mapFilterSearch, sensorWikiAliasEntries],
 	)
 	const outlet = useOutlet()
 	const pendingUi = getExplorePendingUi({
