@@ -35,11 +35,23 @@ import {
 import { getSentryPerformanceConsent } from './services/sentry-consent.server'
 import { PreventFlashOnWrongTheme } from './components/prevent-theme-flash'
 import { TooltipProvider } from './components/ui/tooltip'
+import {
+	clearExploreLoaderCache,
+	setExploreCacheUserId,
+} from './lib/explore-loader-cache'
 
 export const middleware: Route.MiddlewareFunction[] = [
 	prometheusMetricsMiddleware,
 	i18nextMiddleware,
 	tosUiMiddleware,
+]
+
+export const clientMiddleware: Route.ClientMiddlewareFunction[] = [
+	async ({ request }, next) => {
+		// Mutations can change authentication, device data, or map preferences.
+		if (request.method !== 'GET') clearExploreLoaderCache()
+		await next()
+	},
 ]
 
 export const links = () => {
@@ -239,6 +251,7 @@ function EnvScript({ env }: { env: Window['ENV'] }) {
 
 export default function App({
 	loaderData: {
+		user,
 		locale,
 		ENV,
 		themePreference,
@@ -248,6 +261,9 @@ export default function App({
 	},
 }: Route.ComponentProps) {
 	const { i18n } = useTranslation()
+	useEffect(() => {
+		setExploreCacheUserId(user?.id ?? null)
+	}, [user?.id])
 	useEffect(() => {
 		if (i18n.language !== locale) {
 			void i18n.changeLanguage(locale)

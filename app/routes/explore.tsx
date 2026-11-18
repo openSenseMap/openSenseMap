@@ -16,6 +16,7 @@ import {
 	useParams,
 	useLocation,
 	useNavigation,
+	type ShouldRevalidateFunctionArgs,
 } from 'react-router'
 import { type Route } from './+types/explore'
 import Map from '~/components/map'
@@ -68,8 +69,20 @@ import { sensorMatchesAnyPhenomenonFilter } from '~/lib/phenomenon-filter'
 import { sensorWikiAliasEntries } from '~/lib/sensor-wiki/alias-catalog'
 import { getExplorePendingUi } from '~/lib/explore-pending-navigation'
 import { getApproximateMeasurementCount } from '~/services/statistics-service.server'
+import {
+	clearExploreLoaderCacheForUrl,
+	loadExploreDataWithCache,
+} from '~/lib/explore-loader-cache'
+import { shouldRevalidate as shouldRevalidateExplore } from '~/lib/explore-revalidation'
 
-export { shouldRevalidate } from '~/lib/explore-revalidation'
+export function shouldRevalidate(args: ShouldRevalidateFunctionArgs) {
+	const revalidate = shouldRevalidateExplore(args)
+	// A filter change has its own cache key. A same-URL revalidation is an
+	// explicit refresh and must bypass the cached response for that URL.
+	if (revalidate && args.currentUrl.href === args.nextUrl.href)
+		clearExploreLoaderCacheForUrl(args.nextUrl)
+	return revalidate
+}
 
 const INITIAL_VIEW_STATE = {
 	zoom: 2,
@@ -513,6 +526,17 @@ export async function loader({ context, request }: Route.LoaderArgs) {
 		locale,
 	}
 }
+
+export async function clientLoader({
+	request,
+	serverLoader,
+}: Route.ClientLoaderArgs) {
+	const url = new URL(request.url)
+	// On hydration serverLoader returns the SSR data, which primes the cache
+	// without fetching the full map payload a second time.
+	return loadExploreDataWithCache(url, serverLoader)
+}
+clientLoader.hydrate = true as const
 
 // This is for the live data display. The 21-06-2023 works with the seed Data, for Production take now minus 10 minutes
 let currentDate = new Date('2023-06-21T14:13:11.024Z')
