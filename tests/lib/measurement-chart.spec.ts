@@ -23,6 +23,31 @@ test('aggregated values are rounded to two decimals', () => {
 	])
 })
 
+test('aggregated midpoint values round up', () => {
+	const { datasets } = createMeasurementChartData(
+		[
+			{
+				...sensor,
+				data: [
+					{
+						time: '2025-01-02T10:00:00Z',
+						value: '1.005',
+						min_value: 0.995,
+						max_value: '1.015',
+					},
+				],
+			},
+		],
+		true,
+	)
+
+	expect(datasets.map((dataset) => dataset.data[0].y)).toEqual([
+		1.02, // max: 1.015
+		1.01, // avg: 1.005
+		1, // min: 0.995
+	])
+})
+
 test('raw values are not rounded', () => {
 	const { datasets } = createMeasurementChartData([sensor], false)
 

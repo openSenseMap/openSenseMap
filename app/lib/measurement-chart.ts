@@ -71,9 +71,18 @@ function toNumericValue(value: unknown) {
 	return Number.isFinite(numericValue) ? numericValue : null
 }
 
+// Moves the decimal point through the number's string form, so 1.005 becomes
+// exactly 100.5 (1.005 * 100 is 100.49999999999999 in floating point).
+function shiftDecimals(value: number, places: number) {
+	const [mantissa, exponent = '0'] = String(value).split('e')
+	return Number(`${mantissa}e${Number(exponent) + places}`)
+}
+
 // Aggregated averages come back with many decimals; two are enough to display.
 function roundToTwoDecimals(value: number | null) {
-	return value === null ? null : Math.round(value * 100) / 100
+	return value === null
+		? null
+		: shiftDecimals(Math.round(shiftDecimals(value, 2)), -2)
 }
 
 // Filters once so that value/min/max series stay index-aligned.
