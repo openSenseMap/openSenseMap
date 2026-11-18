@@ -13,13 +13,8 @@ import {
 } from '~/components/ui/card'
 import { Label } from '~/components/ui/label'
 import { PasswordInput } from '~/components/ui/password-input'
-import {
-	deleteDevice,
-	getDeviceWithoutSensors,
-	getUserDevice,
-} from '~/db/models/device.server'
+import { deleteDevice, getUserDevice } from '~/db/models/device.server'
 import { verifyLogin } from '~/db/models/user.server'
-import { deleteDeviceImage } from '~/lib/s3.server'
 import { getUserEmail, getUserId } from '~/services/session-service.server'
 
 export async function loader({ request, params }: Route.LoaderArgs) {
@@ -55,15 +50,6 @@ export async function action({ request, params }: Route.ActionArgs) {
 			{ errors: { passwordDelete: 'Invalid password' } },
 			{ status: 400 },
 		)
-	}
-
-	const device = await getDeviceWithoutSensors({ id: deviceId })
-	if (device?.image) {
-		try {
-			await deleteDeviceImage(device.image)
-		} catch (err) {
-			console.error('Failed to delete device image:', err)
-		}
 	}
 
 	await deleteDevice({ id: deviceId })

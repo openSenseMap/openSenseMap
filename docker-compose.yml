@@ -24,16 +24,45 @@ services:
       - '1025:1025'
 
   rustfs:
-    image: rustfs/rustfs:latest
-    container_name: rustfs
+    image: rustfs/rustfs:1.0.5
     environment:
-      RUSTFS_ACCESS_KEY: rustfsadmin
-      RUSTFS_SECRET_KEY: rustfsadmin123
-      RUSTFS_CONSOLE_ENABLE: 'true'
+      RUSTFS_ACCESS_KEY: ${S3_ACCESS_KEY:-OSEMLOCAL}
+      RUSTFS_SECRET_KEY: ${S3_SECRET_KEY:-osem-local-secret-key}
+      RUSTFS_VOLUMES: /data
       RUSTFS_ADDRESS: ':9000'
+      RUSTFS_CONSOLE_ADDRESS: ':9001'
+      RUSTFS_CONSOLE_ENABLE: 'true'
     ports:
-      - '9000:9000' # S3 API
-      - '9001:9001' # Admin UI
+      - '127.0.0.1:9000:9000'
+      - '127.0.0.1:9001:9001'
     volumes:
-      - ./rustfs-data:/data
-    command: ['/data']
+      - rustfs-data:/data
+    healthcheck:
+      test: ['CMD', 'curl', '-sf', 'http://127.0.0.1:9000/health']
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 10s
+
+  rustfs-init:
+    image: rustfs/rc:v0.1.37
+    depends_on:
+      rustfs:
+        condition: service_healthy
+    environment:
+      RUSTFS_ACCESS_KEY: ${S3_ACCESS_KEY:-OSEMLOCAL}
+      RUSTFS_SECRET_KEY: ${S3_SECRET_KEY:-osem-local-secret-key}
+      S3_BUCKET: ${S3_BUCKET:-images}
+    entrypoint:
+      - /bin/sh
+      - -c
+      - |
+        until /usr/bin/rc alias set rustfs http://rustfs:9000 "$${RUSTFS_ACCESS_KEY}" "$${RUSTFS_SECRET_KEY}"; do
+          echo 'Waiting for RustFS...'
+          sleep 2
+        done
+        /usr/bin/rc ls "rustfs/$${S3_BUCKET}" >/dev/null 2>&1 || /usr/bin/rc mb "rustfs/$${S3_BUCKET}"
+    restart: 'no'
+
+volumes:
+  rustfs-data:
