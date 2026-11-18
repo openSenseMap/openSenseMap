@@ -18,6 +18,7 @@ const TEST_BOX = {
 	latitude: 0,
 	longitude: 0,
 	model: 'luftdaten.info',
+	sensorTemplates: ['sds011_pm10'],
 }
 
 describe('openSenseMap API Routes: /users', () => {
