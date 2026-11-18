@@ -28,9 +28,6 @@ export async function getProfileByUserId(userId: User['id']) {
 export async function getSettingsProfileByUserId(userId: User['id']) {
 	return drizzleClient.query.profile.findFirst({
 		where: (profile, { eq }) => eq(profile.userId, userId),
-		with: {
-			profileImage: { columns: { id: true } },
-		},
 	})
 }
 
@@ -58,7 +55,7 @@ export async function getProfileSensorCount(deviceIds: string[]) {
 	return drizzleClient.$count(sensor, inArray(sensor.deviceId, deviceIds))
 }
 
-// The ten-minute aggregate stores raw measurement counts per bucket. 
+// The ten-minute aggregate stores raw measurement counts per bucket.
 export async function getProfileEstimatedMeasurementCount(userId: User['id']) {
 	const [result] = await drizzleClient
 		.select({
