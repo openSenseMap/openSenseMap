@@ -3,7 +3,7 @@
 	"active_token": "Active token",
 	"give_token": "Give this token to the new owner",
 	"transfer_device": "Transfer this device to another user!",
-	"transfer_info": "To complete the transfer, enter the name below and click the button. A token will be displayed. Share this token with the new owner. The new owner must enter the token in their account and click “Claim Device.” The device will then be transferred to the new account. The transfer may be delayed until the new owner has entered the token.",
+	"transfer_info": "To complete the transfer, enter the name below and click the button. A token will be displayed. Share this token with the new owner. The new owner must enter the token in their account and click “Claim device.” The device will then be transferred to the new account. The transfer may be delayed until the new owner has entered the token.",
 	"1_day": "1 day",
 	"7_days": "7 days",
 	"30_days": "30 days",
