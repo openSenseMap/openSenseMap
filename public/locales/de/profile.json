@@ -4,6 +4,8 @@
 	"devices": "Geräte",
 	"sensors": "Sensoren",
 	"measurements": "Messungen",
+	"loading_measurements": "Geschätzte Anzahl der Messungen wird geladen",
+	"measurements_estimate_hint": "Ungefähre Anzahl aus Zehn-Minuten-Aggregaten; neue oder noch nicht verarbeitete Messungen können fehlen.",
 	"device_schemas": "Geräteschemas",
 	"download": "Herunterladen",
 	"badges": "Badges",

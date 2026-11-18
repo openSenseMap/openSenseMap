@@ -15,7 +15,7 @@ import {
 	DialogHeader,
 	DialogTitle,
 } from '~/components/ui/dialog'
-import { getProfileByUserId } from '~/db/models/profile.server'
+import { getSettingsProfileByUserId } from '~/db/models/profile.server'
 import { getUserById } from '~/db/models/user.server'
 import { profile } from '~/db/schema'
 import { drizzleClient } from '~/db.server'
@@ -23,7 +23,10 @@ import { uploadHandler } from '~/lib/file-upload.server'
 import { deleteProfileImage, uploadProfileImage } from '~/lib/s3.server'
 import { logServerWarning } from '~/lib/sentry.server'
 import { getInitials } from '~/lib/strings'
+import { shouldRevalidateExceptRootPreferences } from '~/lib/root-preference-revalidation'
 import { requireUserId } from '~/services/session-service.server'
+
+export { shouldRevalidateExceptRootPreferences as shouldRevalidate }
 
 const MAX_SIZE = 1024 * 1024 * 3 // 3MB
 const SUPPORTED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp']
@@ -55,7 +58,7 @@ const PhotoFormSchema = z.object({
 export async function loader({ request }: Route.LoaderArgs) {
 	const userId = await requireUserId(request)
 	const user = await getUserById(userId)
-	const profile = await getProfileByUserId(userId)
+	const profile = await getSettingsProfileByUserId(userId)
 	if (!user) {
 		throw new Error()
 		// throw await authenticator.logout(request, { redirectTo: "/" });
