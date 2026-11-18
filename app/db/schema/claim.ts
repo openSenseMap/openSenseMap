@@ -14,9 +14,16 @@ export const claim = pgTable(
 			.notNull()
 			.references(() => device.id, { onDelete: 'cascade' }),
 		token: text('token').notNull(),
-		expiresAt: timestamp('expires_at', { mode: 'date' }),
-		createdAt: timestamp('created_at').defaultNow().notNull(),
-		updatedAt: timestamp('updated_at').defaultNow().notNull(),
+		expiresAt: timestamp('expires_at', {
+			mode: 'date',
+			withTimezone: true,
+		}),
+		createdAt: timestamp('created_at', { withTimezone: true })
+			.defaultNow()
+			.notNull(),
+		updatedAt: timestamp('updated_at', { withTimezone: true })
+			.defaultNow()
+			.notNull(),
 	},
 	(table) => [
 		unique('unique_box_id').on(table.boxId),

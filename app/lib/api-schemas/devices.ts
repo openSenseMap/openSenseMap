@@ -114,11 +114,13 @@ export const DevicesQuerySchema = z.object({
 				.array(z.string())
 				.min(1, 'At least one date required')
 				.max(2, 'At most two dates allowed')
+				.refine(
+					(arr) => arr.every((value) => !isNaN(new Date(value).getTime())),
+					'Invalid date',
+				)
 				.transform((arr) => {
 					const [fromDateStr, toDateStr] = arr
 					const fromDate = new Date(fromDateStr)
-					if (isNaN(fromDate.getTime()))
-						throw new Error(`Invalid date: ${fromDateStr}`)
 
 					if (!toDateStr) {
 						return {
@@ -128,8 +130,6 @@ export const DevicesQuerySchema = z.object({
 					}
 
 					const toDate = new Date(toDateStr)
-					if (isNaN(toDate.getTime()))
-						throw new Error(`Invalid date: ${toDateStr}`)
 					return { fromDate, toDate }
 				}),
 		)
@@ -163,11 +163,12 @@ export const DevicesQuerySchema = z.object({
 
 	bbox: z
 		.string()
+		.refine((val) => {
+			const coords = val.split(',').map(Number)
+			return coords.length === 4 && coords.every((n) => !isNaN(n))
+		}, 'Invalid bbox parameter')
 		.transform((val) => {
 			const coords = val.split(',').map(Number)
-			if (coords.length !== 4 || coords.some((n) => isNaN(n))) {
-				throw new Error('Invalid bbox parameter')
-			}
 			const [swLng, swLat, neLng, neLat] = coords
 			return {
 				coordinates: [
