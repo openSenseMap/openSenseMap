@@ -118,7 +118,7 @@ metadata), `sensorWikiPhenomenon` (canonical phenomenon ID), and
 matching can fill the latter two from the bundled
 [phenomenon catalog](./app/lib/sensor-wiki/aliases.json) (see its
 [contribution guide](./app/lib/sensor-wiki/PHENOMENON_CATALOG.md)), and Explore
-uses the same catalog for filtering without a live Sensor-Wiki service.
+uses the same catalog for filtering.
 
 #### How the repository is organized
 
