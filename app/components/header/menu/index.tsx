@@ -122,7 +122,11 @@ export default function Menu() {
 								)}
 
 								{matches[1]?.pathname !== '/profile' && (
-									<Link to="/profile/me" prefetch="intent">
+									<Link
+										to={`/profile/${encodeURIComponent(user.name)}`}
+										prefetch="intent"
+										onClick={() => setOpen(false)}
+									>
 										<DropdownMenuItem className="cursor-pointer">
 											<User2 className="mr-2 h-5 w-5" />
 											{t('my_devices_label')}

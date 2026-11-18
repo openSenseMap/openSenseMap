@@ -29,7 +29,10 @@ import {
 	getOwnedDeviceSchemasWithVersions,
 	updateDeviceSchemaVisibility,
 } from '~/db/models/device-schema.server'
-import { getProfileByUserId, updateProfile } from '~/db/models/profile.server'
+import {
+	getSettingsProfileByUserId,
+	updateProfile,
+} from '~/db/models/profile.server'
 import { getUserById } from '~/db/models/user.server'
 import { useCopyToClipboard } from '~/hooks/use-copy-to-clipboard'
 import {
@@ -37,16 +40,19 @@ import {
 	useAutosaveFetcher,
 } from '~/hooks/use-autosave-fetcher'
 import { getInitials } from '~/lib/strings'
+import { shouldRevalidateExceptRootPreferences } from '~/lib/root-preference-revalidation'
 import { requireUserId } from '~/services/session-service.server'
 import { AutosaveStatusText } from '~/components/autosave-status.text'
 import { UnsavedChangesBlocker } from '~/components/unsaved-changes-blocker'
+
+export { shouldRevalidateExceptRootPreferences as shouldRevalidate }
 
 export async function loader({ request }: Route.LoaderArgs) {
 	const userId = await requireUserId(request)
 
 	const [user, profile, deviceSchemas] = await Promise.all([
 		getUserById(userId),
-		getProfileByUserId(userId),
+		getSettingsProfileByUserId(userId),
 		getOwnedDeviceSchemasWithVersions(userId),
 	])
 
@@ -126,7 +132,7 @@ export async function action({
 	request,
 }: Route.ActionArgs): Promise<SettingsProfileActionData> {
 	const userId = await requireUserId(request)
-	const profile = await getProfileByUserId(userId)
+	const profile = await getSettingsProfileByUserId(userId)
 
 	if (!profile || !userId) {
 		return {

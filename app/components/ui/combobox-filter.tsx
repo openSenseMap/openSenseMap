@@ -18,10 +18,16 @@ import {
 import { cn } from '~/lib/utils'
 import { useTranslation } from 'react-i18next'
 
+type ComboboxFilterOption = {
+	value: string
+	label: string
+	description?: string
+}
+
 interface MultiSelectComboboxFilterProps {
 	label: string
 	values: string[]
-	options: string[]
+	options: ComboboxFilterOption[]
 	placeholder: string
 	searchPlaceholder: string
 	emptyText: string
@@ -38,6 +44,10 @@ export default function MultiSelectComboboxFilter({
 	onChange,
 }: MultiSelectComboboxFilterProps) {
 	const { t } = useTranslation('filter')
+	const optionsByValue = new Map(
+		options.map((option) => [option.value, option]),
+	)
+
 	const toggleValue = (value: string) => {
 		if (values.includes(value)) {
 			onChange(values.filter((current) => current !== value))
@@ -88,13 +98,13 @@ export default function MultiSelectComboboxFilter({
 
 								<CommandGroup>
 									{options.map((option) => {
-										const selected = values.includes(option)
+										const selected = values.includes(option.value)
 
 										return (
 											<CommandItem
-												key={option}
-												value={option}
-												onSelect={() => toggleValue(option)}
+												key={option.value}
+												value={`${option.label} ${option.description ?? ''}`}
+												onSelect={() => toggleValue(option.value)}
 											>
 												<Check
 													className={cn(
@@ -103,7 +113,14 @@ export default function MultiSelectComboboxFilter({
 													)}
 												/>
 
-												<span className="truncate">{option}</span>
+												<span className="min-w-0">
+													<span className="block truncate">{option.label}</span>
+													{option.description && (
+														<span className="text-muted-foreground block truncate text-xs">
+															{option.description}
+														</span>
+													)}
+												</span>
 											</CommandItem>
 										)
 									})}
@@ -117,13 +134,15 @@ export default function MultiSelectComboboxFilter({
 					<div className="flex flex-wrap gap-1.5">
 						{values.map((value) => (
 							<Badge key={value} variant="secondary" className="text-xs">
-								<span className="max-w-40 truncate">{value}</span>
+								<span className="max-w-40 truncate">
+									{optionsByValue.get(value)?.label ?? value}
+								</span>
 
 								<button
 									type="button"
 									onClick={() => removeValue(value)}
 									className="hover:text-destructive ml-1 rounded-full"
-									aria-label={`Remove ${value}`}
+									aria-label={`Remove ${optionsByValue.get(value)?.label ?? value}`}
 								>
 									<X className="h-3 w-3" />
 								</button>

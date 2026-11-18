@@ -1,11 +1,13 @@
 {
 	"reset": "Zurücksetzen",
 	"apply": "Anwenden",
+	"applying_filters": "Filter werden angewendet…",
 	"date_and_time": "Datum & Zeit",
 	"date": "Datum",
 	"timespan": "Zeitspanne",
 	"select_phenomena": "Phänomene auswählen",
 	"search_phenomena": "Phänomene suchen...",
+	"view_supported_mappings": "Phänomenkatalog ansehen",
 	"phenomena_not_found": "Kein Phänomen gefunden.",
 	"phenomenon": "Phänomen",
 	"search_tags": "Tags suchen...",
