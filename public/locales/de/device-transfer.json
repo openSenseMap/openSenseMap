@@ -3,7 +3,7 @@
 	"active_token": "Aktives Token",
 	"give_token": "Gib dieses Token dem neuen Besitzer",
 	"transfer_device": "Übergib dieses Gerät einem anderen Nutzer",
-	"transfer_info": "Um die Übertragung durchzuführen, geben Sie unten den Namen ein und klicken Sie auf die Schaltfläche. Es wird ein Token angezeigt. Sie geben diesen Token an den neuen Eigentümer weiter. Der neue Eigentümer muss den Token in seinem Konto eingeben und auf „Gerät beanspruchen“ klicken. Danach wird das Gerät auf das neue Konto übertragen. Die Übertragung kann sich verzögern, bis der neue Eigentümer den Token eingegeben hat.",
+	"transfer_info": "Um die Übertragung durchzuführen, geben Sie unten den Namen ein und klicken Sie auf die Schaltfläche. Es wird ein Token angezeigt. Sie geben diesen Token an den neuen Eigentümer weiter. Der neue Eigentümer muss den Token in seinem Konto eingeben und auf „Gerät übernehmen“ klicken. Danach wird das Gerät auf das neue Konto übertragen. Die Übertragung kann sich verzögern, bis der neue Eigentümer den Token eingegeben hat.",
 	"1_day": "1 Tag",
 	"7_days": "7 Tage",
 	"30_days": "30 Tage",

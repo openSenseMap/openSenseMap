@@ -6,6 +6,9 @@ running as a public beta at
 
 <img width="1510" height="858" alt="Screenshot OSeM" src="https://github.com/user-attachments/assets/70da4cff-1751-4a13-89e8-607a5198df37">
 
+![](https://status.opensensemap.org/api/badge/2/uptime?style=for-the-badge)
+![](https://status.opensensemap.org/api/badge/13/uptime?labelPrefix=Staging+&style=for-the-badge)
+
 ## Project setup
 
 If you do need to set the project up locally yourself, feel free to follow these

@@ -94,7 +94,11 @@ export default function EditBoxSensors({
 				const err = await response
 					.json()
 					.catch(() => ({ message: 'Compile failed' }))
-				console.error('Compile error:', err.message)
+				if (response.status >= 500) {
+					console.error('Compile error:', err.message)
+				} else {
+					console.warn('Compile error:', err.message)
+				}
 				return
 			}
 			const blob = await response.blob()

@@ -12,6 +12,8 @@
 	"go_home": "Go home",
 	"try_again": "Try again",
 	"map_cluster_marker_label": "Zoom into a cluster of {{total}} devices: {{active}} active, {{inactive}} inactive, {{old}} old.",
+	"loading_device": "Loading device…",
+	"updating_map_results": "Updating map results…",
 	"sentry_performance_consent_title": "Help us improve openSenseMap",
 	"sentry_performance_consent_description": "Allow performance measurements such as page-load and navigation timings to be sent to Sentry. You can change this choice later.",
 	"sentry_performance_consent_accept": "Allow performance measurements",
