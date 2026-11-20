@@ -48,8 +48,14 @@ export const middleware: Route.MiddlewareFunction[] = [
 export const clientMiddleware: Route.ClientMiddlewareFunction[] = [
 	async ({ request }, next) => {
 		// Mutations can change the public map data.
-		if (request.method !== 'GET') clearExploreLoaderCache()
-		await next()
+		const isMutation = request.method !== 'GET'
+		if (isMutation) clearExploreLoaderCache()
+		try {
+			await next()
+		} finally {
+			// Loads started during the mutation may have read the old data.
+			if (isMutation) clearExploreLoaderCache()
+		}
 	},
 ]
 
