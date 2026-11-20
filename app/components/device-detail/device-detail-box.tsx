@@ -67,6 +67,7 @@ import { getArchiveLink } from '~/lib/archive-link'
 import { type loader } from '~/routes/explore.$deviceId'
 import { dateDiffToNowInWords } from '~/lib/date'
 import { calculateHeightAboveSeaLevel } from '~/lib/elevation'
+import { useOptionalUser } from '~/utils'
 
 export interface MeasurementProps {
 	sensorId: string
@@ -91,11 +92,9 @@ export default function DeviceDetailBox() {
 	const sensorIds = new Set()
 
 	const data = useLoaderData<typeof loader>()
-	const exploreData = matches.find((match) => match.pathname === '/explore')
-		?.loaderData as { user?: { id?: string } } | undefined
+	const user = useOptionalUser()
 	const isOwner =
-		typeof data.device?.userId === 'string' &&
-		exploreData?.user?.id === data.device.userId
+		typeof data.device?.userId === 'string' && user?.id === data.device.userId
 	const nodeRef = useRef<HTMLDivElement>(null)
 	// state variables
 	const [open, setOpen] = useState(true)
@@ -595,7 +594,8 @@ export default function DeviceDetailBox() {
 																		className={({ isPending }) =>
 																			clsx(
 																				'h-full transition-opacity',
-																				isPending && 'pointer-events-none opacity-50',
+																				isPending &&
+																					'pointer-events-none opacity-50',
 																			)
 																		}
 																	>
