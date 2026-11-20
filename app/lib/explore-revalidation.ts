@@ -3,7 +3,7 @@ import { isRootPreferenceSubmission } from './root-preference-revalidation'
 
 const CHART_SEARCH_PARAMS = ['aggregation', 'date_from', 'date_to']
 
-function searchWithoutChartParams(url: URL) {
+export function searchWithoutChartParams(url: URL) {
 	const params = new URLSearchParams(url.search)
 	for (const key of CHART_SEARCH_PARAMS) params.delete(key)
 	return params.toString()

@@ -17,6 +17,8 @@ import ErrorMessage from './components/error-message'
 import { TosGraceDialog } from './components/tos-grace-dialog'
 import { SentryPerformanceConsentBanner } from './components/sentry-performance-consent'
 import { Toaster } from './components/ui/toaster'
+import { getUserDeviceLocations } from './db/models/device.server'
+import { getProfileMapPreferencesByUserId } from './db/models/profile.server'
 import { getTosRequirementForUser } from './db/models/tos.server'
 import { updateUserPreferencesById } from './db/models/user.server'
 import { getEnv } from './lib/env.server'
@@ -35,11 +37,26 @@ import {
 import { getSentryPerformanceConsent } from './services/sentry-consent.server'
 import { PreventFlashOnWrongTheme } from './components/prevent-theme-flash'
 import { TooltipProvider } from './components/ui/tooltip'
+import { clearExploreLoaderCache } from './lib/explore-loader-cache'
 
 export const middleware: Route.MiddlewareFunction[] = [
 	prometheusMetricsMiddleware,
 	i18nextMiddleware,
 	tosUiMiddleware,
+]
+
+export const clientMiddleware: Route.ClientMiddlewareFunction[] = [
+	async ({ request }, next) => {
+		// Mutations can change the public map data.
+		const isMutation = request.method !== 'GET'
+		if (isMutation) clearExploreLoaderCache()
+		try {
+			await next()
+		} finally {
+			// Loads started during the mutation may have read the old data.
+			if (isMutation) clearExploreLoaderCache()
+		}
+	},
 ]
 
 export const links = () => {
@@ -65,15 +82,25 @@ export const links = () => {
 	]
 }
 
-export async function loader({ context, request }: Route.LoaderArgs) {
+export function headers({ loaderHeaders }: Route.HeadersArgs) {
+	return loaderHeaders
+}
+
+export async function loader({ context, pattern, request }: Route.LoaderArgs) {
 	const locale = getLocale(context)
 	const user = await getUser(request)
-	const dismissedGraceTosVersionId = user
-		? await getDismissedGraceTosVersionId(request)
-		: undefined
-	const tosRequirement = user
-		? await getTosRequirementForUser(user.id)
-		: undefined
+	const isExplore = /^\/?explore(?:\/|$)/.test(pattern)
+	const [
+		dismissedGraceTosVersionId,
+		tosRequirement,
+		mapPreferences,
+		userDeviceLocations,
+	] = await Promise.all([
+		user ? getDismissedGraceTosVersionId(request) : undefined,
+		user ? getTosRequirementForUser(user.id) : undefined,
+		user && isExplore ? getProfileMapPreferencesByUserId(user.id) : null,
+		user && isExplore ? getUserDeviceLocations(user.id) : [],
+	])
 	const graceTos =
 		tosRequirement?.inGrace &&
 		!tosRequirement.accepted &&
@@ -98,7 +125,11 @@ export async function loader({ context, request }: Route.LoaderArgs) {
 	const theme = getServerTheme(themePreference)
 	const sentryPerformanceConsent = await getSentryPerformanceConsent(request)
 
-	const headers = new Headers()
+	// Intent prefetch can run before another tab changes the session cookie.
+	const headers = new Headers({
+		'Cache-Control': 'private, no-store',
+		Vary: 'Cookie',
+	})
 
 	// setting the cookie is required here to make sure we keep the server and client
 	// instance of i18n in synch
@@ -112,6 +143,8 @@ export async function loader({ context, request }: Route.LoaderArgs) {
 	return data(
 		{
 			user,
+			mapPreferences,
+			userDeviceLocations,
 			graceTos,
 			locale,
 			themePreference,
