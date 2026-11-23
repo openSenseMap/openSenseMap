@@ -102,9 +102,9 @@ export const ResendEmailConfirmationEmail = ({
 					>
 						{intl.formatMessage({ id: 'support' })} {}
 						<Link
-							href={`mailto:support@opensensemap.org?Subject=Email%20Best%C3%A4tigen%20f%C3%BCr%20${encodeURI(email)}`}
+							href={`mailto:info@opensensemap.org?Subject=Email%20Best%C3%A4tigen%20f%C3%BCr%20${encodeURI(email)}`}
 						>
-							support@opensensemap.org
+							info@opensensemap.org
 						</Link>
 					</Text>
 					<Text>{intl.formatMessage({ id: 'salutation' })}</Text>
