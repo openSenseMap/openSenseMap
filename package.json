@@ -19,7 +19,8 @@
     "db:seed-integrations": "tsx ./scripts/db/seed-integrations",
     "db:seed-orphan-user": "tsx ./scripts/db/seed-orphan-user",
     "email:dev": "email dev --dir app/emails",
-    "components": "npx shadcn"
+    "components": "npx shadcn",
+    "typegen": "react-router typegen"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1161.0",

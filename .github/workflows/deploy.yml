@@ -35,6 +35,9 @@ jobs:
           run-install: |
             - args: ['--frozen-lockfile']
 
+      - name: Generate react-router types
+        run: vp run typegen
+
       - name: 🔬 Vite+ check
         run: vp check
 
