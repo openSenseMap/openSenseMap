@@ -17,9 +17,9 @@ during device creation, as well as phenomenon filtering in Explore. Browse it at
 3. Add or update localized display labels in
    `public/locales/<language>/phenomena.json` when available. Matching aliases
    belong in `aliases.json`, including aliases in languages other than English.
-4. Run `npx tsx ./app/lib/sensor-wiki/alias-catalog.ts` to validate the catalog,
-   then run `npm run typecheck`. The parser rejects duplicate targets and
-   aliases that do not resolve to their intended target.
+4. Run `npx dlx ./app/lib/sensor-wiki/alias-catalog.ts` to validate the catalog,
+   then run `vp run typegen && vp check`. The parser rejects duplicate targets
+   and aliases that do not resolve to their intended target.
 5. Open a pull request against `dev` and describe the intended mapping and any
    potentially ambiguous names or units.
 
