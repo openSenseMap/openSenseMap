@@ -44,4 +44,6 @@ sensor data.
 - Use `vp update` to update packages, run `vp dedupe` afterwards to remove
   duplications if necessary
 - Use `vp why <flags>` to find out why a dependency is installed
-- Use `vp lint` and `vp run format` to lint and format code.
+- Use `vp check` to check for linting, formatting or type issues
+  - Use `vp fmt . --write` to fix formatting issues
+  - Use `vp lint --fix` to fix linting issues

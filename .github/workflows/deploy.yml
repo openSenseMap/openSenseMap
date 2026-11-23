@@ -17,7 +17,7 @@ permissions:
 
 jobs:
   lint:
-    name: ⬣ Lint
+    name: ⬣ Check Lint & Format & Types
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -35,30 +35,8 @@ jobs:
           run-install: |
             - args: ['--frozen-lockfile']
 
-      - name: 🔬 Lint
-        run: vp lint
-
-  typecheck:
-    name: ʦ TypeScript
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-    steps:
-      - name: ⬇️ Checkout repo
-        uses: actions/checkout@v7
-        with:
-          persist-credentials: false
-
-      - name: ⎔ Setup Vite+
-        uses: voidzero-dev/setup-vp@v1.22.0
-        with:
-          cache: true
-          node-version-file: .node-version
-          run-install: |
-            - args: ['--frozen-lockfile']
-
-      - name: 🔎 Type check
-        run: vp run typecheck
+      - name: 🔬 Vite+ check
+        run: vp check
 
   test:
     name: ⚡ Test
