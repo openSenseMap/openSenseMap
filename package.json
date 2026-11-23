@@ -20,10 +20,7 @@
     "db:seed-orphan-user": "tsx ./scripts/db/seed-orphan-user",
     "email:dev": "email dev --dir app/emails",
     "components": "npx shadcn",
-    "format": "vp fmt --write .",
-    "format:check": "vp fmt --check .",
-    "lint:fix": "vp lint --fix",
-    "typecheck": "react-router typegen && tsc"
+    "typegen": "react-router typegen"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1161.0",

@@ -6,7 +6,7 @@ import {
 	TooltipContent,
 	TooltipTrigger,
 } from '~/components/ui/tooltip'
-import type { ThemePreference } from '~/lib/theme'
+import { type ThemePreference } from '~/lib/theme'
 import { useRootRouteLoaderData } from '~/root'
 
 function applyThemePreference(preference: ThemePreference) {

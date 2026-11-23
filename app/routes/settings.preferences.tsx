@@ -475,20 +475,20 @@ export default function PreferencesSettingsPage({
 	])
 
 	const submitMapAutosave = useCallback(
-		(nextValues: MapPreferenceAutosaveValues) => {
+		async (nextValues: MapPreferenceAutosaveValues) => {
 			const normalizedValues = normalizeMapPreferenceValues(nextValues)
 
 			if (validateMapAutosave(normalizedValues)) {
-				mapAutosave.submit(normalizedValues)
+				await mapAutosave.submit(normalizedValues)
 			}
 		},
 		[mapAutosave, validateMapAutosave],
 	)
 
 	const handleHomeLatitudeChange = useCallback(
-		(value: string) => {
+		async (value: string) => {
 			setHomeLatitude(value)
-			submitMapAutosave({
+			await submitMapAutosave({
 				homeLatitude: value,
 				homeLongitude,
 				homeZoom,
@@ -498,9 +498,9 @@ export default function PreferencesSettingsPage({
 	)
 
 	const handleHomeLongitudeChange = useCallback(
-		(value: string) => {
+		async (value: string) => {
 			setHomeLongitude(value)
-			submitMapAutosave({
+			await submitMapAutosave({
 				homeLatitude,
 				homeLongitude: value,
 				homeZoom,
@@ -510,12 +510,12 @@ export default function PreferencesSettingsPage({
 	)
 
 	const handleHomeZoomChange = useCallback(
-		(value: string) => {
+		async (value: string) => {
 			setHomeZoom(value)
 
 			if (!hasCompleteHomeLocation({ homeLatitude, homeLongitude })) return
 
-			submitMapAutosave({
+			await submitMapAutosave({
 				homeLatitude,
 				homeLongitude,
 				homeZoom: value,
@@ -524,7 +524,7 @@ export default function PreferencesSettingsPage({
 		[homeLatitude, homeLongitude, submitMapAutosave],
 	)
 
-	const clearHomeLocation = useCallback(() => {
+	const clearHomeLocation = useCallback(async () => {
 		const nextValues = {
 			homeLatitude: '',
 			homeLongitude: '',
@@ -534,14 +534,14 @@ export default function PreferencesSettingsPage({
 		setHomeLatitude(nextValues.homeLatitude)
 		setHomeLongitude(nextValues.homeLongitude)
 		setHomeZoom(nextValues.homeZoom)
-		mapAutosave.submit(nextValues)
+		await mapAutosave.submit(nextValues)
 	}, [mapAutosave])
 
 	const handleNewsletterChange = useCallback(
-		(checked: boolean) => {
+		async (checked: boolean) => {
 			const nextValues = { newsletterRequested: checked }
 			setNewsletterRequested(checked)
-			newsletterAutosave.submit(nextValues)
+			await newsletterAutosave.submit(nextValues)
 		},
 		[newsletterAutosave],
 	)

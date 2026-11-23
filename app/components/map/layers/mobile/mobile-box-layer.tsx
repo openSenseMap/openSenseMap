@@ -36,12 +36,9 @@ export default function MobileBoxLayer({
 	maxColor = HIGH_COLOR,
 }: {
 	sensor: Sensor
-	minColor?:
-		| NonNullable<CircleLayerSpecification['paint']>['circle-color']
-		| NonNullable<LineLayerSpecification['paint']>['line-color']
-	maxColor?:
-		| NonNullable<CircleLayerSpecification['paint']>['circle-color']
-		| NonNullable<LineLayerSpecification['paint']>['line-color']
+	minColor?: NonNullable<CircleLayerSpecification['paint']>['circle-color']
+
+	maxColor?: NonNullable<CircleLayerSpecification['paint']>['circle-color']
 }) {
 	const { hoveredPoint, setHoveredPoint } = useContext(HoveredPointContext)
 	const { osem: mapRef } = useMap()

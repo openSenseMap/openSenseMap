@@ -595,7 +595,8 @@ export default function DeviceDetailBox() {
 																		className={({ isPending }) =>
 																			clsx(
 																				'h-full transition-opacity',
-																				isPending && 'pointer-events-none opacity-50',
+																				isPending &&
+																					'pointer-events-none opacity-50',
 																			)
 																		}
 																	>

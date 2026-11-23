@@ -91,11 +91,11 @@ export default function PhenomenonCatalogRoute({
 				</header>
 
 				<div>
-						<label htmlFor="phenomenon-catalog-search" className="sr-only">
+					<label htmlFor="phenomenon-catalog-search" className="sr-only">
 						{t('search_label')}
 					</label>
 					<Input
-							id="phenomenon-catalog-search"
+						id="phenomenon-catalog-search"
 						type="search"
 						value={query}
 						onChange={(event) => setQuery(event.target.value)}
