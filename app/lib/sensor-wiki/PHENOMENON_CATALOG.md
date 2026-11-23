@@ -18,15 +18,15 @@ during device creation, as well as phenomenon filtering in Explore. Browse it at
    `public/locales/<language>/phenomena.json` when available. Matching aliases
    belong in `aliases.json`, including aliases in languages other than English.
 4. Run `npx tsx ./app/lib/sensor-wiki/alias-catalog.ts` to validate the catalog,
-   then run `npm run typecheck`. The parser rejects duplicate targets and aliases
-   that do not resolve to their intended target.
+   then run `npm run typecheck`. The parser rejects duplicate targets and
+   aliases that do not resolve to their intended target.
 5. Open a pull request against `dev` and describe the intended mapping and any
    potentially ambiguous names or units.
 
-Standard contributions may introduce new phenomena. A real legacy sensor
-example or an ontology reference is not required. Reviewers should check that
-the identifier, unit, and aliases are clear and that the mapping does not make
-an existing alias ambiguous.
+Standard contributions may introduce new phenomena. A real legacy sensor example
+or an ontology reference is not required. Reviewers should check that the
+identifier, unit, and aliases are clear and that the mapping does not make an
+existing alias ambiguous.
 
 Exact aliases are used when canonical phenomenon metadata is assigned to a
 sensor. Explore also uses fuzzy matching to group older sensors without that

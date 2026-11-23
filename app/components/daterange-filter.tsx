@@ -1,4 +1,4 @@
-import { format, Locale } from 'date-fns'
+import { format, type Locale } from 'date-fns'
 import { de, enGB } from 'date-fns/locale'
 import { CalendarIcon } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
@@ -22,7 +22,7 @@ import { Separator } from './ui/separator'
 import { getDateTimeRanges } from '~/lib/date-ranges'
 import { type loader } from '~/routes/explore.$deviceId.$sensorId.$'
 import { useTranslation } from 'react-i18next'
-import { TFunction } from 'i18next'
+import { type TFunction } from 'i18next'
 
 function formatDateRange(t: TFunction, date?: DateRange) {
 	if (!date?.from) return t('pick_range')

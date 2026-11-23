@@ -18,9 +18,7 @@ if (process.env.SENTRY_DSN) {
 		release: process.env.SENTRY_RELEASE,
 		includeServerName: false,
 		...sentryPrivacyOptions,
-		integrations: [
-			Sentry.consoleLoggingIntegration({ levels: ['error'] }),
-		],
+		integrations: [Sentry.consoleLoggingIntegration({ levels: ['error'] })],
 		tracesSampleRate,
 	})
 

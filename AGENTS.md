@@ -44,6 +44,8 @@ sensor data.
 - Use `vp update` to update packages, run `vp dedupe` afterwards to remove
   duplications if necessary
 - Use `vp why <flags>` to find out why a dependency is installed
-- Use `vp check` to check for linting, formatting or type issues
+- Use `vp check` to check for linting, formatting and typing issues.
+  `vp run typegen` needs to run before, for the typechecking step to work.
+  `vp check` first runs the format check and will stop if there are formatting
+  issues. Linting is only run when no formatting issues are found.
   - Use `vp fmt . --write` to fix formatting issues
-  - Use `vp lint --fix` to fix linting issues

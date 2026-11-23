@@ -26,7 +26,7 @@ import {
 	notFoundResponse,
 } from '~/lib/openapi/errors'
 import { DevicePathParamsSchema } from '~/lib/openapi/schemas/common'
-import { ZodOpenApiPathItemObject } from 'zod-openapi'
+import { type ZodOpenApiPathItemObject } from 'zod-openapi'
 import { requestContentTypeJsonOrForm } from '~/middleware/content-type-header.server'
 import { parsePathParams } from '~/lib/request-parsing'
 

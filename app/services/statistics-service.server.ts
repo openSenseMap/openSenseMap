@@ -2,7 +2,6 @@ import { and, count, gt, lt, sql } from 'drizzle-orm'
 import { measurement } from '~/db/schema'
 import { drizzleClient } from '~/db.server'
 
-
 const getApproximateRowCount = async (tableName: string) => {
 	const [count] = await drizzleClient.execute(
 		sql`SELECT * FROM approximate_row_count(${tableName});`,
