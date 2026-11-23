@@ -125,11 +125,11 @@ export function useAutosaveFetcher<TValues, TData>({
 	const shouldBlockNavigation = navigationState !== 'idle'
 
 	const submit = useCallback(
-		(nextValues: TValues) => {
+		async (nextValues: TValues) => {
 			setLastSubmittedValues(() => nextValues)
 			setFailedValues(null)
 
-			fetcher.submit(getPayload(nextValues), {
+			await fetcher.submit(getPayload(nextValues), {
 				method: 'post',
 			})
 		},
@@ -143,8 +143,8 @@ export function useAutosaveFetcher<TValues, TData>({
 		if (currentValuesHaveFailed) return
 		if (validate && !validate(values)) return
 
-		const timeout = window.setTimeout(() => {
-			submit(values)
+		const timeout = window.setTimeout(async () => {
+			await submit(values)
 		}, debounceMs)
 
 		return () => window.clearTimeout(timeout)
