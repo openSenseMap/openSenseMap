@@ -20,7 +20,12 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '~/components/ui/tabs'
 import { uploadedDeviceSchemaV1 } from '~/lib/device-schemas/device-schema-v1'
 
 import { type loader } from '~/routes/device.new'
-import { getSensorWikiAliasSuggestions, matchSensorWikiAlias, SensorWikiAliasEntry, SensorWikiAliasSuggestion } from '~/lib/sensor-wiki/aliases'
+import {
+	getSensorWikiAliasSuggestions,
+	matchSensorWikiAlias,
+	type SensorWikiAliasEntry,
+	type SensorWikiAliasSuggestion,
+} from '~/lib/sensor-wiki/aliases'
 
 type RegistryDeviceSchema = {
 	id: string

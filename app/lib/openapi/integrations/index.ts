@@ -1,4 +1,4 @@
-import type { ZodOpenApiObject } from 'zod-openapi'
+import { type ZodOpenApiObject } from 'zod-openapi'
 import { integrationComponents } from './components'
 import { integrationApiDescription } from './description'
 import { integrationPaths } from './apis'

@@ -366,7 +366,7 @@ export default function EditUserProfilePage({
 	}, [data.profile.displayName, data.profile.public, autosave.resetLastSaved])
 
 	const handlePublicChange = useCallback(
-		(checked: boolean) => {
+		async (checked: boolean) => {
 			setIsPublic(checked)
 
 			const nextValues = {
@@ -375,7 +375,7 @@ export default function EditUserProfilePage({
 			}
 
 			if (validateAutosave(nextValues)) {
-				autosave.submit(nextValues)
+				await autosave.submit(nextValues)
 			}
 		},
 		[autosave, displayName, validateAutosave],

@@ -66,10 +66,8 @@ export const getPhenomena = async function findPhenomena(): Promise<
 	for (const row of rows) {
 		const canonicalPhenomenon =
 			getCanonicalSensorWikiPhenomenon(row, sensorWikiAliasEntries) ??
-			getFuzzySensorWikiPhenomenonMatch(
-				row,
-				sensorWikiAliasEntries,
-			)?.sensorWikiPhenomenon
+			getFuzzySensorWikiPhenomenonMatch(row, sensorWikiAliasEntries)
+				?.sensorWikiPhenomenon
 
 		if (canonicalPhenomenon) {
 			const value = getSensorWikiPhenomenonFilterValue(canonicalPhenomenon)

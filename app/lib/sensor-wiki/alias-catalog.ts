@@ -1,9 +1,6 @@
 import { z } from 'zod'
 import rawCatalog from './aliases.json'
-import {
-	createSensorWikiAliasKey,
-	matchSensorWikiAlias,
-} from './aliases'
+import { createSensorWikiAliasKey, matchSensorWikiAlias } from './aliases'
 
 const nonEmptyString = z.string().trim().min(1)
 
@@ -63,5 +60,6 @@ const sensorWikiAliasCatalogSchema = z
 		}
 	})
 
-export const sensorWikiAliasCatalog = sensorWikiAliasCatalogSchema.parse(rawCatalog)
+export const sensorWikiAliasCatalog =
+	sensorWikiAliasCatalogSchema.parse(rawCatalog)
 export const sensorWikiAliasEntries = sensorWikiAliasCatalog.entries

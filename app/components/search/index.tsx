@@ -3,9 +3,9 @@ import { Trans, useTranslation } from 'react-i18next'
 import SearchList from './search-list'
 import { searchNominatimLocations } from './nominatim'
 import {
-	DeviceFeatureCollection,
-	DeviceSearchResult,
-	LocationSearchResult,
+	type DeviceFeatureCollection,
+	type DeviceSearchResult,
+	type LocationSearchResult,
 } from './search-types'
 
 interface SearchProps {

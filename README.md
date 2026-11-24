@@ -40,7 +40,7 @@ above. Elevation lookup additionally requires a GPXZ API key.
 
 ### Setup Steps
 
-1. Clone the repo: `git clone https://github.com/openSenseMap/frontend`
+1. Clone the repo: `git clone https://github.com/openSenseMap/openSenseMap`
 2. Copy `.env.example` into `.env`
 3. Activate the Node.js version listed in [.node-version](./.node-version) with
    your preferred version manager

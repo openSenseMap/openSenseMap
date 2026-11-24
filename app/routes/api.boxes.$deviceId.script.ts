@@ -2,7 +2,7 @@ import { type Route } from './+types/api.boxes.$deviceId.script'
 import { getDevice } from '~/db/models/device.server'
 import type SketchTemplaterConstructor from '@sensebox/sketch-templater'
 import * as z from 'zod/v4'
-import { ZodOpenApiPathItemObject } from 'zod-openapi'
+import { type ZodOpenApiPathItemObject } from 'zod-openapi'
 import { DevicePathParamsSchema } from '~/lib/openapi/schemas/common'
 import { StandardResponse } from '~/lib/responses'
 import {
