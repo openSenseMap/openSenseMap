@@ -1,13 +1,7 @@
 import { type ShouldRevalidateFunctionArgs } from 'react-router'
+import { clearExploreLoaderCacheForUrl } from './explore-loader-cache'
+import { searchWithoutChartParams } from './explore-map-search'
 import { isRootPreferenceSubmission } from './root-preference-revalidation'
-
-const CHART_SEARCH_PARAMS = ['aggregation', 'date_from', 'date_to']
-
-export function searchWithoutChartParams(url: URL) {
-	const params = new URLSearchParams(url.search)
-	for (const key of CHART_SEARCH_PARAMS) params.delete(key)
-	return params.toString()
-}
 
 export function shouldRevalidate({
 	currentUrl,
@@ -22,7 +16,8 @@ export function shouldRevalidate({
 	if (currentUrl.search !== nextUrl.search) {
 		return (
 			(formMethod !== undefined && formMethod.toUpperCase() !== 'GET') ||
-			searchWithoutChartParams(currentUrl) !== searchWithoutChartParams(nextUrl)
+			searchWithoutChartParams(currentUrl.search) !==
+				searchWithoutChartParams(nextUrl.search)
 		)
 	}
 
@@ -41,5 +36,11 @@ export function shouldRevalidate({
 	const isPathnameOnlyChildTransition =
 		formMethod === undefined && currentUrl.pathname !== nextUrl.pathname
 
-	return isPathnameOnlyChildTransition ? false : defaultShouldRevalidate
+	if (isPathnameOnlyChildTransition) return false
+
+	// A revalidation of the same URL should fetch a fresh map response.
+	if (defaultShouldRevalidate && currentUrl.href === nextUrl.href)
+		clearExploreLoaderCacheForUrl(nextUrl)
+
+	return defaultShouldRevalidate
 }

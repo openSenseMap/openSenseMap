@@ -1,11 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from 'vite-plus/test'
 import {
 	clearExploreLoaderCache,
-	clearExploreLoaderCacheForUrl,
 	EXPLORE_FILTERED_CACHE_TTL_MS,
 	EXPLORE_HOME_CACHE_TTL_MS,
 	loadExploreDataWithCache,
 } from '~/lib/explore-loader-cache'
+import { shouldRevalidate } from '~/lib/explore-revalidation'
 
 const url = (path: string) => new URL(path, 'https://example.com')
 const data = (version: number) => ({ devices: [{ version }] })
@@ -82,7 +82,16 @@ describe('explore client loader cache', () => {
 			.mockResolvedValue(data(2))
 		await loadCached('/explore', loadHome)
 		await loadCached('/explore?phenomenon=temperature', loadFiltered)
-		clearExploreLoaderCacheForUrl(url('/explore?phenomenon=temperature'))
+		const filteredUrl = url('/explore?phenomenon=temperature')
+		expect(
+			shouldRevalidate({
+				currentUrl: filteredUrl,
+				nextUrl: filteredUrl,
+				currentParams: {},
+				nextParams: {},
+				defaultShouldRevalidate: true,
+			}),
+		).toBe(true)
 		await loadCached('/explore?phenomenon=temperature', loadFiltered)
 		await loadCached('/explore', loadHome)
 		expect(loadHome).toHaveBeenCalledTimes(1)

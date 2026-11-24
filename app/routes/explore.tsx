@@ -16,7 +16,6 @@ import {
 	useParams,
 	useLocation,
 	useNavigation,
-	type ShouldRevalidateFunctionArgs,
 } from 'react-router'
 import { type Route } from './+types/explore'
 import Map from '~/components/map'
@@ -63,20 +62,10 @@ import { sensorMatchesAnyPhenomenonFilter } from '~/lib/phenomenon-filter'
 import { sensorWikiAliasEntries } from '~/lib/sensor-wiki/alias-catalog'
 import { getExplorePendingUi } from '~/lib/explore-pending-navigation'
 import { getApproximateMeasurementCount } from '~/services/statistics-service.server'
-import {
-	clearExploreLoaderCacheForUrl,
-	loadExploreDataWithCache,
-} from '~/lib/explore-loader-cache'
-import { shouldRevalidate as shouldRevalidateExplore } from '~/lib/explore-revalidation'
+import { loadExploreDataWithCache } from '~/lib/explore-loader-cache'
+import { searchWithoutChartParams } from '~/lib/explore-map-search'
 
-export function shouldRevalidate(args: ShouldRevalidateFunctionArgs) {
-	const revalidate = shouldRevalidateExplore(args)
-	// A filter change has its own cache key. A same-URL revalidation is an
-	// explicit refresh and must bypass the cached response for that URL.
-	if (revalidate && args.currentUrl.href === args.nextUrl.href)
-		clearExploreLoaderCacheForUrl(args.nextUrl)
-	return revalidate
-}
+export { shouldRevalidate } from '~/lib/explore-revalidation'
 
 const INITIAL_VIEW_STATE = {
 	zoom: 2,
@@ -518,13 +507,10 @@ export default function Explore({ loaderData }: Route.ComponentProps) {
 	const navigate = useNavigate()
 	const location = useLocation()
 	const navigation = useNavigation()
-	const mapFilterSearch = useMemo(() => {
-		const params = new URLSearchParams(location.search)
-		for (const key of ['aggregation', 'date_from', 'date_to']) {
-			params.delete(key)
-		}
-		return params.toString()
-	}, [location.search])
+	const mapFilterSearch = useMemo(
+		() => searchWithoutChartParams(location.search),
+		[location.search],
+	)
 	const filteredDevices = useMemo(
 		() =>
 			getFilteredDevices(

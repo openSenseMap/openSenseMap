@@ -1,4 +1,4 @@
-import { searchWithoutChartParams } from './explore-revalidation'
+import { searchWithoutChartParams } from './explore-map-search'
 
 // Keep the complete Home map through filter visits. Sensor and time-range
 // results change more often and can be much larger, so retain only one briefly.
@@ -17,7 +17,7 @@ let generation = 0
 
 function cacheKey(url: URL) {
 	// Child paths and chart controls do not change the map's loader data.
-	return searchWithoutChartParams(url)
+	return searchWithoutChartParams(url.search)
 }
 
 export function clearExploreLoaderCache() {
