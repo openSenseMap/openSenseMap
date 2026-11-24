@@ -1,5 +1,5 @@
 import { type ShouldRevalidateFunctionArgs } from 'react-router'
-import { clearExploreLoaderCacheForUrl } from './explore-loader-cache'
+import { clearExploreLoaderCache } from './explore-loader-cache'
 import { searchWithoutChartParams } from './explore-map-search'
 import { isRootPreferenceSubmission } from './root-preference-revalidation'
 
@@ -38,9 +38,13 @@ export function shouldRevalidate({
 
 	if (isPathnameOnlyChildTransition) return false
 
-	// A revalidation of the same URL should fetch a fresh map response.
-	if (defaultShouldRevalidate && currentUrl.href === nextUrl.href)
-		clearExploreLoaderCacheForUrl(nextUrl)
+	// Refreshing the unfiltered map should fetch a fresh response.
+	if (
+		defaultShouldRevalidate &&
+		currentUrl.href === nextUrl.href &&
+		!searchWithoutChartParams(nextUrl.search)
+	)
+		clearExploreLoaderCache()
 
 	return defaultShouldRevalidate
 }

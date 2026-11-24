@@ -1,7 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vite-plus/test'
 import {
 	clearExploreLoaderCache,
-	EXPLORE_FILTERED_CACHE_TTL_MS,
 	EXPLORE_HOME_CACHE_TTL_MS,
 	loadExploreDataWithCache,
 } from '~/lib/explore-loader-cache'
@@ -19,7 +18,7 @@ beforeEach(() => {
 })
 
 describe('explore client loader cache', () => {
-	it('reuses the Home map after visiting a filtered route and another page', async () => {
+	it('reuses the Home map after a filtered load and ignores chart controls', async () => {
 		const load = vi.fn<() => Promise<TestData>>().mockResolvedValue(data(1))
 		const loadFiltered = vi
 			.fn<() => Promise<TestData>>()
@@ -33,73 +32,52 @@ describe('explore client loader cache', () => {
 		expect(loadFiltered).toHaveBeenCalledTimes(1)
 	})
 
-	it('loads a different map filter variant', async () => {
+	it('loads fresh data each time a filtered request runs', async () => {
+		const load = vi
+			.fn<() => Promise<TestData>>()
+			.mockResolvedValueOnce(data(1))
+			.mockResolvedValueOnce(data(2))
+		const path = '/explore?phenomenon=temperature'
+		expect(await loadCached(path, load)).toEqual(data(1))
+		expect(await loadCached(path, load)).toEqual(data(2))
+
+		expect(load).toHaveBeenCalledTimes(2)
+	})
+
+	it('expires the Home map ten minutes after loading it', async () => {
+		vi.useFakeTimers()
 		const load = vi
 			.fn<() => Promise<TestData>>()
 			.mockResolvedValueOnce(data(1))
 			.mockResolvedValueOnce(data(2))
 		await loadCached('/explore', load)
-		const filtered = await loadCached('/explore?phenomenon=temperature', load)
-
-		expect(filtered.devices).toEqual([{ version: 2 }])
+		vi.advanceTimersByTime(EXPLORE_HOME_CACHE_TTL_MS - 1)
+		expect(await loadCached('/explore', load)).toEqual(data(1))
+		vi.advanceTimersByTime(1)
+		expect(await loadCached('/explore', load)).toEqual(data(2))
 		expect(load).toHaveBeenCalledTimes(2)
 	})
 
-	it('keeps Home for ten minutes and expires filtered data after one minute', async () => {
-		vi.useFakeTimers()
-		const loadHome = vi
+	it('evicts the Home cache when refreshing the unfiltered view', async () => {
+		const load = vi
 			.fn<() => Promise<TestData>>()
 			.mockResolvedValueOnce(data(1))
-			.mockResolvedValueOnce(data(3))
-		const loadFiltered = vi
-			.fn<() => Promise<TestData>>()
 			.mockResolvedValueOnce(data(2))
-			.mockResolvedValueOnce(data(4))
-		await loadCached('/explore', loadHome)
-		await loadCached('/explore?phenomenon=temperature', loadFiltered)
-		vi.advanceTimersByTime(EXPLORE_FILTERED_CACHE_TTL_MS)
-		expect((await loadCached('/explore', loadHome)).devices).toEqual([
-			{ version: 1 },
-		])
-		expect(
-			(await loadCached('/explore?phenomenon=temperature', loadFiltered))
-				.devices,
-		).toEqual([{ version: 4 }])
-		vi.advanceTimersByTime(
-			EXPLORE_HOME_CACHE_TTL_MS - EXPLORE_FILTERED_CACHE_TTL_MS,
-		)
-		expect((await loadCached('/explore', loadHome)).devices).toEqual([
-			{ version: 3 },
-		])
-		expect(loadHome).toHaveBeenCalledTimes(2)
-		expect(loadFiltered).toHaveBeenCalledTimes(2)
-	})
-
-	it('refreshes one URL without evicting Home and clears both on mutation', async () => {
-		const loadHome = vi.fn<() => Promise<TestData>>().mockResolvedValue(data(1))
-		const loadFiltered = vi
-			.fn<() => Promise<TestData>>()
-			.mockResolvedValue(data(2))
-		await loadCached('/explore', loadHome)
-		await loadCached('/explore?phenomenon=temperature', loadFiltered)
-		const filteredUrl = url('/explore?phenomenon=temperature')
-		expect(
+		const refresh = (path: string) =>
 			shouldRevalidate({
-				currentUrl: filteredUrl,
-				nextUrl: filteredUrl,
+				currentUrl: url(path),
+				nextUrl: url(path),
 				currentParams: {},
 				nextParams: {},
 				defaultShouldRevalidate: true,
-			}),
-		).toBe(true)
-		await loadCached('/explore?phenomenon=temperature', loadFiltered)
-		await loadCached('/explore', loadHome)
-		expect(loadHome).toHaveBeenCalledTimes(1)
-		expect(loadFiltered).toHaveBeenCalledTimes(2)
+			})
+		await loadCached('/explore', load)
+		expect(refresh('/explore?phenomenon=temperature')).toBe(true)
+		expect(await loadCached('/explore', load)).toEqual(data(1))
 
-		clearExploreLoaderCache()
-		await loadCached('/explore', loadHome)
-		expect(loadHome).toHaveBeenCalledTimes(2)
+		expect(refresh('/explore')).toBe(true)
+		expect(await loadCached('/explore', load)).toEqual(data(2))
+		expect(load).toHaveBeenCalledTimes(2)
 	})
 
 	it('does not restore a result invalidated while its request was pending', async () => {

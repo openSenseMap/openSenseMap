@@ -483,8 +483,8 @@ export async function clientLoader({
 	url,
 	serverLoader,
 }: Route.ClientLoaderArgs) {
-	// On hydration serverLoader returns the SSR data, which primes the cache
-	// without fetching the full map payload a second time.
+	// On hydration serverLoader returns the SSR data, which can prime the Home
+	// cache without fetching the full map payload a second time.
 	return loadExploreDataWithCache(url, serverLoader)
 }
 clientLoader.hydrate = true as const
