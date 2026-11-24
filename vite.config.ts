@@ -37,7 +37,7 @@ export default defineConfig(async (configEnv) => {
 
 	return {
 		staged: {
-			'*': 'vp check --fix',
+			'*': (f) => ['vp run typegen', 'vp check --fix'],
 		},
 		fmt: {
 			...epicOxfmt,
