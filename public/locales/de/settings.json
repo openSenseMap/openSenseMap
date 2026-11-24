@@ -57,7 +57,7 @@
 	"newsletter_confirmation_link_invalid_description": "Dieser Info-Mails-Bestätigungslink ist ungültig oder wurde bereits verwendet.",
 	"newsletter_disabled": "Info-Mails deaktiviert.",
 	"newsletter_confirmation_failed": "Die Info-Mails-Bestätigungs-E-Mail konnte nicht gesendet werden. Bitte versuche es später erneut.",
-	"newsletter_sync_failed": "Info-Mails-Einstellung gespeichert, aber die Synchronisierung mit dem E-Mail-Anbieter ist fehlgeschlagen. Bitte kontaktiere uns unter support@opensensemap.org",
+	"newsletter_sync_failed": "Info-Mails-Einstellung gespeichert, aber die Synchronisierung mit dem E-Mail-Anbieter ist fehlgeschlagen. Bitte kontaktiere uns unter info@opensensemap.org",
 	"confirm_password": "Bestätige dein Passwort",
 	"enter_current_password": "Gib dein aktuelles Passwort ein",
 	"try_again": "Versuche es nochmal.",

@@ -518,7 +518,7 @@ export default function Explore({ loaderData }: Route.ComponentProps) {
 				new URLSearchParams(mapFilterSearch),
 				sensorWikiAliasEntries,
 			),
-		[devices, mapFilterSearch, sensorWikiAliasEntries],
+		[devices, mapFilterSearch],
 	)
 	const outlet = useOutlet()
 	const pendingUi = getExplorePendingUi({

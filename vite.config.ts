@@ -65,6 +65,10 @@ export default defineConfig(async (configEnv) => {
 			rules: {
 				'vite-plus/prefer-vite-plus-imports': 'error',
 			},
+			options: {
+				typeAware: true,
+				typeCheck: true,
+			},
 		},
 		server: {
 			port: 3000,

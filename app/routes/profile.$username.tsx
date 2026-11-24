@@ -2,10 +2,10 @@ import { useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 import { redirect, useFetcher } from 'react-router'
 import { type Route } from './+types/profile.$username'
-import type { loader as measurementEstimateLoader } from './resources.profile-measurement-estimate.$userId'
+import { type loader as measurementEstimateLoader } from './resources.profile-measurement-estimate.$userId'
 import { getColumns, type SenseBox } from '~/components/mydevices/dt/columns'
 import {
-	CustomTableFeatures,
+	type CustomTableFeatures,
 	DataTable,
 } from '~/components/mydevices/dt/data-table'
 import { NavBar } from '~/components/nav-bar'
@@ -26,7 +26,7 @@ import { getUserId } from '~/services/session-service.server'
 import { claimDevice } from '~/services/transfer-service.server'
 import { userNameFromURl } from '~/services/user-service.server'
 import { useHydrated } from '~/hooks/use-hydrated'
-import { ColumnDef, RowData } from '@tanstack/react-table'
+import { type ColumnDef, type RowData } from '@tanstack/react-table'
 
 export { shouldRevalidateExceptRootPreferences as shouldRevalidate }
 

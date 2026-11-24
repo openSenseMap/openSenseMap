@@ -15,7 +15,10 @@ import FilterTags from './filter-options/filter-tags'
 import FilterPhenomena from './filter-options/filter-phenomena'
 import FilterTime from './filter-options/filter-time'
 import { useTranslation } from 'react-i18next'
-import { DeviceExposureType, DeviceStatusType } from '~/lib/device-enums'
+import {
+	type DeviceExposureType,
+	type DeviceStatusType,
+} from '~/lib/device-enums'
 import { getExplorePendingUi } from '~/lib/explore-pending-navigation'
 
 export type TimeFilterState =

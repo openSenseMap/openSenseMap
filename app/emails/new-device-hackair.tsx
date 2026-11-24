@@ -106,9 +106,9 @@ export const NewDeviceHackairEmail = ({
 					<Text>
 						{intl.formatMessage({ id: 'support' })} {}
 						<Link
-							href={`mailto:support@opensensemap.org?Subject=Hilfe%20bei%20der%20Einrichtung&body=Bitte%20bei%20jeder%20Anfrage%20die%20senseBox-ID%20(${device._id})%20mit%20angeben.%20Danke!`}
+							href={`mailto:info@opensensemap.org?Subject=Hilfe%20bei%20der%20Einrichtung&body=Bitte%20bei%20jeder%20Anfrage%20die%20senseBox-ID%20(${device._id})%20mit%20angeben.%20Danke!`}
 						>
-							support@opensensemap.org
+							info@opensensemap.org
 						</Link>
 					</Text>
 					<Text>{intl.formatMessage({ id: 'salutation' })}</Text>

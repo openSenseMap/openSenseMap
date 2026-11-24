@@ -1,4 +1,4 @@
-import z from 'zod'
+import type z from 'zod'
 import { apiMessages } from './openapi/messages'
 import { BearerTokenSchema } from './openapi/schemas/auth'
 import { StandardResponse } from './responses'
