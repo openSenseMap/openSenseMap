@@ -36,6 +36,9 @@ export default defineConfig(async (configEnv) => {
 	}
 
 	return {
+		staged: {
+			'*': 'vp check --fix',
+		},
 		fmt: {
 			...epicOxfmt,
 			ignorePatterns: [

@@ -15,12 +15,13 @@
     "db:migrate": "drizzle-kit migrate",
     "db:studio": "drizzle-kit studio",
     "db:setup": "vp run db:generate && vp run db:migrate",
-    "db:seed": "tsx ./scripts/db/seed.ts",
+    "db:seed": "vpx ./scripts/db/seed.ts",
     "db:seed-integrations": "tsx ./scripts/db/seed-integrations",
     "db:seed-orphan-user": "tsx ./scripts/db/seed-orphan-user",
     "email:dev": "email dev --dir app/emails",
     "components": "npx shadcn",
-    "typegen": "react-router typegen"
+    "typegen": "react-router typegen",
+    "prepare": "vp config"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1161.0",
