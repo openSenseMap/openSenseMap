@@ -36,7 +36,7 @@
     "@mjackson/form-data-parser": "^0.9.1",
     "@paralleldrive/cuid2": "^3.3.0",
     "@react-router/node": "8.5.1",
-    "@react-router/serve": "8.5.1",
+    "@react-router/serve": "8.5.2",
     "@rjsf/core": "^6.11.1",
     "@rjsf/utils": "^6.11.1",
     "@rjsf/validator-ajv8": "^6.11.0",
