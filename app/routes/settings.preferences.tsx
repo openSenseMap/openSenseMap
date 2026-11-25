@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { useLoaderData } from 'react-router'
 import { type Route } from './+types/settings.preferences'
 import { AutosaveStatusText } from '~/components/autosave-status.text'
+import { UnsavedChangesBlocker } from '~/components/unsaved-changes-blocker'
 import { LanguageSelect } from '~/components/language-select'
 import { ThemeSelect } from '~/components/theme-select'
 import { Button } from '~/components/ui/button'
@@ -13,9 +13,14 @@ import { Label } from '~/components/ui/label'
 import { useToast } from '~/components/ui/use-toast'
 import {
 	AUTOSAVE_DELAY_MS,
+	combineAutosaveNavigationStates,
 	useAutosaveFetcher,
 } from '~/hooks/use-autosave-fetcher'
-import { getProfileByUserId, updateProfile } from '~/db/models/profile.server'
+import {
+	getSettingsProfileByUserId,
+	updateProfile,
+} from '~/db/models/profile.server'
+import { shouldRevalidateExceptRootPreferences } from '~/lib/root-preference-revalidation'
 import { getUserById } from '~/db/models/user.server'
 import {
 	isOptionalMapViewInputValid,
@@ -28,6 +33,8 @@ import {
 	requestNewsletterConfirmation,
 } from '~/services/newsletter-service.server'
 import { requireUserId } from '~/services/session-service.server'
+
+export { shouldRevalidateExceptRootPreferences as shouldRevalidate }
 
 const DEFAULT_HOME_ZOOM = String(MAP_ZOOM_LIMITS.default)
 
@@ -74,7 +81,7 @@ export type PreferencesActionData =
 export async function loader({ request }: Route.LoaderArgs) {
 	const userId = await requireUserId(request)
 	const [profile, user] = await Promise.all([
-		getProfileByUserId(userId),
+		getSettingsProfileByUserId(userId),
 		getUserById(userId),
 	])
 
@@ -189,7 +196,7 @@ async function handleMapPreferencesAction(
 	userId: string,
 	formData: FormData,
 ): Promise<MapPreferencesActionData> {
-	const profile = await getProfileByUserId(userId)
+	const profile = await getSettingsProfileByUserId(userId)
 
 	if (!profile) {
 		return {
@@ -262,12 +269,14 @@ function normalizeMapPreferenceValues(
 	}
 }
 
-export default function PreferencesSettingsPage() {
+export default function PreferencesSettingsPage({
+	loaderData,
+}: Route.ComponentProps) {
 	const {
 		profile,
 		newsletterOptIn: initialNewsletterOptIn,
 		newsletterOptInPending: initialNewsletterOptInPending,
-	} = useLoaderData<typeof loader>()
+	} = loaderData
 	const { toast } = useToast()
 	const { t } = useTranslation('settings')
 
@@ -466,20 +475,20 @@ export default function PreferencesSettingsPage() {
 	])
 
 	const submitMapAutosave = useCallback(
-		(nextValues: MapPreferenceAutosaveValues) => {
+		async (nextValues: MapPreferenceAutosaveValues) => {
 			const normalizedValues = normalizeMapPreferenceValues(nextValues)
 
 			if (validateMapAutosave(normalizedValues)) {
-				mapAutosave.submit(normalizedValues)
+				await mapAutosave.submit(normalizedValues)
 			}
 		},
 		[mapAutosave, validateMapAutosave],
 	)
 
 	const handleHomeLatitudeChange = useCallback(
-		(value: string) => {
+		async (value: string) => {
 			setHomeLatitude(value)
-			submitMapAutosave({
+			await submitMapAutosave({
 				homeLatitude: value,
 				homeLongitude,
 				homeZoom,
@@ -489,9 +498,9 @@ export default function PreferencesSettingsPage() {
 	)
 
 	const handleHomeLongitudeChange = useCallback(
-		(value: string) => {
+		async (value: string) => {
 			setHomeLongitude(value)
-			submitMapAutosave({
+			await submitMapAutosave({
 				homeLatitude,
 				homeLongitude: value,
 				homeZoom,
@@ -501,12 +510,12 @@ export default function PreferencesSettingsPage() {
 	)
 
 	const handleHomeZoomChange = useCallback(
-		(value: string) => {
+		async (value: string) => {
 			setHomeZoom(value)
 
 			if (!hasCompleteHomeLocation({ homeLatitude, homeLongitude })) return
 
-			submitMapAutosave({
+			await submitMapAutosave({
 				homeLatitude,
 				homeLongitude,
 				homeZoom: value,
@@ -515,7 +524,7 @@ export default function PreferencesSettingsPage() {
 		[homeLatitude, homeLongitude, submitMapAutosave],
 	)
 
-	const clearHomeLocation = useCallback(() => {
+	const clearHomeLocation = useCallback(async () => {
 		const nextValues = {
 			homeLatitude: '',
 			homeLongitude: '',
@@ -525,20 +534,26 @@ export default function PreferencesSettingsPage() {
 		setHomeLatitude(nextValues.homeLatitude)
 		setHomeLongitude(nextValues.homeLongitude)
 		setHomeZoom(nextValues.homeZoom)
-		mapAutosave.submit(nextValues)
+		await mapAutosave.submit(nextValues)
 	}, [mapAutosave])
 
 	const handleNewsletterChange = useCallback(
-		(checked: boolean) => {
+		async (checked: boolean) => {
 			const nextValues = { newsletterRequested: checked }
 			setNewsletterRequested(checked)
-			newsletterAutosave.submit(nextValues)
+			await newsletterAutosave.submit(nextValues)
 		},
 		[newsletterAutosave],
 	)
 
 	return (
 		<Card className="border-border bg-card text-card-foreground">
+			<UnsavedChangesBlocker
+				autosaveState={combineAutosaveNavigationStates(
+					mapAutosave.navigationState,
+					newsletterAutosave.navigationState,
+				)}
+			/>
 			<CardHeader>
 				<CardTitle>{t('preferences')}</CardTitle>
 				<AutosaveStatusText status={mapAutosave.status} namespace="settings" />

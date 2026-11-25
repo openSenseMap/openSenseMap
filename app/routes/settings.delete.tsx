@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Form, useActionData, data, redirect } from 'react-router'
+import { Form, data, redirect } from 'react-router'
 import invariant from 'tiny-invariant'
 import { type Route } from './+types/settings.delete'
 import { Button } from '~/components/ui/button'
@@ -11,8 +11,8 @@ import {
 	CardHeader,
 	CardTitle,
 } from '~/components/ui/card'
-import { Input } from '~/components/ui/input'
 import { Label } from '~/components/ui/label'
+import { PasswordInput } from '~/components/ui/password-input'
 import { useToast } from '~/components/ui/use-toast'
 import {
 	deleteUserByEmail,
@@ -69,8 +69,9 @@ export async function action({ request }: Route.ActionArgs) {
 	return redirect('')
 }
 
-export default function EditUserProfilePage() {
-	const actionData = useActionData<typeof action>()
+export default function EditUserProfilePage({
+	actionData,
+}: Route.ComponentProps) {
 	const [passwordDelVal, setPasswordVal] = useState('') //* to enable delete account button
 	//* To focus when an error occured
 	const passwordDelRef = useRef<HTMLInputElement>(null)
@@ -99,10 +100,9 @@ export default function EditUserProfilePage() {
 				<CardContent className="grid gap-4">
 					<div className="grid gap-2">
 						<Label htmlFor="passwordDelete">{t('confirm_password')}</Label>
-						<Input
+						<PasswordInput
 							placeholder={t('enter_password')}
 							required
-							type="password"
 							id="passwordDelete"
 							name="passwordDelete"
 							ref={passwordDelRef}

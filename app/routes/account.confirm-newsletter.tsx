@@ -1,5 +1,5 @@
 import { useTranslation } from 'react-i18next'
-import { Link, data, useLoaderData } from 'react-router'
+import { Link, data } from 'react-router'
 import { type Route } from './+types/account.confirm-newsletter'
 import { Button } from '~/components/ui/button'
 import {
@@ -38,8 +38,9 @@ export async function loader({ request }: Route.LoaderArgs) {
 	})
 }
 
-export default function ConfirmNewsletterRoute() {
-	const { status, isLoggedIn } = useLoaderData<typeof loader>()
+export default function ConfirmNewsletterRoute({
+	loaderData: { status, isLoggedIn },
+}: Route.ComponentProps) {
 	const { t } = useTranslation('settings')
 
 	const content = {
@@ -61,15 +62,14 @@ export default function ConfirmNewsletterRoute() {
 		<div className="flex min-h-screen items-center justify-center p-4">
 			<Card className="w-full max-w-md text-center">
 				<CardHeader className="space-y-2">
-					<CardTitle className="text-2xl font-bold">
-						{content.title}
-					</CardTitle>
+					<CardTitle className="text-2xl font-bold">{content.title}</CardTitle>
 					<CardDescription>{content.description}</CardDescription>
 				</CardHeader>
 				<CardContent />
 				<CardFooter className="flex flex-col gap-2">
 					<Link
 						to={isLoggedIn ? '/settings/preferences' : '/explore'}
+						prefetch="intent"
 						className="w-full"
 					>
 						<Button className="w-full">
@@ -77,7 +77,7 @@ export default function ConfirmNewsletterRoute() {
 						</Button>
 					</Link>
 					{!isLoggedIn && (
-						<Link to="/explore/login" className="w-full">
+						<Link to="/explore/login" prefetch="intent" className="w-full">
 							<Button variant="outline" className="w-full">
 								{t('go_to_login')}
 							</Button>

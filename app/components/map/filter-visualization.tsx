@@ -1,6 +1,6 @@
 import { X } from 'lucide-react'
 import { Fragment, useEffect } from 'react'
-import { useLoaderData, useNavigate } from 'react-router'
+import { useLoaderData, useNavigate, useSearchParams } from 'react-router'
 import { DeviceExposureZodEnum, DeviceStatusZodEnum } from '~/lib/device-enums'
 import { type loader } from '~/routes/explore'
 
@@ -9,7 +9,7 @@ const FILTER_KEYS = new Set(['exposure', 'status', 'tags'])
 export default function FilterVisualization() {
 	const data = useLoaderData<typeof loader>()
 	const navigate = useNavigate()
-	const params = new URLSearchParams(data.filterParams)
+	const [params] = useSearchParams()
 
 	// Validate filter values using the predefined enums
 	const isValidFilter = (key: string, value: string) => {
@@ -113,7 +113,7 @@ export default function FilterVisualization() {
 			))}
 			<div className="bg-light-green flex items-center rounded-full pr-2 text-sm">
 				<span className="bg-light-green rounded-l-full px-2 py-1 font-medium text-white">
-					{'Total Devices: ' + data.filteredDevices.features.length}
+					{'Total Devices: ' + data.filteredDeviceCount}
 				</span>
 			</div>
 		</div>

@@ -1,4 +1,4 @@
-import { Form, Link, redirect, useActionData } from 'react-router'
+import { Form, Link, redirect } from 'react-router'
 import invariant from 'tiny-invariant'
 import { type Route } from './+types/admin.users.$userId'
 import { getUserDevices } from '~/db/models/device.server'
@@ -136,9 +136,9 @@ export async function action({
 
 export default function AdminUserDetailRoute({
 	loaderData,
+	actionData,
 }: Route.ComponentProps) {
 	const { user, devices } = loaderData
-	const actionData = useActionData<typeof action>()
 
 	return (
 		<>
@@ -446,6 +446,7 @@ export default function AdminUserDetailRoute({
 												<td className="border-r-2 border-black p-2">
 													<Link
 														to={`/admin/devices/${device.id}`}
+														prefetch="intent"
 														className="cursor-pointer hover:underline hover:underline-offset-2"
 													>
 														Open

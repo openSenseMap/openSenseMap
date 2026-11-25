@@ -1,4 +1,4 @@
-import z from 'zod'
+import type z from 'zod'
 import { apiMessages } from './openapi/messages'
 import { BearerTokenSchema } from './openapi/schemas/auth'
 import { StandardResponse } from './responses'
@@ -64,7 +64,9 @@ export async function parseUserRegistrationData(request: Request): Promise<{
 		password: data.password || '',
 		language: data.language || 'en_US',
 		tosAccepted: parseBoolean(data.tosAccepted),
-		newsletterOptIn: parseBoolean(data.newsletterOptIn ?? data.newsletter_optIn),
+		newsletterOptIn: parseBoolean(
+			data.newsletterOptIn ?? data.newsletter_optIn,
+		),
 	}
 }
 

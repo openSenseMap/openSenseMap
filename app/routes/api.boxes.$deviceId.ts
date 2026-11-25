@@ -29,7 +29,7 @@ import {
 	DeviceSensorUpdateSchema,
 	DeviceAddonsUpdateSchema,
 	ApiDeviceSchema,
-	DeviceSensorUpdate,
+	type DeviceSensorUpdate,
 } from '~/lib/openapi/schemas/device'
 import { ExposureSchema } from '~/lib/api-schemas/query'
 import {
@@ -37,7 +37,13 @@ import {
 	responseContentTypeJson,
 } from '~/middleware/content-type-header.server'
 import { parseJsonBody } from '~/lib/request-parsing'
-import { LocationObjectSchema } from '~/lib/openapi/schemas/location'
+import { DeviceLocationInputSchema } from '~/lib/openapi/schemas/location'
+import { ElevationLookupConsentSchema } from '~/lib/openapi/schemas/consent'
+import {
+	ElevationLookupError,
+	getTerrainElevation,
+} from '~/services/elevation-service.server'
+import { applyElevationConsentChoice } from '~/db/models/elevation-consent.server'
 
 const messages = {
 	conflictingSensorsAndAddons:
@@ -84,7 +90,9 @@ const UpdateDeviceRequestSchema = z
 			example: 'https://example.com',
 		}),
 
-		location: LocationObjectSchema.optional(),
+		location: DeviceLocationInputSchema.optional(),
+
+		elevationLookupConsent: ElevationLookupConsentSchema.optional(),
 
 		grouptag: z
 			.union([z.string(), z.array(z.string())])
@@ -170,7 +178,8 @@ export const openapi: ZodOpenApiPathItemObject = {
 	put: {
 		tags: ['Devices'],
 		summary: 'Update device',
-		description: 'Updates a device. Requires JWT authorization.',
+		description:
+			'Updates a device. Requires JWT authorization. An optional location height is interpreted and stored as height above ground. Coordinates are sent to GPXZ and height above sea level is recalculated only when the authenticated user has granted the current elevation lookup consent. A missing consent or lookup failure does not fail the update.',
 		security: [{ bearerAuth: [] }],
 
 		requestParams: {
@@ -372,6 +381,10 @@ async function put(request: Request, user: User, deviceId: string) {
 		return StandardResponse.notFound(apiMessages.deviceNotFound)
 	}
 
+	if (currentDevice.userId !== user.id) {
+		return StandardResponse.forbidden(messages.deviceNotOwned)
+	}
+
 	if (body.sensors && body.addons?.add) {
 		return StandardResponse.badRequest(
 			'sensors and addons can not appear in the same request.',
@@ -432,14 +445,57 @@ async function put(request: Request, user: User, deviceId: string) {
 	}
 
 	// Prepare location if provided
-	let locationData: { lat: number; lng: number; height?: number } | undefined
+	let locationData: UpdateDeviceArgs['location']
+	const mayLookupElevation =
+		body.location || body.elevationLookupConsent !== undefined
+			? await applyElevationConsentChoice(user.id, body.elevationLookupConsent)
+			: false
 	if (body.location) {
 		locationData = {
 			lat: body.location.lat,
 			lng: body.location.lng,
 		}
-		if (body.location.height !== undefined) {
-			locationData.height = body.location.height
+
+		const coordinatesChanged =
+			body.location.lat !== currentDevice.latitude ||
+			body.location.lng !== currentDevice.longitude
+		const heightWasSupplied = body.location.height !== undefined
+		const heightAboveGround = heightWasSupplied
+			? body.location.height
+			: currentDevice.heightAboveGround
+
+		if (heightWasSupplied) {
+			locationData.heightAboveGround = heightAboveGround ?? null
+		}
+
+		if (coordinatesChanged) {
+			locationData.heightAboveGround = heightAboveGround ?? null
+			locationData.terrainElevation = null
+			locationData.terrainElevationDataset = null
+		}
+
+		const shouldLookupElevation =
+			heightAboveGround !== null &&
+			heightAboveGround !== undefined &&
+			mayLookupElevation &&
+			(coordinatesChanged || currentDevice.terrainElevation === null)
+
+		if (shouldLookupElevation) {
+			try {
+				const elevationResult = await getTerrainElevation(
+					body.location.lat,
+					body.location.lng,
+				)
+				locationData.terrainElevation = elevationResult.elevation
+				locationData.terrainElevationDataset = elevationResult.dataset
+			} catch (error) {
+				console.warn('PUT /boxes/:deviceId terrain elevation lookup failed', {
+					error: error instanceof ElevationLookupError ? error.code : error,
+					deviceId,
+					latitude: body.location.lat,
+					longitude: body.location.lng,
+				})
+			}
 		}
 	}
 

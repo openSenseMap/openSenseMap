@@ -1,6 +1,6 @@
 @import 'tailwindcss';
 
-@plugin 'tailwindcss-animate';
+@import 'tw-animate-css';
 @plugin '@tailwindcss/typography';
 
 @custom-variant dark (&:where(.dark, .dark *));
@@ -117,7 +117,7 @@
 	--color-light-green: #3d843f;
 	--color-light-blue: #037ea1;
 
-	--color-dark-title: #FFFFFF;
+	--color-dark-title: #ffffff;
 	--color-dark-menu: #d2d1d0;
 	--color-dark-text: #d2d1d0;
 	--color-dark-green: #6fa161;
@@ -477,7 +477,7 @@
 	}
 
 	@font-face {
-		font-family: 'Matter';
+		font-family: 'RobotoSlab';
 		src:
 			url('/fonts/RobotoSlab-Regular.woff2') format('woff2'),
 			url('/fonts/RobotoSlab-Regular.woff') format('woff');
@@ -497,7 +497,7 @@
 	}
 
 	@font-face {
-		font-family: 'Matter';
+		font-family: 'Urbanist';
 		src:
 			url('/fonts/Urbanist-Regular.woff2') format('woff2'),
 			url('/fonts/Urbanist-Regular.woff') format('woff');

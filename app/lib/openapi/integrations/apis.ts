@@ -1,4 +1,4 @@
-import type { ZodOpenApiPathsObject } from 'zod-openapi'
+import { type ZodOpenApiPathsObject } from 'zod-openapi'
 import {
 	healthResponseExample,
 	mqttConfigRequestExample,

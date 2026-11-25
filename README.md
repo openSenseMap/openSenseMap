@@ -6,6 +6,8 @@ running as a public beta at
 
 <img width="1510" height="858" alt="Screenshot OSeM" src="https://github.com/user-attachments/assets/70da4cff-1751-4a13-89e8-607a5198df37">
 
+![](https://status.opensensemap.org/api/badge/2/uptime?style=for-the-badge)
+![](https://status.opensensemap.org/api/badge/13/uptime?labelPrefix=Staging+&style=for-the-badge)
 
 ## Project setup
 
@@ -14,7 +16,8 @@ instructions:
 
 ### System Requirements
 
-- [Node.js](https://nodejs.org/) >= 24.0.0 (see [.nvmrc](./.nvmrc))
+- [Node.js](https://nodejs.org/) >= 24.0.0 (see
+  [.node-version](./.node-version))
 - [npm](https://npmjs.com/) >= 11.0.0
 - [nvm](https://github.com/nvm-sh/nvm) >= 4.0.0
 - [git](https://git-scm.com/) >= 2.38.0
@@ -28,16 +31,19 @@ You can configure the API endpoint using the following environmental variables:
 | ------------ | -------------------------------------------------------- |
 | OSEM_API_URL | https://api.testing.opensensemap.org                     |
 | DATABASE_URL | `postgresql://postgres:postgres@localhost:5432/postgres` |
+| GPXZ_API_URL | `https://api-eu.gpxz.io/v1/elevation/points`             |
+| GPXZ_API_KEY | `YOUR_GPXZ_API_KEY`                                      |
 
 You can create a copy of `.env.example`, rename it to `.env` and set the values.
-To run a local development version, you only need to adjust the `OSEM_API_URL`
-to the one given above.
+To run a local development version, adjust `OSEM_API_URL` to the one given
+above. Elevation lookup additionally requires a GPXZ API key.
 
 ### Setup Steps
 
-1. Clone the repo: `git clone https://github.com/openSenseMap/frontend`
+1. Clone the repo: `git clone https://github.com/openSenseMap/openSenseMap`
 2. Copy `.env.example` into `.env`
-3. Run `nvm use` to use the npm version referred to in [.nvmrc](./.nvmrc)
+3. Activate the Node.js version listed in [.node-version](./.node-version) with
+   your preferred version manager
 4. Run `npm install` to install dependencies
 5. Optionally run `docker compose up` to start a docker container running your
    local postgres DB (`docker compose up -d` for running container in
@@ -50,9 +56,10 @@ to the one given above.
 
 ### Linting and formatting
 
-This project uses [Oxlint](https://oxc.rs/docs/guide/usage/linter.html) for
-linting and [Oxfmt](https://oxc.rs/docs/guide/usage/formatter.html) for
-formatting.The configurations in `oxfmt.config.ts` and `.oxlintrc.json` extend
+This project uses [Vite+](https://viteplus.dev/) to run
+[Oxlint](https://oxc.rs/docs/guide/usage/linter.html) and
+[Oxfmt](https://oxc.rs/docs/guide/usage/formatter.html). Their configuration
+lives in `vite.config.ts` and extends
 [@epic-web/config/](https://github.com/epicweb-dev/config).
 
 Run formatting:
@@ -74,8 +81,10 @@ Exemplary VSCode config:
     "source.fixAll.oxc": "always"
   },
   "oxc.enable": true,
-  "oxc.fmt.configPath": "./oxfmt.config.ts",
-  "oxc.configPath": "./oxlintrc.json",
+  "oxc.fmt.configPath": "./vite.config.ts",
+  "oxc.fmt.disableNestedConfig": true,
+  "oxc.configPath": "./vite.config.ts",
+  "oxc.disableNestedConfig": true,
   "[typescript]": {
     "editor.defaultFormatter": "oxc.oxc-vscode"
   },
@@ -103,6 +112,16 @@ Afterwards follow these steps:
 4. Push to the branch (`git push origin feat/my-new-feature`)
 5. Create a new pull request against this repository's `dev` branch, linking
    your issue.
+
+#### Phenomenon metadata
+
+Sensor records and device schemas may include `sensorWikiType` (sensor type
+metadata), `sensorWikiPhenomenon` (canonical phenomenon ID), and
+`sensorWikiUnit` (canonical unit ID). Despite their historical names, new-device
+matching can fill the latter two from the bundled
+[phenomenon catalog](./app/lib/sensor-wiki/aliases.json) (see its
+[contribution guide](./app/lib/sensor-wiki/PHENOMENON_CATALOG.md)), and Explore
+uses the same catalog for filtering.
 
 #### How the repository is organized
 
@@ -163,11 +182,10 @@ flexibility to adjust the outputs to the needs of the respective use case.
 
 ##### Documenting an API Route
 
-API route documentation is generated from route-local `zod-openapi`
-definitions. Each API route can export an `openapi` object that describes the
-route's OpenAPI path item. Request bodies, response bodies, path parameters,
-query parameters, and headers should be described with Zod schemas wherever
-possible.
+API route documentation is generated from route-local `zod-openapi` definitions.
+Each API route can export an `openapi` object that describes the route's OpenAPI
+path item. Request bodies, response bodies, path parameters, query parameters,
+and headers should be described with Zod schemas wherever possible.
 
 The main benefit of this approach is that schemas can be shared between
 validation and documentation. This keeps the OpenAPI documentation closer to the

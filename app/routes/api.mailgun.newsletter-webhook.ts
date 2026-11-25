@@ -7,9 +7,7 @@ import {
 	verifyMailgunWebhookSignature,
 } from '~/services/newsletter-service.server'
 
-type MailgunWebhookPayload = Parameters<
-	typeof verifyMailgunWebhookSignature
->[0]
+type MailgunWebhookPayload = Parameters<typeof verifyMailgunWebhookSignature>[0]
 
 export const action = async ({ request }: Route.ActionArgs) => {
 	if (request.method !== 'POST') {

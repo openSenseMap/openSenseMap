@@ -1,4 +1,5 @@
 import * as z from 'zod/v4'
+import { IsoDateTimeSchema } from './common'
 
 export const UserRoleSchema = z.enum(['admin', 'user']).meta({
 	description: "User's role",
@@ -48,12 +49,12 @@ export const UserSchema = z
 			example: false,
 		}),
 
-		createdAt: z.iso.datetime().meta({
+		createdAt: IsoDateTimeSchema.meta({
 			description: 'Account creation timestamp',
 			example: '2024-01-15T10:30:00.000Z',
 		}),
 
-		updatedAt: z.iso.datetime().meta({
+		updatedAt: IsoDateTimeSchema.meta({
 			description: 'Last account update timestamp',
 			example: '2024-01-20T14:45:00.000Z',
 		}),
@@ -63,7 +64,7 @@ export const UserSchema = z
 			example: 'tos_2024_01',
 		}),
 
-		acceptedTosAt: z.iso.datetime().nullable().optional().meta({
+		acceptedTosAt: IsoDateTimeSchema.nullable().optional().meta({
 			description: 'Timestamp when the user accepted the Terms of Service.',
 			example: '2024-01-15T10:30:00.000Z',
 		}),

@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { redirect, useLoaderData } from 'react-router'
+import { redirect } from 'react-router'
 import { type Route } from './+types/device.$deviceId.edit.script'
 import { Button } from '~/components/ui/button'
+import { PasswordInput } from '~/components/ui/password-input'
 import { Textarea } from '~/components/ui/textarea'
 import { getDeviceWithoutSensors } from '~/db/models/device.server'
 import { getSensorsFromDevice } from '~/db/models/sensor.server'
@@ -34,8 +35,9 @@ export async function action() {
 }
 
 //**********************************
-export default function EditBoxSensors() {
-	const { deviceData, ghUrl } = useLoaderData<typeof loader>()
+export default function EditBoxSensors({
+	loaderData: { deviceData, ghUrl },
+}: Route.ComponentProps) {
 	const [sketch, setSketch] = useState<string>('')
 	const [isCompiling, setIsCompiling] = useState(false)
 	const { t } = useTranslation('script')
@@ -92,7 +94,11 @@ export default function EditBoxSensors() {
 				const err = await response
 					.json()
 					.catch(() => ({ message: 'Compile failed' }))
-				console.error('Compile error:', err.message)
+				if (response.status >= 500) {
+					console.error('Compile error:', err.message)
+				} else {
+					console.warn('Compile error:', err.message)
+				}
 				return
 			}
 			const blob = await response.blob()
@@ -258,14 +264,13 @@ export default function EditBoxSensors() {
 										</label>
 
 										<div className="mt-1">
-											<input
+											<PasswordInput
 												id="password"
 												required
 												autoFocus={true}
 												name="password"
-												type="password"
 												aria-describedby="name-error"
-												className="w-full rounded border border-gray-200 px-2 py-1 text-base"
+												className="text-base"
 											/>
 										</div>
 									</div>

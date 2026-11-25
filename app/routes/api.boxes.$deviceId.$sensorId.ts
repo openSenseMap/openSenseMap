@@ -168,6 +168,16 @@ const parsePostSensorMeasurementBody = async (
 	const parsed = PostSensorMeasurementRequestSchema.safeParse(body)
 
 	if (!parsed.success) {
+		const hasOnlyLocationIssues = parsed.error.issues.every(
+			(issue) => issue.path[0] === 'location',
+		)
+
+		if (hasOnlyLocationIssues) {
+			return StandardResponse.unprocessableContent(
+				'Invalid location coordinates',
+			)
+		}
+
 		return StandardResponse.badRequest(
 			parsed.error.issues[0]?.message ?? 'Invalid measurement request body',
 		)

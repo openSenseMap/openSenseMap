@@ -44,7 +44,7 @@ const RefreshAuthResponseSchema = AuthTokensSchema.extend({
 	code: z.literal('Authorized').default('Authorized'),
 	message: z
 		.literal('Successfully refreshed auth')
-			.default('Successfully refreshed auth'),
+		.default('Successfully refreshed auth'),
 	data: z.object({
 		user: UserSchema,
 	}),

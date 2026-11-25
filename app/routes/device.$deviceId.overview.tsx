@@ -1,7 +1,7 @@
 import { ArrowLeft, ClipboardCopy, CopyCheck } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { redirect, Link, useLoaderData } from 'react-router'
+import { redirect, Link } from 'react-router'
 import { type Route } from './+types/device.$deviceId.overview'
 import { Table, TableBody, TableCell, TableRow } from '@/components/ui/table'
 import { NavBar } from '~/components/nav-bar'
@@ -26,8 +26,9 @@ export async function loader({ request, params }: Route.LoaderArgs) {
 	return { deviceData, sensorsData, userId }
 }
 
-export default function DeviceOverview() {
-	const { deviceData, sensorsData, userId } = useLoaderData<typeof loader>()
+export default function DeviceOverview({
+	loaderData: { deviceData, sensorsData, userId },
+}: Route.ComponentProps) {
 	const { t, i18n } = useTranslation('device-overview')
 	const [copiedToClipboard, setCopiedToClipboard] = useState<string | null>(
 		null,
@@ -63,7 +64,9 @@ export default function DeviceOverview() {
 
 			<p className="inline-block rounded p-3 text-[#676767] hover:bg-[#eee]">
 				<ArrowLeft className="mr-2 inline h-5 w-5" />
-				<Link to="/profile/me">{t('back_to_dashboard')}</Link>
+				<Link to="/profile/me" prefetch="intent">
+					{t('back_to_dashboard')}
+				</Link>
 			</p>
 
 			<main className="mx-auto max-w-(--breakpoint-xl)">

@@ -1,5 +1,6 @@
 import * as z from 'zod/v4'
 
+import { IsoDateTimeSchema } from './common'
 import { LastMeasurementSchema } from './measurement'
 
 export const UnknownJsonSchema = z.unknown().nullable().meta({
@@ -38,12 +39,12 @@ export const SensorSchema = z
 			example: 'active',
 		}),
 
-		createdAt: z.iso.datetime().meta({
+		createdAt: IsoDateTimeSchema.meta({
 			description: 'Sensor creation timestamp',
 			example: '2026-05-15T12:00:00.000Z',
 		}),
 
-		updatedAt: z.iso.datetime().meta({
+		updatedAt: IsoDateTimeSchema.meta({
 			description: 'Sensor update timestamp',
 			example: '2026-05-15T12:00:00.000Z',
 		}),

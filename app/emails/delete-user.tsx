@@ -77,8 +77,8 @@ export const DeleteUserEmail = ({
 					</Text>
 					<Text>
 						{intl.formatMessage({ id: 'support' })} {}
-						<Link href="mailto:support@opensensemap.org">
-							support@opensensemap.org
+						<Link href="mailto:info@opensensemap.org">
+							info@opensensemap.org
 						</Link>
 					</Text>
 					<Text>{intl.formatMessage({ id: 'salutation' })}</Text>

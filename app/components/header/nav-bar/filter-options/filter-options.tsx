@@ -2,7 +2,10 @@ import { Label } from '~/components/ui/label'
 import { ToggleGroup, ToggleGroupItem } from '~/components/ui/toggle-group'
 
 import { useTranslation } from 'react-i18next'
-import { DeviceExposureType, DeviceStatusType } from '~/lib/device-enums'
+import {
+	type DeviceExposureType,
+	type DeviceStatusType,
+} from '~/lib/device-enums'
 
 interface FilterOptionsProps {
 	exposure: DeviceExposureType[]

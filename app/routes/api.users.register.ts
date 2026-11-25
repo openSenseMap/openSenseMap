@@ -22,10 +22,7 @@ import {
 	requestContentTypeJsonOrForm,
 	responseContentTypeJson,
 } from '~/middleware/content-type-header.server'
-import {
-	AuthTokensSchema,
-	NewPasswordSchema,
-} from '~/lib/openapi/schemas/auth'
+import { AuthTokensSchema, NewPasswordSchema } from '~/lib/openapi/schemas/auth'
 import { transformUserToApiFormat } from '~/lib/user-transform'
 
 const RegistrationNameSchema = z
@@ -72,8 +69,8 @@ const RegisterUserResponseSchema = AuthTokensSchema.extend({
 	code: z.literal('Created').default('Created'),
 
 	message: z
-			.literal('Successfully registered new user')
-			.default('Successfully registered new user'),
+		.literal('Successfully registered new user')
+		.default('Successfully registered new user'),
 
 	data: z.object({
 		user: UserSchema,

@@ -1,4 +1,5 @@
 import * as z from 'zod/v4'
+import { IsoDateTimeSchema } from './common'
 
 export const DeviceTransferTokenSchema = z.string().min(1).meta({
 	description: 'Transfer token.',
@@ -19,18 +20,18 @@ export const DeviceTransferClaimSchema = z
 
 		token: DeviceTransferTokenSchema,
 
-		expiresAt: z.iso.datetime().nullable().optional().meta({
+		expiresAt: IsoDateTimeSchema.nullable().optional().meta({
 			description:
 				'Expiration date of the transfer token. If omitted, the token does not have an explicit expiration date.',
 			example: '2026-05-22T12:00:00.000Z',
 		}),
 
-		createdAt: z.iso.datetime().meta({
+		createdAt: IsoDateTimeSchema.meta({
 			description: 'Transfer claim creation timestamp.',
 			example: '2026-05-21T12:00:00.000Z',
 		}),
 
-		updatedAt: z.iso.datetime().meta({
+		updatedAt: IsoDateTimeSchema.meta({
 			description: 'Transfer claim update timestamp.',
 			example: '2026-05-21T12:00:00.000Z',
 		}),

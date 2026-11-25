@@ -1,12 +1,6 @@
 import * as React from 'react'
 import { Trans, useTranslation } from 'react-i18next'
-import {
-	Form,
-	data,
-	redirect,
-	useActionData,
-	useLoaderData,
-} from 'react-router'
+import { Form, data, redirect } from 'react-router'
 import invariant from 'tiny-invariant'
 import { type Route } from './+types/device.$deviceId.edit.delete'
 import { Button } from '~/components/ui/button'
@@ -17,15 +11,10 @@ import {
 	CardHeader,
 	CardTitle,
 } from '~/components/ui/card'
-import { Input } from '~/components/ui/input'
 import { Label } from '~/components/ui/label'
-import {
-	deleteDevice,
-	getDeviceWithoutSensors,
-	getUserDevice,
-} from '~/db/models/device.server'
+import { PasswordInput } from '~/components/ui/password-input'
+import { deleteDevice, getUserDevice } from '~/db/models/device.server'
 import { verifyLogin } from '~/db/models/user.server'
-import { deleteDeviceImage } from '~/lib/s3.server'
 import { getUserEmail, getUserId } from '~/services/session-service.server'
 
 export async function loader({ request, params }: Route.LoaderArgs) {
@@ -63,23 +52,15 @@ export async function action({ request, params }: Route.ActionArgs) {
 		)
 	}
 
-	const device = await getDeviceWithoutSensors({ id: deviceId })
-	if (device?.image) {
-		try {
-			await deleteDeviceImage(device.image)
-		} catch (err) {
-			console.error('Failed to delete device image:', err)
-		}
-	}
-
 	await deleteDevice({ id: deviceId })
 
 	return redirect('/profile/me')
 }
 
-export default function DeviceDeletePage() {
-	const { device } = useLoaderData<typeof loader>()
-	const actionData = useActionData<typeof action>()
+export default function DeviceDeletePage({
+	loaderData: { device },
+	actionData,
+}: Route.ComponentProps) {
 	const passwordRef = React.useRef<HTMLInputElement>(null)
 	const [password, setPassword] = React.useState('')
 
@@ -107,10 +88,9 @@ export default function DeviceDeletePage() {
 				<CardContent className="space-y-4">
 					<div className="space-y-2">
 						<Label htmlFor="passwordDelete">{t('password')}</Label>
-						<Input
+						<PasswordInput
 							id="passwordDelete"
 							name="passwordDelete"
-							type="password"
 							ref={passwordRef}
 							value={password}
 							onChange={(e) => setPassword(e.target.value)}

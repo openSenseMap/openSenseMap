@@ -57,7 +57,11 @@ export const customTableFeatures = tableFeatures({
 	sortedRowModel: createSortedRowModel(),
 	paginatedRowModel: createPaginatedRowModel(),
 	filteredRowModel: createFilteredRowModel(),
-	sortFns: { alphanumeric: sortFn_alphanumeric, datetime: sortFn_datetime, text: sortFn_text },
+	sortFns: {
+		alphanumeric: sortFn_alphanumeric,
+		datetime: sortFn_datetime,
+		text: sortFn_text,
+	},
 	filterFns: { includesString: filterFn_includesString },
 })
 
@@ -79,7 +83,7 @@ export function DataTable<TData extends RowData, TValue extends CellData>({
 	])
 	const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>(
 		[],
-	)	
+	)
 
 	const table = useTable({
 		features: customTableFeatures,
@@ -94,7 +98,7 @@ export function DataTable<TData extends RowData, TValue extends CellData>({
 		initialState: {
 			pagination: {
 				pageSize: 5,
-				pageIndex: 0
+				pageIndex: 0,
 			},
 		},
 		enableRowRangeSelection: false,

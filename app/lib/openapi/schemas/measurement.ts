@@ -1,4 +1,5 @@
 import * as z from 'zod/v4'
+import { IsoDateTimeSchema } from './common'
 import { CoordinatesWithHeightSchema, LocationObjectSchema } from './location'
 
 export const MeasurementValueSchema = z.number().nullable().meta({
@@ -27,7 +28,7 @@ export const LastMeasurementSchema = z
 	.object({
 		value: MeasurementValueSchema,
 
-		createdAt: z.iso.datetime().meta({
+		createdAt: IsoDateTimeSchema.meta({
 			description: 'Timestamp of the latest measurement',
 			example: '2026-05-15T12:00:00.000Z',
 		}),
@@ -49,7 +50,7 @@ export const LegacyLatestMeasurementSchema = z
 			example: '4.78',
 		}),
 
-		createdAt: z.iso.datetime().meta({
+		createdAt: IsoDateTimeSchema.meta({
 			description: 'Timestamp of the latest measurement.',
 			example: '2026-05-15T12:00:00.000Z',
 		}),
@@ -66,7 +67,7 @@ export const MeasurementSchema = z
 			example: '60a13611a877b3001b8ffd59',
 		}),
 
-		time: z.iso.datetime().meta({
+		time: IsoDateTimeSchema.meta({
 			description: 'Measurement timestamp',
 			example: '2026-05-15T12:00:00.000Z',
 		}),

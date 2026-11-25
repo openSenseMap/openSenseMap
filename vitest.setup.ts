@@ -1,6 +1,6 @@
-import '@testing-library/jest-dom'
+import '@testing-library/jest-dom/vitest'
 import { cleanup } from '@testing-library/react'
-import { afterEach } from 'vitest'
+import { afterEach } from 'vite-plus/test'
 import { seedTos } from './scripts/db/seed-tos'
 import { drizzleClient, pg } from '~/db.server'
 

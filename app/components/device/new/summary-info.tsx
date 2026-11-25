@@ -2,13 +2,54 @@ import { MapPin, Tag, Smartphone, Cpu, Cog } from 'lucide-react'
 import { useFormContext } from 'react-hook-form'
 import { useTranslation } from 'react-i18next'
 import { Card, CardContent } from '@/components/ui/card'
+import { useTerrainElevation } from '~/hooks/use-terrain-elevation'
+import { calculateHeightAboveSeaLevel } from '~/lib/elevation'
 
 export function SummaryInfo() {
 	const { getValues } = useFormContext()
 	const formData = getValues()
 	const { t } = useTranslation('newdevice')
+	const rawHeightAboveGround = formData.heightAboveGround
+	const parsedHeightAboveGround =
+		rawHeightAboveGround === undefined ||
+		rawHeightAboveGround === null ||
+		rawHeightAboveGround === ''
+			? null
+			: Number(rawHeightAboveGround)
+	const heightAboveGround =
+		parsedHeightAboveGround === null || Number.isFinite(parsedHeightAboveGround)
+			? parsedHeightAboveGround
+			: null
+	const latitude = Number(formData.latitude)
+	const longitude = Number(formData.longitude)
+	const elevationLookupConsent = formData.elevationLookupConsent === true
+	const shouldResolveElevation =
+		heightAboveGround !== null && elevationLookupConsent
+	const elevation = useTerrainElevation({
+		latitude: shouldResolveElevation ? latitude : undefined,
+		longitude: shouldResolveElevation ? longitude : undefined,
+		debounceMs: 0,
+	})
+	const terrainElevation = elevation.result?.elevation ?? null
+	const finalHeight = calculateHeightAboveSeaLevel(
+		terrainElevation,
+		heightAboveGround,
+	)
 	const modelLabel =
 		formData.model === 'luftdaten.info' ? 'Sensor.Community' : formData.model
+	let heightSummary: string
+
+	if (heightAboveGround === null) {
+		heightSummary = t('height_not_set')
+	} else if (!elevationLookupConsent) {
+		heightSummary = t('elevation_consent_required')
+	} else if (elevation.status === 'loading') {
+		heightSummary = t('fetching_elevation')
+	} else if (finalHeight !== null) {
+		heightSummary = `${Math.round(finalHeight)} m`
+	} else {
+		heightSummary = t('elevation_unavailable')
+	}
 
 	const sections = [
 		{
@@ -32,6 +73,10 @@ export function SummaryInfo() {
 				{
 					label: 'longitude',
 					value: parseFloat(formData.longitude).toFixed(4),
+				},
+				{
+					label: 'final_height',
+					value: heightSummary,
 				},
 			],
 		},
