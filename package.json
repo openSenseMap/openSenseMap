@@ -83,7 +83,7 @@
     "react-email": "^6.11.6",
     "react-globe.gl": "^2.38.0",
     "react-hook-form": "^7.91.0",
-    "react-i18next": "^17.1.12",
+    "react-i18next": "^18.0.3",
     "react-map-gl": "^8.1.3",
     "react-router": "8.5.3",
     "remix-i18next": "^8.0.0",
