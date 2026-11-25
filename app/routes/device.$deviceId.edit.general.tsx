@@ -67,6 +67,7 @@ type DeviceGeneralActionErrors = {
 	exposure: string | null
 	passwordDelete: string | null
 	image: string | null
+	integrationCleanup?: boolean
 }
 
 export type DeviceGeneralActionData =
@@ -552,9 +553,16 @@ export async function action({ request, params }: Route.ActionArgs) {
 
 			invariant(typeof userEmail === 'string', 'email not found')
 
-			const user = await verifyLogin(userEmail, passwordDelete)
+			const result = await deleteDevice(
+				{ id: userId, email: userEmail },
+				device,
+				passwordDelete,
+			)
 
-			if (!user) {
+			if (result === 'forbidden') {
+				throw new Response('Forbidden', { status: 403 })
+			}
+			if (result === 'unauthorized') {
 				return data(
 					{
 						intent,
@@ -570,7 +578,22 @@ export async function action({ request, params }: Route.ActionArgs) {
 				)
 			}
 
-			await deleteDevice(user, device, passwordDelete)
+			if (result === 'integration-cleanup-failed') {
+				return data(
+					{
+						intent,
+						errors: {
+							name: null,
+							exposure: null,
+							passwordDelete: null,
+							image: null,
+							integrationCleanup: true,
+						},
+						status: 503,
+					} satisfies DeviceGeneralActionData,
+					{ status: 503 },
+				)
+			}
 
 			return redirect('/profile/me')
 		}
@@ -644,7 +667,7 @@ export default function EditDeviceGeneral({
 	const [newTag, setNewTag] = useState('')
 	const [website, setWebsite] = useState(initialAutosaveValues.website)
 
-	const { t } = useTranslation('edit-device-general')
+	const { t } = useTranslation(['edit-device-general', 'delete-device'])
 
 	const [imagePreview, setImagePreview] = useState<string | null>(
 		imageUrl || null,
@@ -868,7 +891,7 @@ export default function EditDeviceGeneral({
 	const isDeleteMeasurementsSubmitting =
 		deleteMeasurementsFetcher.state !== 'idle'
 
-	const actionErrors =
+	const actionErrors: DeviceGeneralActionErrors | null =
 		actionData && 'errors' in actionData && actionData.errors
 			? actionData.errors
 			: null
@@ -1286,6 +1309,11 @@ Installed on the school roof.
 									</div>
 								) : null}
 							</div>
+							{actionErrors?.integrationCleanup && (
+								<p role="alert" className="mt-1 text-sm text-red-600">
+									{t('integration_cleanup_failed', { ns: 'delete-device' })}
+								</p>
+							)}
 
 							<div className="flex justify-end">
 								<div className="flex justify-end">

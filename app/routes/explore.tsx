@@ -21,13 +21,8 @@ import { type Route } from './+types/explore'
 import Map from '~/components/map'
 import { phenomenonLayers, defaultLayer } from '~/components/map/layers'
 import Legend, { type LegendValue } from '~/components/map/legend'
-import {
-	getDevices,
-	getDevicesWithSensors,
-	getUserDeviceLocations,
-} from '~/db/models/device.server'
+import { getDevices, getDevicesWithSensors } from '~/db/models/device.server'
 import { getMeasurement } from '~/db/models/measurement.query.server'
-import { getProfileMapPreferencesByUserId } from '~/db/models/profile.server'
 import { getSensors } from '~/db/models/sensor.server'
 import { type Device } from '~/db/schema'
 import { getCSV, getJSON, getTXT } from '~/lib/file-exports'
@@ -37,8 +32,7 @@ import {
 	validLngLat,
 	type MapViewport,
 } from '~/lib/location'
-import { getLocale } from '~/middleware/i18next'
-import { getUser, getUserSession } from '~/services/session-service.server'
+import { useRootRouteLoaderData } from '~/root'
 import { getFilteredDevices } from '~/utils'
 import {
 	Popup,
@@ -68,6 +62,8 @@ import { sensorMatchesAnyPhenomenonFilter } from '~/lib/phenomenon-filter'
 import { sensorWikiAliasEntries } from '~/lib/sensor-wiki/alias-catalog'
 import { getExplorePendingUi } from '~/lib/explore-pending-navigation'
 import { getApproximateMeasurementCount } from '~/services/statistics-service.server'
+import { loadExploreDataWithCache } from '~/lib/explore-loader-cache'
+import { searchWithoutChartParams } from '~/lib/explore-map-search'
 
 export { shouldRevalidate } from '~/lib/explore-revalidation'
 
@@ -448,11 +444,8 @@ export function getMeasurementTimeRangeFromSearchParams(
 	return undefined
 }
 
-export async function loader({ context, request }: Route.LoaderArgs) {
-	//* Get filter params
-	let locale = getLocale(context)
-	const url = new URL(request.url)
-	const urlFilterParams = new URLSearchParams(url.search)
+export async function loader({ url }: Route.LoaderArgs) {
+	const urlFilterParams = url.searchParams
 
 	const measurementTimeRange =
 		getMeasurementTimeRangeFromSearchParams(urlFilterParams)
@@ -461,58 +454,44 @@ export async function loader({ context, request }: Route.LoaderArgs) {
 	const needsSensors =
 		Boolean(urlFilterParams.get('phenomenon')) || Boolean(measurementTimeRange)
 
-	const [devices, availableTags, measurementCount, session, user, phenomena] =
+	const [devices, availableTags, measurementCount, phenomena] =
 		await Promise.all([
 			needsSensors
 				? getDevicesWithSensors({ measurementTimeRange })
 				: getDevices('geojson'),
 			getTags(),
 			getApproximateMeasurementCount(),
-			getUserSession(request),
-			getUser(request),
 			getPhenomena(),
 		])
-	const message = session.get('global_message') || null
 	const filteredDeviceCount = getFilteredDevices(
 		devices,
 		urlFilterParams,
 		sensorWikiAliasEntries,
 	).features.length
 
-	if (user) {
-		const [profile, userDeviceLocations] = await Promise.all([
-			getProfileMapPreferencesByUserId(user.id),
-			getUserDeviceLocations(user.id),
-		])
-		const userLocale = user.language
-			? user.language.split(/[_-]/)[0].toLowerCase()
-			: 'en'
-
-		return {
-			devices,
-			availableTags,
-			phenomena,
-			measurementCount,
-			filteredDeviceCount,
-			user,
-			profile,
-			userDeviceLocations,
-			locale: userLocale,
-		}
-	}
+	// This loader's response is reused across account changes in the browser.
 	return {
 		devices,
 		availableTags,
 		phenomena,
 		measurementCount,
 		filteredDeviceCount,
-		user,
-		profile: null,
-		userDeviceLocations: [],
-		message,
-		locale,
 	}
 }
+
+export async function clientLoader({
+	url,
+	serverLoader,
+}: Route.ClientLoaderArgs) {
+	// On hydration serverLoader returns the SSR data, which can prime the Home
+	// cache without fetching the full map payload a second time.
+	return loadExploreDataWithCache(
+		url,
+		serverLoader,
+		window.ENV.EXPLORE_HOME_CACHE_TTL_SECONDS * 1_000,
+	)
+}
+clientLoader.hydrate = true as const
 
 // This is for the live data display. The 21-06-2023 works with the seed Data, for Production take now minus 10 minutes
 let currentDate = new Date('2023-06-21T14:13:11.024Z')
@@ -521,15 +500,8 @@ if (process.env.NODE_ENV === 'production') {
 }
 
 export default function Explore({ loaderData }: Route.ComponentProps) {
-	// data from our loader
-	const {
-		devices,
-		availableTags,
-		measurementCount,
-		user,
-		profile,
-		userDeviceLocations,
-	} = loaderData
+	const { devices, availableTags, measurementCount } = loaderData
+	const { mapPreferences, userDeviceLocations } = useRootRouteLoaderData()
 	const { t } = useTranslation()
 	const mapRef = useRef<MapRef | null>(null)
 	const appliedInitialMyAreaRef = useRef(false)
@@ -539,13 +511,10 @@ export default function Explore({ loaderData }: Route.ComponentProps) {
 	const navigate = useNavigate()
 	const location = useLocation()
 	const navigation = useNavigation()
-	const mapFilterSearch = useMemo(() => {
-		const params = new URLSearchParams(location.search)
-		for (const key of ['aggregation', 'date_from', 'date_to']) {
-			params.delete(key)
-		}
-		return params.toString()
-	}, [location.search])
+	const mapFilterSearch = useMemo(
+		() => searchWithoutChartParams(location.search),
+		[location.search],
+	)
 	const filteredDevices = useMemo(
 		() =>
 			getFilteredDevices(
@@ -772,7 +741,7 @@ export default function Explore({ loaderData }: Route.ComponentProps) {
 			}
 		: null
 	const hashView = parseMapHash(location.hash)
-	const homeView = getHomeView(profile)
+	const homeView = getHomeView(mapPreferences)
 	const ownedDevicesAreaTarget = useMemo(
 		() => getOwnedDevicesAreaTarget(userDeviceLocations),
 		[userDeviceLocations],
