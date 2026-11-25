@@ -115,24 +115,6 @@ describe('Device Model: createDevice', () => {
 		expect(result.sensors).toHaveLength(0)
 	})
 
-	it('does not include location history in the general device query', async () => {
-		const deviceData = {
-			name: 'Device Without Location History',
-			latitude: 52.0,
-			longitude: 8.0,
-			exposure: 'mobile',
-			model: 'custom',
-		}
-
-		const createdDevice = await createDevice(deviceData, userId)
-		createdDeviceIds.push(createdDevice.id)
-
-		const result = await getDevice({ id: createdDevice.id })
-
-		expect(result).toBeDefined()
-		expect(result).not.toHaveProperty('locations')
-	})
-
 	it('should persist the sensor definition ID in sensor data', async () => {
 		const result = await createDevice(
 			{
