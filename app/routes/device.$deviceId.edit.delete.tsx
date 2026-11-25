@@ -13,8 +13,8 @@ import {
 } from '~/components/ui/card'
 import { Label } from '~/components/ui/label'
 import { PasswordInput } from '~/components/ui/password-input'
-import { deleteDevice, getUserDevice } from '~/db/models/device.server'
-import { verifyLogin } from '~/db/models/user.server'
+import { getUserDevice } from '~/db/models/device.server'
+import { deleteDevice } from '~/services/device-service.server'
 import { getUserEmail, getUserId } from '~/services/session-service.server'
 
 export async function loader({ request, params }: Route.LoaderArgs) {
@@ -44,15 +44,35 @@ export async function action({ request, params }: Route.ActionArgs) {
 	const userEmail = await getUserEmail(request)
 	invariant(typeof userEmail === 'string', 'email not found')
 
-	const user = await verifyLogin(userEmail, passwordDelete)
-	if (!user) {
+	const device = await getUserDevice({ id: deviceId, userId })
+	if (!device) return redirect('/profile/me')
+
+	const result = await deleteDevice(
+		{ id: userId, email: userEmail },
+		device,
+		passwordDelete,
+	)
+
+	if (result === 'forbidden') {
+		throw new Response('Forbidden', { status: 403 })
+	}
+	if (result === 'unauthorized') {
 		return data(
-			{ errors: { passwordDelete: 'Invalid password' } },
+			{
+				errors: {
+					passwordDelete: 'Invalid password',
+					integrationCleanup: false,
+				},
+			},
 			{ status: 400 },
 		)
 	}
-
-	await deleteDevice({ id: deviceId })
+	if (result === 'integration-cleanup-failed') {
+		return data(
+			{ errors: { passwordDelete: null, integrationCleanup: true } },
+			{ status: 503 },
+		)
+	}
 
 	return redirect('/profile/me')
 }
@@ -102,6 +122,12 @@ export default function DeviceDeletePage({
 							</div>
 						)}
 					</div>
+
+					{actionData?.errors?.integrationCleanup && (
+						<p role="alert" className="text-sm text-red-600">
+							{t('integration_cleanup_failed')}
+						</p>
+					)}
 
 					<Button type="submit" variant="destructive" disabled={!password}>
 						{t('delete_device')}
