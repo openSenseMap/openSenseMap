@@ -11,10 +11,11 @@ import {
 	device,
 	sensor,
 } from '~/db/schema'
-import { drizzleClient } from '~/db.server'
+import { drizzleClient, type DatabaseTransaction } from '~/db.server'
 import {
 	type MinimalDevice,
 	type MeasurementWithLocation,
+	type LocationWithId,
 	getLocationUpdates,
 	findOrCreateLocations,
 	addLocationUpdates,
@@ -22,6 +23,7 @@ import {
 	updateLastMeasurements,
 } from '~/lib/measurement-server-helper'
 import { type MeasurementTiming } from '~/lib/measurement-timing.server'
+import { ArchivedDeviceError } from './device.server'
 
 // This function retrieves measurements from the database based on the provided parameters.
 export function getMeasurement(
@@ -235,27 +237,32 @@ export async function saveMeasurements(
 		locationUpdateCount: deviceLocationUpdates.length,
 	})
 
-	await drizzleClient.transaction(async (tx) => {
-		timing?.mark('transactionStart')
+	// Run location writes as individual statements before opening the measurement
+	// transaction, so their locks are released before TimescaleDB creates chunks.
+	let locations: LocationWithId[] = []
+	if (deviceLocationUpdates.length > 0) {
+		await ensureDeviceCanReceiveMeasurements(drizzleClient, minimalDevice.id)
+		timing?.mark('locationDeviceLookup')
 
-		const locations =
-			deviceLocationUpdates.length > 0
-				? await findOrCreateLocations(deviceLocationUpdates, tx)
-				: []
+		locations = await findOrCreateLocations(
+			deviceLocationUpdates,
+			drizzleClient,
+		)
 		timing?.mark('findOrCreateLocations', {
 			locationCount: locations.length,
 		})
 
-		if (deviceLocationUpdates.length > 0) {
-			await addLocationUpdates(
-				deviceLocationUpdates,
-				minimalDevice.id,
-				locations,
-				tx,
-			)
-		}
+		await addLocationUpdates(
+			deviceLocationUpdates,
+			minimalDevice.id,
+			locations,
+			drizzleClient,
+		)
 		timing?.mark('addLocationUpdates')
+	}
 
+	await drizzleClient.transaction(async (tx) => {
+		timing?.mark('transactionStart')
 		await insertMeasurementsWithLocation(
 			measurements,
 			locations,
@@ -268,6 +275,30 @@ export async function saveMeasurements(
 		timing?.mark('updateLastMeasurements')
 	})
 	timing?.mark('transaction')
+}
+
+async function ensureDeviceCanReceiveMeasurements(
+	db: Pick<DatabaseTransaction, 'select'>,
+	deviceId: string,
+): Promise<void> {
+	const [currentDevice] = await db
+		.select({
+			id: device.id,
+			archivedAt: device.archivedAt,
+		})
+		.from(device)
+		.where(eq(device.id, deviceId))
+		.limit(1)
+
+	if (!currentDevice) {
+		const error = new Error('Device not found')
+		error.name = 'NotFoundError'
+		throw error
+	}
+
+	if (currentDevice.archivedAt) {
+		throw new ArchivedDeviceError(currentDevice.id)
+	}
 }
 
 export async function insertMeasurements(measurements: any[]): Promise<void> {

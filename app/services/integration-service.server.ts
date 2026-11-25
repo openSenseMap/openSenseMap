@@ -207,6 +207,7 @@ export async function deleteDeviceIntegrations(
 					headers: {
 						'x-service-key': serviceKey,
 					},
+					signal: AbortSignal.timeout(2000),
 				},
 			)
 
