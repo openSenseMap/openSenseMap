@@ -262,9 +262,6 @@ export async function saveMeasurements(
 
 	await drizzleClient.transaction(async (tx) => {
 		timing?.mark('transactionStart')
-		await ensureDeviceCanReceiveMeasurements(tx, minimalDevice.id)
-		timing?.mark('transactionDeviceLookup')
-
 		await insertMeasurementsWithLocation(
 			measurements,
 			locations,
