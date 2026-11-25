@@ -5,8 +5,24 @@
 	"device": "Device",
 	"exposure": "Exposure",
 	"sensors": "Sensors",
+	"latest_measurement": "Last measurement: {{time}}",
+	"no_measurements_yet": "No measurements yet",
 	"name_label": "Name",
 	"model_label": "Model",
 	"tags_label": "Tags",
-	"api_key_label": "API Key"
+	"api_key_label": "API Key",
+	"device_settings": "Device settings",
+	"manage_device_data": "Manage your device data.",
+	"sidebar": {
+		"general": "General",
+		"sensors": "Sensors",
+		"location": "Location",
+		"logs": "Logs",
+		"security": "Security",
+		"script": "Script",
+		"transfer": "Transfer"
+	},
+	"show_on_map": "Show on map",
+	"device_updated": "Device successfully updated",
+	"view": "View"
 }

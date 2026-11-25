@@ -2,10 +2,8 @@
 	"features": "Features",
 	"description": "The openSenseMap platform has a lot to offer that makes discoverability and sharing of environmental and sensor data easy.",
 	"dataAggregation": "Data aggregation",
-	"noDataRetention": "No data retention",
 	"dataPublished": "Data published as ODbL",
 	"discoverDevices": "Discover devices",
-	"compareDevices": "Compare devices",
 	"downloadOptions": "Download options",
 	"httpRestApi": "HTTP REST API"
 }

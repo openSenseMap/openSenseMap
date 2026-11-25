@@ -1,17 +1,19 @@
-import { describe, it, expect, beforeAll, afterAll } from 'vitest'
-import { BASE_URL } from 'vitest.setup'
+import { describe, it, expect, beforeAll, afterAll } from 'vite-plus/test'
+import { type Route } from '../../.react-router/types/app/routes/+types/api.boxes.$deviceId'
+import { BASE_URL } from '../../vitest.setup'
+import {
+	createDevice,
+	deleteDevice,
+	getDevice,
+} from '~/db/models/device.server'
+import { deleteUserByEmail } from '~/db/models/user.server'
+import { type User, type Device } from '~/db/schema'
 import { createToken } from '~/lib/jwt'
-import { registerUser } from '~/lib/user-service.server'
-import { createDevice, deleteDevice, getDevice } from '~/models/device.server'
-import { deleteUserByEmail } from '~/models/user.server'
 import { action as deviceUpdateAction } from '~/routes/api.boxes.$deviceId'
-import { type User, type Device } from '~/schema'
+import { registerUser } from '~/services/user-service.server'
+import { generateTestUserCredentials } from 'tests/data/generate_test_user'
 
-const DEVICE_TEST_USER = {
-	name: 'deviceUpdateDeviceSensorsTest123',
-	email: 'test@deviceSensorsTest123.endpoint',
-	password: 'highlySecurePasswordForTesting',
-}
+const DEVICE_TEST_USER = generateTestUserCredentials()
 
 let user: User
 let jwt: string
@@ -25,15 +27,15 @@ const generateMinimalDevice = () => ({
 
 describe('Device Sensors API: updating sensors', () => {
 	beforeAll(async () => {
+		await deleteUserByEmail(DEVICE_TEST_USER.email)
+
 		const registration = await registerUser(
 			DEVICE_TEST_USER.name,
 			DEVICE_TEST_USER.email,
 			DEVICE_TEST_USER.password,
 			'en_US',
-			true
+			true,
 		)
-
-		expect(registration.ok).toBe(true)
 
 		if (!registration.ok) {
 			throw new Error(
@@ -83,7 +85,10 @@ describe('Device Sensors API: updating sensors', () => {
 	})
 
 	afterAll(async () => {
-		await deleteDevice({ id: queryableDevice.id })
+		if (queryableDevice) {
+			await deleteDevice({ id: queryableDevice.id })
+		}
+
 		await deleteUserByEmail(DEVICE_TEST_USER.email)
 	})
 
@@ -108,11 +113,10 @@ describe('Device Sensors API: updating sensors', () => {
 			body: JSON.stringify(payload),
 		}) as unknown as Request
 
-		const response: any = await deviceUpdateAction({
+		const response = await deviceUpdateAction({
 			request,
-			params: { deviceId: queryableDevice.id },
-			context: {} as any,
-		})
+			params: { deviceId: queryableDevice?.id },
+		} as Route.ActionArgs)
 
 		expect(response.status).toBe(200)
 		const data = await response.json()
@@ -161,11 +165,10 @@ describe('Device Sensors API: updating sensors', () => {
 			body: JSON.stringify(payload),
 		}) as unknown as Request
 
-		const response: any = await deviceUpdateAction({
+		const response = await deviceUpdateAction({
 			request,
-			params: { deviceId: queryableDevice.id },
-			context: {} as any,
-		})
+			params: { deviceId: queryableDevice?.id },
+		} as Route.ActionArgs)
 
 		expect(response.status).toBe(200)
 		const data = await response.json()
@@ -216,11 +219,10 @@ describe('Device Sensors API: updating sensors', () => {
 			body: JSON.stringify(payload),
 		}) as unknown as Request
 
-		const response: any = await deviceUpdateAction({
+		const response = await deviceUpdateAction({
 			request,
-			params: { deviceId: queryableDevice.id },
-			context: {} as any,
-		})
+			params: { deviceId: queryableDevice?.id },
+		} as Route.ActionArgs)
 
 		expect(response.status).toBe(200)
 		const data = await response.json()
@@ -262,11 +264,10 @@ describe('Device Sensors API: updating sensors', () => {
 			body: JSON.stringify(payload),
 		}) as unknown as Request
 
-		const response: any = await deviceUpdateAction({
+		const response = await deviceUpdateAction({
 			request,
-			params: { deviceId: queryableDevice.id },
-			context: {} as any,
-		})
+			params: { deviceId: queryableDevice?.id },
+		} as Route.ActionArgs)
 
 		expect(response.status).toBe(200)
 		const data = await response.json()
@@ -306,11 +307,10 @@ describe('Device Sensors API: updating sensors', () => {
 			body: JSON.stringify(payload),
 		}) as unknown as Request
 
-		const response: any = await deviceUpdateAction({
+		const response = await deviceUpdateAction({
 			request,
-			params: { deviceId: queryableDevice.id },
-			context: {} as any,
-		})
+			params: { deviceId: queryableDevice?.id },
+		} as Route.ActionArgs)
 
 		expect(response.status).toBe(200)
 		const data = await response.json()
@@ -349,15 +349,14 @@ describe('Device Sensors API: updating sensors', () => {
 			body: JSON.stringify(payload),
 		}) as unknown as Request
 
-		const response: any = await deviceUpdateAction({
+		const response = await deviceUpdateAction({
 			request,
-			params: { deviceId: queryableDevice.id },
-			context: {} as any,
-		})
+			params: { deviceId: queryableDevice?.id },
+		} as Route.ActionArgs)
 
 		expect(response.status).toBe(400)
 		const data = await response.json()
-		expect(data.code).toBe('BadRequest')
+		expect(data.code).toBe('Bad Request')
 		expect(data.message).toContain('Unable to delete sensor')
 
 		const unchangedDevice = await getDevice({ id: queryableDevice.id })

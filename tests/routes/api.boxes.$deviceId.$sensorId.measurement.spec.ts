@@ -1,14 +1,14 @@
-import { type ActionFunctionArgs, type Params } from 'react-router'
+import { type Params } from 'react-router'
 import { generateTestUserCredentials } from 'tests/data/generate_test_user'
-import { BASE_URL } from 'vitest.setup'
+import { type Route } from '../../.react-router/types/app/routes/+types/api.boxes.$deviceId.$sensorId.measurements'
+import { BASE_URL } from '../../vitest.setup'
+import { createDevice, deleteDevice } from '~/db/models/device.server'
+import { insertMeasurements } from '~/db/models/measurement.server'
+import { getSensors } from '~/db/models/sensor.server'
+import { deleteUserByEmail } from '~/db/models/user.server'
 import { createToken } from '~/lib/jwt'
-import { registerUser } from '~/lib/user-service.server'
-import { createDevice, deleteDevice } from '~/models/device.server'
-import { insertMeasurements } from '~/models/measurement.server'
-import { getSensors } from '~/models/sensor.server'
-import { deleteUserByEmail } from '~/models/user.server'
 import { action } from '~/routes/api.boxes.$deviceId.$sensorId.measurements'
-import { type User } from '~/schema'
+import { registerUser } from '~/services/user-service.server'
 
 const USER = generateTestUserCredentials()
 const USER2 = generateTestUserCredentials()
@@ -56,13 +56,19 @@ describe('openSenseMap API Routes: /boxes/:deviceId/:sensorId/measurement', () =
 	let jwt2: string
 
 	beforeAll(async () => {
-		const registration1 = await registerUser(USER.name, USER.email, USER.password, 'en_US', true)
+		const registration1 = await registerUser(
+			USER.name,
+			USER.email,
+			USER.password,
+			'en_US',
+			true,
+		)
 		const registration2 = await registerUser(
 			USER2.name,
 			USER2.email,
 			USER2.password,
 			'en_US',
-			true
+			true,
 		)
 
 		expect(registration1.ok).toBe(true)
@@ -99,8 +105,14 @@ describe('openSenseMap API Routes: /boxes/:deviceId/:sensorId/measurement', () =
 	describe('DELETE', () => {
 		it('should remove measurements by date range (from-date, to-date)', async () => {
 			// Arrange
+
+			const searchParams = new URLSearchParams({
+				'from-date': new Date('1954-01-01 00:00:00+00').toISOString(),
+				'to-date': new Date('1954-12-31 23:59:59+00').toISOString(),
+			})
+
 			const request = new Request(
-				`${BASE_URL}/api/boxes/${deviceId}/${sensorId}?from-date=${new Date('1954-01-01 00:00:00+00')}&to-date=${new Date('1954-12-31 23:59:59+00')}`,
+				`${BASE_URL}/api/boxes/${deviceId}/${sensorId}/measurements?${searchParams}`,
 				{ method: 'DELETE', headers: { Authorization: `Bearer ${jwt}` } },
 			)
 
@@ -111,7 +123,7 @@ describe('openSenseMap API Routes: /boxes/:deviceId/:sensorId/measurement', () =
 					deviceId: `${deviceId}`,
 					sensorId: `${sensorId}`,
 				} as Params<string>,
-			} as ActionFunctionArgs)
+			} as Route.ActionArgs)
 			const response = dataFunctionValue as Response
 			const body = await response?.json()
 
@@ -123,8 +135,12 @@ describe('openSenseMap API Routes: /boxes/:deviceId/:sensorId/measurement', () =
 
 		it('should remove measurements by exact timestamps', async () => {
 			// Arrange
+			const searchParams = new URLSearchParams({
+				timestamps: MEASUREMENTS[1].createdAt.toISOString(),
+			})
+
 			const request = new Request(
-				`${BASE_URL}/api/boxes/${deviceId}/${sensorId}?timestamps=${MEASUREMENTS[1].createdAt.toISOString()}`,
+				`${BASE_URL}/api/boxes/${deviceId}/${sensorId}/measurements?${searchParams}`,
 				{ method: 'DELETE', headers: { Authorization: `Bearer ${jwt}` } },
 			)
 
@@ -135,7 +151,7 @@ describe('openSenseMap API Routes: /boxes/:deviceId/:sensorId/measurement', () =
 					deviceId: `${deviceId}`,
 					sensorId: `${sensorId}`,
 				} as Params<string>,
-			} as ActionFunctionArgs)
+			} as Route.ActionArgs)
 			const response = dataFunctionValue as Response
 			const body = await response?.json()
 
@@ -159,7 +175,7 @@ describe('openSenseMap API Routes: /boxes/:deviceId/:sensorId/measurement', () =
 					deviceId: `${deviceId}`,
 					sensorId: `${sensorId}`,
 				} as Params<string>,
-			} as ActionFunctionArgs)
+			} as Route.ActionArgs)
 			const response = dataFunctionValue as Response
 			const body = await response?.json()
 
@@ -183,7 +199,7 @@ describe('openSenseMap API Routes: /boxes/:deviceId/:sensorId/measurement', () =
 					deviceId: `${deviceId}`,
 					sensorId: `${sensorId}`,
 				} as Params<string>,
-			} as ActionFunctionArgs)
+			} as Route.ActionArgs)
 			const response = dataFunctionValue as Response
 			const body = await response?.json()
 
@@ -193,6 +209,28 @@ describe('openSenseMap API Routes: /boxes/:deviceId/:sensorId/measurement', () =
 			expect(body.error).toBe(
 				'You are not allowed to delete data of the given device',
 			)
+		})
+
+		it('should not delete all measurements when deleteAllMeasurements=false', async () => {
+			const request = new Request(
+				`${BASE_URL}/api/boxes/${deviceId}/${sensorId}/measurements?deleteAllMeasurements=false`,
+				{ method: 'DELETE', headers: { Authorization: `Bearer ${jwt}` } },
+			)
+
+			const dataFunctionValue = await action({
+				request,
+				params: {
+					deviceId,
+					sensorId,
+				} as Params<string>,
+			} as Route.ActionArgs)
+
+			const response = dataFunctionValue as Response
+			const body = await response.json()
+
+			expect(response.status).toBe(200)
+			expect(body).toHaveProperty('message')
+			expect(body.message).toBe(`Successfully deleted 0 of sensor ${sensorId}`)
 		})
 	})
 

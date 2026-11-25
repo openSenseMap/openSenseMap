@@ -1,152 +1,218 @@
-import { type ActionFunctionArgs } from 'react-router'
-import z from 'zod'
-import { getUserFromJwt } from '~/lib/jwt'
-import { getUserDevices } from '~/models/device.server'
+import { type Route } from './+types/api.boxes.$deviceId.$sensorId.measurements'
+import { getUserDevices } from '~/db/models/device.server'
 import {
 	deleteMeasurementsForSensor,
 	deleteSensorMeasurementsForTimeRange,
 	deleteSensorMeasurementsForTimes,
-} from '~/models/measurement.server'
-import { StandardResponse } from '~/utils/response-utils'
+} from '~/db/models/measurement.server'
+import { withAuthenticatedUser } from '~/lib/jwt'
+import { StandardResponse } from '~/lib/responses'
 
-export async function action({ request, params }: ActionFunctionArgs) {
-	try {
-		const { deviceId, sensorId } = params
-		if (!deviceId || !sensorId)
-			return StandardResponse.badRequest(
-				'Invalid device id or sensor id specified',
-			)
+import * as z from 'zod/v4'
+import { type ZodOpenApiPathItemObject } from 'zod-openapi'
 
-		const jwtResponse = await getUserFromJwt(request)
+import {
+	DeviceSensorPathParamsSchema,
+	IsoDateTimeToDateSchema,
+} from '~/lib/openapi/schemas/common'
 
-		if (typeof jwtResponse === 'string')
-			return StandardResponse.forbidden(
-				'Invalid JWT authorization. Please sign in to obtain new JWT.',
-			)
+import {
+	BadRequestErrorSchema,
+	ForbiddenErrorSchema,
+	InternalServerErrorSchema,
+	MessageResponseSchema,
+	MethodNotAllowedErrorSchema,
+	NotFoundErrorSchema,
+	messageResponse,
+	badRequestResponse,
+	forbiddenResponse,
+	internalServerErrorResponse,
+	methodNotAllowedResponse,
+	notFoundResponse,
+} from '~/lib/openapi/errors'
 
-		if (request.method !== 'DELETE')
-			return StandardResponse.methodNotAllowed('Endpoint only supports DELETE')
+import { parsePathParams } from '~/lib/request-parsing'
 
-		const userDevices = await getUserDevices(jwtResponse.id)
-		if (!userDevices.some((d) => d.id === deviceId))
-			return StandardResponse.forbidden(
-				'You are not allowed to delete data of the given device',
-			)
+const DeleteSensorMeasurementsQueryParamsSchema = z
+	.object({
+		'from-date': IsoDateTimeToDateSchema.optional().meta({
+			description: 'Beginning date of the measurement range to delete.',
+			example: '2026-05-13T12:00:00.000Z',
+		}),
 
-		const device = userDevices.find((d) => d.id === deviceId)
-		if (!device?.sensors.some((s) => s.id === sensorId))
-			return StandardResponse.notFound(
-				`Sensor with id ${sensorId} not found or not part of this device`,
-			)
+		'to-date': IsoDateTimeToDateSchema.optional().meta({
+			description: 'End date of the measurement range to delete.',
+			example: '2026-05-15T12:00:00.000Z',
+		}),
 
-		try {
-			const parsedParams = await parseQueryParams(request)
-			let count = 0
-
-			if (parsedParams.deleteAllMeasurements)
-				count = (await deleteMeasurementsForSensor(sensorId)).count
-			else if (parsedParams.timestamps)
-				count = (
-					await deleteSensorMeasurementsForTimes(
-						sensorId,
-						parsedParams.timestamps,
-					)
-				).count
-			else if (parsedParams['from-date'] && parsedParams['to-date'])
-				count = (
-					await deleteSensorMeasurementsForTimeRange(
-						sensorId,
-						parsedParams['from-date'],
-						parsedParams['to-date'],
-					)
-				).count
-
-			return StandardResponse.ok({
-				message: `Successfully deleted ${count} of sensor ${sensorId}`,
+		timestamps: z
+			.union([IsoDateTimeToDateSchema, z.array(IsoDateTimeToDateSchema)])
+			.optional()
+			.transform((value) => {
+				if (value === undefined) return undefined
+				return Array.isArray(value) ? value : [value]
 			})
-		} catch (e) {
-			if (e instanceof Response) return e
-			else throw e
-		}
-	} catch (err: any) {
-		return StandardResponse.internalServerError(
-			err.message || 'An unexpected error occured',
-		)
-	}
+			.meta({
+				description: 'One or more exact measurement timestamps to delete.',
+				example: ['2026-05-15T12:00:00.000Z'],
+			}),
+
+		deleteAllMeasurements: z.enum(['true', 'false']).optional().meta({
+			description: 'Set to `true` to delete all measurements of this sensor.',
+			example: 'true',
+		}),
+	})
+	.meta({
+		id: 'DeleteSensorMeasurementsQueryParams',
+		description:
+			'Query parameters selecting which measurements should be deleted.',
+	})
+
+export const openapi: ZodOpenApiPathItemObject = {
+	delete: {
+		tags: ['Measurements'],
+		summary: 'Delete measurements of a sensor',
+		description:
+			'Deletes measurements for the specified sensor. The measurements to delete are selected via query parameters. You can delete all measurements, delete specific timestamps, or delete a time range using `from-date` and `to-date`.',
+		security: [{ bearerAuth: [] }],
+
+		requestParams: {
+			path: DeviceSensorPathParamsSchema,
+			query: DeleteSensorMeasurementsQueryParamsSchema,
+		},
+
+		responses: {
+			200: messageResponse('Measurements deleted successfully.'),
+
+			400: badRequestResponse(
+				BadRequestErrorSchema,
+				'Bad request. This can happen for invalid query parameters or invalid parameter combinations.',
+			),
+
+			403: forbiddenResponse(
+				ForbiddenErrorSchema,
+				'Invalid JWT authorization or the authenticated user is not allowed to delete data of the given device.',
+			),
+
+			404: notFoundResponse(
+				NotFoundErrorSchema,
+				'Sensor not found or not part of this device.',
+			),
+
+			405: methodNotAllowedResponse(
+				MethodNotAllowedErrorSchema,
+				'Method not allowed. Endpoint only supports DELETE.',
+			),
+
+			500: internalServerErrorResponse(
+				InternalServerErrorSchema,
+				'Internal server error.',
+			),
+		},
+	},
 }
 
-const DeleteQueryParams = z
-	.object({
-		'from-date': z
-			.string()
-			.transform((s) => new Date(s))
-			.refine((d) => !isNaN(d.getTime()), {
-				message: 'from-date is invalid',
-			})
-			.optional(),
-		'to-date': z
-			.string()
-			.transform((s) => new Date(s))
-			.refine((d) => !isNaN(d.getTime()), {
-				message: 'to-date is invalid',
-			})
-			.optional(),
-		timestamps: z
-			.preprocess((val) => {
-				if (Array.isArray(val)) return val
-				else return [val]
-			}, z.array(z.string()))
-			.transform((a) => a.map((i) => new Date(i)))
-			.refine((a) => a.some((i) => !isNaN(i.getTime())), {
-				message: 'timestamps contains invalid input',
-			})
-			.optional(),
-		deleteAllMeasurements: z.coerce.boolean().optional(),
-	})
-	.superRefine((data, ctx) => {
-		const fromDateSet = data['from-date'] !== undefined
-		const toDateSet = data['to-date'] !== undefined
-		const timestampsSet = data.timestamps !== undefined
-		const deleteAllSet = data.deleteAllMeasurements !== undefined
-
-		if (deleteAllSet && (timestampsSet || fromDateSet || toDateSet)) {
-			const paths: string[] = []
-			if (timestampsSet) paths.push('timestamps')
-			if (fromDateSet) paths.push('from-date')
-			if (toDateSet) paths.push('to-date')
-			ctx.addIssue({
-				code: z.ZodIssueCode.custom,
-				message: 'Parameter deleteAllMeasurements can only be used by itself',
-				path: paths,
-			})
-		} else if (!deleteAllSet && timestampsSet && fromDateSet && toDateSet)
-			ctx.addIssue({
-				code: z.ZodIssueCode.custom,
-				message:
-					'Please specify only timestamps or a range with from-date and to-date',
-				path: ['timestamps', 'from-date', 'to-date'],
-			})
-		else if (!deleteAllSet && !timestampsSet && !fromDateSet && !toDateSet)
-			ctx.addIssue({
-				code: z.ZodIssueCode.custom,
-				message:
-					'Please specify only timestamps or a range with from-date and to-date',
-				path: ['timestamps', 'from-date', 'to-date'],
-			})
-	})
-
-const parseQueryParams = async (
+const parseQueryParams = (
 	request: Request,
-): Promise<z.infer<typeof DeleteQueryParams>> => {
+): z.output<typeof DeleteSensorMeasurementsQueryParamsSchema> | Response => {
 	const url = new URL(request.url)
-	const params: Record<string, any> = Object.fromEntries(url.searchParams)
-	const parseResult = DeleteQueryParams.safeParse(params)
+	const timestamps = url.searchParams.getAll('timestamps')
 
-	if (!parseResult.success) {
-		const firstError = parseResult.error.errors[0]
-		const message = firstError.message || 'Invalid query parameters'
-		throw StandardResponse.badRequest(message)
+	const params = {
+		'from-date': url.searchParams.get('from-date') ?? undefined,
+		'to-date': url.searchParams.get('to-date') ?? undefined,
+		deleteAllMeasurements:
+			url.searchParams.get('deleteAllMeasurements') ?? undefined,
+		timestamps:
+			timestamps.length === 0
+				? undefined
+				: timestamps.length === 1
+					? timestamps[0]
+					: timestamps,
 	}
 
-	return parseResult.data
+	const parsed = DeleteSensorMeasurementsQueryParamsSchema.safeParse(params)
+
+	if (!parsed.success) {
+		return StandardResponse.badRequest(
+			parsed.error.issues[0]?.message ?? 'Invalid query parameters',
+		)
+	}
+
+	return parsed.data
+}
+
+export async function action({ request, params }: Route.ActionArgs) {
+	if (request.method !== 'DELETE') {
+		return StandardResponse.methodNotAllowed('Endpoint only supports DELETE')
+	}
+
+	const parsedParams = parsePathParams(params, DeviceSensorPathParamsSchema, {
+		message: 'Invalid device id or sensor id specified',
+	})
+
+	if (parsedParams instanceof Response) {
+		return parsedParams
+	}
+
+	return withAuthenticatedUser(request, async (user) => {
+		try {
+			const userDevices = await getUserDevices(user.id)
+
+			const device = userDevices.find((d) => d.id === parsedParams.deviceId)
+
+			if (!device) {
+				return StandardResponse.forbidden(
+					'You are not allowed to delete data of the given device',
+				)
+			}
+
+			if (!device.sensors.some((s) => s.id === parsedParams.sensorId)) {
+				return StandardResponse.notFound(
+					`Sensor with id ${parsedParams.sensorId} not found or not part of this device`,
+				)
+			}
+
+			const queryParams = parseQueryParams(request)
+
+			if (queryParams instanceof Response) {
+				return queryParams
+			}
+
+			let count = 0
+
+			if (queryParams.deleteAllMeasurements === 'true') {
+				count = (await deleteMeasurementsForSensor(parsedParams.sensorId)).count
+			} else if (queryParams.timestamps) {
+				count = (
+					await deleteSensorMeasurementsForTimes(
+						parsedParams.sensorId,
+						queryParams.timestamps,
+					)
+				).count
+			} else if (queryParams['from-date'] && queryParams['to-date']) {
+				count = (
+					await deleteSensorMeasurementsForTimeRange(
+						parsedParams.sensorId,
+						queryParams['from-date'],
+						queryParams['to-date'],
+					)
+				).count
+			}
+
+			const responseParsed = await MessageResponseSchema.safeParseAsync({
+				message: `Successfully deleted ${count} of sensor ${parsedParams.sensorId}`,
+			})
+
+			if (!responseParsed.success) {
+				return StandardResponse.internalServerError()
+			}
+
+			return StandardResponse.ok(responseParsed.data)
+		} catch (err: any) {
+			return StandardResponse.internalServerError(
+				err.message || 'An unexpected error occured',
+			)
+		}
+	})
 }

@@ -1,11 +1,11 @@
-import { type ActionFunctionArgs } from 'react-router'
 import { generateTestUserCredentials } from 'tests/data/generate_test_user'
-import { BASE_URL } from 'vitest.setup'
+import { type Route } from '../../.react-router/types/app/routes/+types/api.sign-out'
+import { BASE_URL } from '../../vitest.setup'
+import { deleteUserByEmail } from '~/db/models/user.server'
+import { type User } from '~/db/schema'
 import { createToken } from '~/lib/jwt'
-import { registerUser } from '~/lib/user-service.server'
-import { deleteUserByEmail } from '~/models/user.server'
 import { action } from '~/routes/api.sign-out'
-import { type User } from '~/schema'
+import { registerUser } from '~/services/user-service.server'
 
 const VALID_SIGN_OUT_TEST_USER = generateTestUserCredentials()
 
@@ -18,7 +18,7 @@ describe('openSenseMap API Routes: /users', () => {
 				VALID_SIGN_OUT_TEST_USER.email,
 				VALID_SIGN_OUT_TEST_USER.password,
 				'en_US',
-				true
+				true,
 			)
 			expect(registration.ok).toBe(true)
 			if (!registration.ok) {
@@ -45,7 +45,7 @@ describe('openSenseMap API Routes: /users', () => {
 				// Act
 				const dataFunctionValue = await action({
 					request,
-				} as ActionFunctionArgs)
+				} as Route.ActionArgs)
 				const response = dataFunctionValue as Response
 
 				// Assert

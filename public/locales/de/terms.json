@@ -1,20 +1,20 @@
 {
-  "notConfigured": "Es sind keine Nutzungsbedingungen konfiguriert.",
-  "effectiveFrom": "Gültig ab {{date}}",
-  "info": {
-    "accepted": "Vielen Dank. Sie haben die Nutzungsbedingungen erfolgreich akzeptiert.",
-    "alreadyAccepted": "Diese Nutzungsbedingungen wurden für Ihr Konto bereits akzeptiert.",
-    "invalid": "Dieser Bestätigungslink ist ungültig oder abgelaufen.",
-    "missing": "Es wurde kein Bestätigungstoken übergeben.",
-    "notConfigured": "Derzeit sind keine Nutzungsbedingungen konfiguriert."
-  },
-  "form": {
-    "acceptLabel": "Ich habe die aktuellen Nutzungsbedingungen gelesen und akzeptiere sie.",
-    "errors": {
-      "mustAccept": "Bitte bestätigen Sie, dass Sie die Nutzungsbedingungen akzeptieren.",
-      "invalidOrExpiredLink": "Dieser Bestätigungslink ist ungültig oder abgelaufen.",
-      "notConfigured": "Derzeit sind keine Nutzungsbedingungen konfiguriert."
-    },
-    "submit": "Nutzungsbedingungen akzeptieren"
-  }
+	"notConfigured": "Es sind keine Nutzungsbedingungen konfiguriert.",
+	"effectiveFrom": "Gültig ab {{date}}",
+	"info": {
+		"accepted": "Vielen Dank. Sie haben die Nutzungsbedingungen erfolgreich akzeptiert.",
+		"alreadyAccepted": "Diese Nutzungsbedingungen wurden für Ihr Konto bereits akzeptiert.",
+		"invalid": "Dieser Bestätigungslink ist ungültig oder abgelaufen.",
+		"missing": "Es wurde kein Bestätigungstoken übergeben.",
+		"notConfigured": "Derzeit sind keine Nutzungsbedingungen konfiguriert."
+	},
+	"form": {
+		"acceptLabel": "Ich habe die aktuellen Nutzungsbedingungen gelesen und akzeptiere sie.",
+		"errors": {
+			"mustAccept": "Bitte bestätigen Sie, dass Sie die Nutzungsbedingungen akzeptieren.",
+			"invalidOrExpiredLink": "Dieser Bestätigungslink ist ungültig oder abgelaufen.",
+			"notConfigured": "Derzeit sind keine Nutzungsbedingungen konfiguriert."
+		},
+		"submit": "Nutzungsbedingungen akzeptieren"
+	}
 }

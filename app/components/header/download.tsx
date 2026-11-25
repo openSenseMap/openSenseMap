@@ -1,9 +1,14 @@
 import { type BBox } from 'geojson'
-import { Download as DownloadIcon } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import {
+	AlertTriangle,
+	CheckCircle2,
+	Download as DownloadIcon,
+} from 'lucide-react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { useMap } from 'react-map-gl'
-import { Form, useNavigation, useActionData } from 'react-router'
+import { useMap } from 'react-map-gl/maplibre'
+import { useFetcher, useSearchParams } from 'react-router'
+
 import { Button } from '../ui/button'
 import { Checkbox } from '../ui/checkbox'
 import {
@@ -13,7 +18,6 @@ import {
 	DialogFooter,
 	DialogHeader,
 	DialogTitle,
-	DialogTrigger,
 } from '../ui/dialog'
 import { Input } from '../ui/input'
 import { Label } from '../ui/label'
@@ -26,401 +30,494 @@ import {
 } from '../ui/select'
 import { toast } from '../ui/use-toast'
 
-// Custom Loading Animation Component
-const PulsingDownloadAnimation = () => {
+type DownloadActionData =
+	| {
+			href: string
+			download?: string
+			error?: never
+			link?: never
+	  }
+	| {
+			error: string
+			link?: string
+			href?: never
+			download?: never
+	  }
+
+type DeviceFeature = {
+	geometry?: {
+		coordinates?: number[]
+	}
+	properties?: {
+		id?: string | number
+	}
+}
+
+type DevicesGeoJson = {
+	features?: DeviceFeature[]
+}
+
+type DownloadProps = {
+	devices: DevicesGeoJson
+	open: boolean
+	onOpenChange: (open: boolean) => void
+}
+
+type DownloadFields = {
+	title: boolean
+	unit: boolean
+	value: boolean
+	timestamp: boolean
+	coordinates: boolean
+}
+
+const DEFAULT_FIELDS: DownloadFields = {
+	title: true,
+	unit: true,
+	value: true,
+	timestamp: true,
+	coordinates: true,
+}
+
+export const DOWNLOAD_FILTER_KEYS = new Set([
+	'phenomenon',
+	'timeMode',
+	'date',
+	'from',
+	'to',
+])
+
+function getDeviceIdsInBounds(
+	devices: DevicesGeoJson,
+	bounds: BBox | undefined,
+): string[] {
+	if (!bounds || bounds.length !== 4) {
+		return []
+	}
+
+	const [minLon, minLat, maxLon, maxLat] = bounds
+
+	const ids =
+		devices.features
+			?.filter((device) => {
+				const coordinates = device.geometry?.coordinates
+
+				if (!coordinates) {
+					return false
+				}
+
+				const [longitude, latitude] = coordinates
+
+				return (
+					longitude >= minLon &&
+					longitude <= maxLon &&
+					latitude >= minLat &&
+					latitude <= maxLat
+				)
+			})
+			.map((device) => device.properties?.id)
+			.filter((id): id is string | number => id !== undefined && id !== null)
+			.map(String) ?? []
+
+	return Array.from(new Set(ids))
+}
+
+function PulsingDownloadAnimation() {
 	const { t } = useTranslation('download')
+
 	return (
 		<div className="flex items-center justify-center">
 			<div className="relative">
-				{/* Main download icon */}
-				<div className="text-blue-600 animate-bounce">
-					<svg
-						xmlns="http://www.w3.org/2000/svg"
-						width="24"
-						height="24"
-						viewBox="0 0 24 24"
-						fill="none"
-						stroke="currentColor"
-						strokeWidth="2"
-						strokeLinecap="round"
-						strokeLinejoin="round"
-					>
-						<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-						<polyline points="7 10 12 15 17 10"></polyline>
-						<line x1="12" y1="15" x2="12" y2="3"></line>
-					</svg>
+				<div className="animate-bounce text-blue-600">
+					<DownloadIcon className="h-6 w-6" />
 				</div>
 
-				{/* Animated ripples */}
-				<div className="absolute left-0 top-0 h-full w-full animate-ping rounded-full border-2 border-blue-400 opacity-75"></div>
-				<div
-					className="absolute left-0 top-0 h-full w-full animate-pulse rounded-full border border-blue-300 opacity-75"
-					style={{ animationDelay: '0.3s' }}
-				></div>
+				<div className="absolute top-0 left-0 h-full w-full animate-ping rounded-full border-2 border-blue-400 opacity-75" />
 
-				{/* Small data points moving toward the download icon */}
 				<div
-					className="absolute -left-4 -top-4 h-2 w-2 animate-ping rounded-full bg-blue-500"
+					className="absolute top-0 left-0 h-full w-full animate-pulse rounded-full border border-blue-300 opacity-75"
+					style={{ animationDelay: '0.3s' }}
+				/>
+
+				<div
+					className="absolute -top-4 -left-4 h-2 w-2 animate-ping rounded-full bg-blue-500"
 					style={{ animationDelay: '0.1s' }}
-				></div>
+				/>
+
 				<div
 					className="absolute -top-4 left-0 h-2 w-2 animate-ping rounded-full bg-blue-500"
 					style={{ animationDelay: '0.4s' }}
-				></div>
+				/>
+
 				<div
 					className="absolute -top-4 left-4 h-2 w-2 animate-ping rounded-full bg-blue-500"
 					style={{ animationDelay: '0.7s' }}
-				></div>
+				/>
 			</div>
-			<span className="text-blue-600 ml-3 font-medium">
+
+			<span className="ml-3 font-medium text-blue-600">
 				{t('processingData')}
 			</span>
 		</div>
 	)
 }
 
-// Data Ready Animation
-const DataReadyAnimation = () => {
+function DataReadyAnimation() {
 	const { t } = useTranslation('download')
+
 	return (
-		<div className="flex items-center justify-center text-light-blue">
-			<svg
-				xmlns="http://www.w3.org/2000/svg"
-				width="24"
-				height="24"
-				viewBox="0 0 24 24"
-				fill="none"
-				stroke="currentColor"
-				strokeWidth="2"
-				strokeLinecap="round"
-				strokeLinejoin="round"
-				className="animate-pulse"
-			>
-				<path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
-				<polyline points="22 4.3 12 14.01 9 11.01"></polyline>
-			</svg>
+		<div className="flex items-center justify-center text-green-700">
+			<CheckCircle2 className="h-6 w-6 animate-pulse" />
 			<span className="ml-2">{t('readyToDownload')}</span>
 		</div>
 	)
 }
 
-export default function Download(props: any) {
+export default function Download({
+	devices,
+	open,
+	onOpenChange,
+}: DownloadProps) {
 	const { t } = useTranslation('download')
-	const actionData = useActionData()
-	const navigation = useNavigation()
-	const isLoading = navigation.state === 'submitting'
-	const devices = props.devices.features || []
+	const fetcher = useFetcher<DownloadActionData>()
+	const actionData = fetcher.data
+
+	const [searchParams] = useSearchParams()
 	const { osem: mapRef } = useMap()
+
+	const closeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+	const [format, setFormat] = useState('csv')
+	const [aggregate, setAggregate] = useState('raw')
+	const [fields, setFields] = useState<DownloadFields>(DEFAULT_FIELDS)
 
 	const [isDownloadReady, setIsDownloadReady] = useState(false)
 	const [showReadyAnimation, setShowReadyAnimation] = useState(false)
+	const [downloadStarted, setDownloadStarted] = useState(false)
 	const [errorMessage, setErrorMessage] = useState<string | null>(null)
 
-	// Update download ready state when actionData changes
-	useEffect(() => {
-		if (actionData && actionData.error) {
-			setErrorMessage(actionData.error)
-		} else {
-			setErrorMessage(null)
-			// Only set download ready if there's no error
-			if (actionData) {
-				setIsDownloadReady(true)
-				setShowReadyAnimation(true)
-			}
-		}
-	}, [actionData])
+	const isBusy = fetcher.state !== 'idle'
+	const hasSelectedFields = Object.values(fields).some(Boolean)
 
-	// Reset download ready state when format changes
-	const [format, setFormat] = useState<string>('csv')
-	const handleFormatChange = (value: string) => {
-		setFormat(value)
-		setShowReadyAnimation(false)
+	const activeFilterEntries = useMemo(() => {
+		return Array.from(searchParams.entries()).filter(([key]) =>
+			DOWNLOAD_FILTER_KEYS.has(key),
+		)
+	}, [searchParams])
+
+	const deviceIds = useMemo(() => {
+		const bounds = mapRef?.getMap().getBounds()?.toArray().flat() as
+			| BBox
+			| undefined
+
+		return getDeviceIdsInBounds(devices, bounds)
+	}, [devices, mapRef, open])
+
+	const resetResultState = () => {
 		setIsDownloadReady(false)
+		setShowReadyAnimation(false)
+		setDownloadStarted(false)
 		setErrorMessage(null)
 	}
 
-	const [downloadStarted, setDownloadStarted] = useState(false)
+	const handleDialogOpenChange = (nextOpen: boolean) => {
+		onOpenChange(nextOpen)
 
-	// Add this function to handle download start
+		if (!nextOpen) {
+			resetResultState()
+		}
+	}
+
+	const handleFormatChange = (value: string) => {
+		setFormat(value)
+		resetResultState()
+	}
+
+	const handleAggregateChange = (value: string) => {
+		setAggregate(value)
+		setFields((currentFields) => ({
+			...currentFields,
+			coordinates: value === 'raw',
+		}))
+		resetResultState()
+	}
+
+	const handleFieldChange = (
+		field: keyof DownloadFields,
+		checked: boolean | 'indeterminate',
+	) => {
+		setFields((currentFields) => ({
+			...currentFields,
+			[field]: checked === true,
+		}))
+
+		resetResultState()
+	}
+
+	const handleSubmit = () => {
+		resetResultState()
+	}
+
 	const handleDownloadStart = () => {
-		const Delay = 3500
+		const delay = 3500
+
+		if (closeTimerRef.current) {
+			clearTimeout(closeTimerRef.current)
+		}
+
 		setDownloadStarted(true)
 		setShowReadyAnimation(false)
+
 		toast({
 			description: t('toast'),
-			duration: Delay,
+			duration: delay,
 			variant: 'success',
 		})
 
-		// Reset the download started state after a delay
-		setTimeout(() => {
+		closeTimerRef.current = setTimeout(() => {
 			setDownloadStarted(false)
-			setOpen(false)
-		}, Delay)
+			onOpenChange(false)
+		}, delay)
 	}
 
-	// Filter devices inside the current bounds
-	const bounds =
-		(mapRef?.getMap().getBounds().toArray().flat() as BBox) ?? undefined
-	const devicesInBounds =
-		bounds && bounds.length === 4
-			? devices.filter((device: any) => {
-					// Ensure the device has coordinates
+	useEffect(() => {
+		if (!actionData) {
+			return
+		}
 
-					if (!device.geometry || !device.geometry.coordinates) return false
+		if ('error' in actionData && actionData.error) {
+			setErrorMessage(actionData.error)
+			setIsDownloadReady(false)
+			setShowReadyAnimation(false)
+			return
+		}
 
-					const [longitude, latitude] = device.geometry.coordinates
+		if ('href' in actionData && actionData.href) {
+			setErrorMessage(null)
+			setIsDownloadReady(true)
+			setShowReadyAnimation(true)
+		}
+	}, [actionData])
 
-					// Check if bounds are defined properly
-					const [minLon, minLat] = bounds.slice(0, 2) // [minLongitude, minLatitude]
-					const [maxLon, maxLat] = bounds.slice(2, 4) // [maxLongitude, maxLatitude]
-
-					return (
-						longitude >= minLon &&
-						longitude <= maxLon &&
-						latitude >= minLat &&
-						latitude <= maxLat
-					)
-				})
-			: []
-
-	let deviceIDs: Array<string> = []
-	devicesInBounds.map((device: any) => {
-		deviceIDs.push(device.properties.id)
-	})
-
-	const [aggregate, setAggregate] = useState<string>('10m')
-	const [fields, setFields] = useState({
-		title: true,
-		unit: true,
-		value: true,
-		timestamp: true,
-	})
-	const [open, setOpen] = useState(false)
-	const handleFieldChange = (field: keyof typeof fields) => {
-		setFields((prev) => ({ ...prev, [field]: !prev[field] }))
-		setIsDownloadReady(false)
-		setErrorMessage(null)
-		setShowReadyAnimation(false)
-	}
+	useEffect(() => {
+		return () => {
+			if (closeTimerRef.current) {
+				clearTimeout(closeTimerRef.current)
+			}
+		}
+	}, [])
 
 	return (
-		<Dialog
-			open={open}
-			onOpenChange={() => {
-				setOpen(!open)
-				setIsDownloadReady(false)
-				setErrorMessage(null)
-				setShowReadyAnimation(false)
-			}}
-		>
-			<DialogTrigger
-				asChild
-				className="pointer-events-auto"
-				onClick={() => setOpen(true)}
-			>
-				<div className="pointer-events-auto box-border h-10 w-10">
-					<button
-						type="button"
-						className="h-10 w-10 rounded-full border border-green-700 bg-white text-center text-black transition-all hover:bg-slate-50 hover:shadow-md"
-						aria-label={t('download')}
-					>
-						<DownloadIcon className="mx-auto h-6 w-6" />
-					</button>
-				</div>
-			</DialogTrigger>
-			<DialogContent
-				className="max-w-1/2"
-				style={{ maxHeight: '100vh', overflowY: 'auto' }}
-			>
+		<Dialog open={open} onOpenChange={handleDialogOpenChange}>
+			<DialogContent className="p-4 sm:max-w-xl sm:p-6">
 				<DialogHeader>
 					<DialogTitle>{t('downloadOptions')}</DialogTitle>
 					<DialogDescription>{t('downloadDescription')}</DialogDescription>
 				</DialogHeader>
-				<div className="grid gap-4 py-3">
-					<Form action={'/explore'} method="post">
-						<div className="grid gap-2">
-							<div className="flex items-center justify-between">
-								<Label htmlFor="devices">{t('devices')}</Label>
-								<span className="text-blue-600 text-sm font-medium">
-									{deviceIDs.length} 📡 {t('selected')}
-								</span>
-							</div>
-							<Input
-								type="text"
-								id="devices"
-								name="devices"
-								value={deviceIDs}
-								readOnly
-							/>
-							<Label htmlFor="format">{t('format')}</Label>
-							<Select
-								value={format}
-								onValueChange={handleFormatChange}
-								name="format"
-							>
-								<SelectTrigger id="format">
-									<SelectValue placeholder={t('selectFormat')} />
-								</SelectTrigger>
-								<SelectContent>
-									<SelectItem value="csv">CSV</SelectItem>
-									<SelectItem value="json">JSON</SelectItem>
-									<SelectItem value="txt">{t('text')}</SelectItem>
-								</SelectContent>
-							</Select>
-							<Label htmlFor="aggregate">{t('aggregateTo')}</Label>
-							<Select
-								value={aggregate}
-								onValueChange={(value) => {
-									setAggregate(value)
-									setIsDownloadReady(false)
-									setErrorMessage(null)
-									setShowReadyAnimation(false)
-								}}
-								name="aggregate"
-							>
-								<SelectTrigger id="aggregate">
-									<SelectValue placeholder={t('aggregateTo')} />
-								</SelectTrigger>
-								<SelectContent>
-									<SelectItem value="raw">{t('rawData')}</SelectItem>
-									<SelectItem value="10m">{t('10minutes')}</SelectItem>
-									<SelectItem value="1h">{t('1hour')}</SelectItem>
-									<SelectItem value="1d">{t('1day')}</SelectItem>
-									<SelectItem value="1m">{t('1month')}</SelectItem>
-									<SelectItem value="1y">{t('1year')}</SelectItem>
-								</SelectContent>
-							</Select>
-						</div>
-						<div className="mt-4 grid gap-2">
-							<fieldset className="grid grid-cols-2 gap-3" id="fields">
-								<legend>{t('fieldsToInclude')}</legend>
-								<div className="flex items-center space-x-2">
-									<Checkbox
-										id="title"
-										checked={fields.title}
-										onCheckedChange={() => handleFieldChange('title')}
-										name="title"
-									/>
-									<Label htmlFor="title" className="cursor-pointer">
-										{t('title')}
-									</Label>
-								</div>
-								<div className="flex items-center space-x-2">
-									<Checkbox
-										id="unit"
-										checked={fields.unit}
-										onCheckedChange={() => handleFieldChange('unit')}
-										name="unit"
-									/>
-									<Label htmlFor="unit" className="cursor-pointer">
-										{t('unit')}
-									</Label>
-								</div>
-								<div className="flex items-center space-x-2">
-									<Checkbox
-										id="value"
-										checked={fields.value}
-										onCheckedChange={() => handleFieldChange('value')}
-										name="value"
-									/>
-									<Label htmlFor="value" className="cursor-pointer">
-										{t('value')}
-									</Label>
-								</div>
-								<div className="flex items-center space-x-2">
-									<Checkbox
-										id="timestamp"
-										checked={fields.timestamp}
-										onCheckedChange={() => handleFieldChange('timestamp')}
-										name="timestamp"
-									/>
-									<Label htmlFor="timestamp" className="cursor-pointer">
-										{t('timestamp')}
-									</Label>
-								</div>
-							</fieldset>
+
+				<fetcher.Form
+					action="/explore"
+					method="post"
+					className="grid gap-4"
+					onSubmit={handleSubmit}
+				>
+					{activeFilterEntries.map(([key, value], index) => (
+						<input
+							key={`${key}-${value}-${index}`}
+							type="hidden"
+							name={key}
+							value={value}
+						/>
+					))}
+
+					<div className="grid gap-3">
+						<div className="flex flex-wrap items-center justify-between gap-2">
+							<Label htmlFor="devices">{t('devices')}</Label>
+
+							<span className="text-sm font-medium text-blue-600">
+								{deviceIds.length} 📡 {t('selected')}
+							</span>
 						</div>
 
-						<div className="mt-2 flex h-16 items-center justify-center">
-							{isLoading ? (
-								<PulsingDownloadAnimation />
-							) : showReadyAnimation ? (
-								<DataReadyAnimation />
+						<Input
+							id="devices"
+							name="devices"
+							value={deviceIds.join(',')}
+							readOnly
+						/>
+
+						{deviceIds.length === 0 && (
+							<p className="text-muted-foreground text-sm">
+								{t(
+									'noDevicesInBounds',
+									'No devices are currently selected in the visible map area.',
+								)}
+							</p>
+						)}
+
+						{activeFilterEntries.length > 0 && (
+							<p className="text-muted-foreground text-sm">
+								{t(
+									'activeFiltersApplied',
+									'The currently active filters will be applied to this download.',
+								)}
+							</p>
+						)}
+
+						<Label htmlFor="format">{t('format')}</Label>
+
+						<Select
+							name="format"
+							value={format}
+							onValueChange={handleFormatChange}
+						>
+							<SelectTrigger id="format">
+								<SelectValue placeholder={t('selectFormat')} />
+							</SelectTrigger>
+
+							<SelectContent>
+								<SelectItem value="csv">CSV</SelectItem>
+								<SelectItem value="json">JSON</SelectItem>
+								<SelectItem value="txt">{t('text')}</SelectItem>
+							</SelectContent>
+						</Select>
+
+						<Label htmlFor="aggregate">{t('aggregateTo')}</Label>
+
+						<Select
+							name="aggregate"
+							value={aggregate}
+							onValueChange={handleAggregateChange}
+						>
+							<SelectTrigger id="aggregate">
+								<SelectValue placeholder={t('aggregateTo')} />
+							</SelectTrigger>
+
+							<SelectContent>
+								<SelectItem value="raw">{t('rawData')}</SelectItem>
+								<SelectItem value="10m">{t('10minutes')}</SelectItem>
+								<SelectItem value="1h">{t('1hour')}</SelectItem>
+								<SelectItem value="1d">{t('1day')}</SelectItem>
+								<SelectItem value="1m">{t('1month')}</SelectItem>
+								<SelectItem value="1y">{t('1year')}</SelectItem>
+							</SelectContent>
+						</Select>
+					</div>
+
+					<fieldset className="grid grid-cols-2 gap-3" id="fields">
+						<legend className="col-span-2 text-sm font-medium">
+							{t('fieldsToInclude')}
+						</legend>
+
+						{Object.entries(fields).map(([field, checked]) => {
+							const isCoordinateField = field === 'coordinates'
+
+							return (
+								<div key={field} className="flex items-center space-x-2">
+									<Checkbox
+										id={field}
+										name={field}
+										value="on"
+										checked={checked}
+										disabled={isCoordinateField && aggregate !== 'raw'}
+										onCheckedChange={(nextChecked) =>
+											handleFieldChange(
+												field as keyof DownloadFields,
+												nextChecked,
+											)
+										}
+									/>
+
+									<Label htmlFor={field} className="cursor-pointer">
+										{t(field)}
+									</Label>
+								</div>
+							)
+						})}
+					</fieldset>
+
+					{aggregate !== 'raw' && (
+						<p className="text-muted-foreground text-sm">
+							{t('coordinatesRawOnly')}
+						</p>
+					)}
+
+					<div className="flex min-h-16 items-center justify-center text-center">
+						{isBusy ? (
+							<PulsingDownloadAnimation />
+						) : showReadyAnimation ? (
+							<DataReadyAnimation />
+						) : null}
+					</div>
+
+					{errorMessage && (
+						<div className="flex min-w-0 items-center gap-3 rounded-md border border-red-300 bg-red-100 p-3 text-red-700">
+							<AlertTriangle className="h-8 w-8 shrink-0 animate-pulse text-red-500" />
+
+							<p className="min-w-0 text-sm wrap-break-word">
+								{t('error')}{' '}
+								{actionData && 'link' in actionData && actionData.link ? (
+									<>
+										<a
+											href={actionData.link}
+											className="font-medium text-blue-700 underline"
+											target="_blank"
+											rel="noreferrer"
+										>
+											{t('clickHere')}
+										</a>{' '}
+										{t('toGoToArchive')}
+									</>
+								) : null}
+							</p>
+						</div>
+					)}
+
+					{!hasSelectedFields && (
+						<p className="text-sm text-red-600">
+							{t(
+								'selectAtLeastOneField',
+								'Please select at least one field to include.',
+							)}
+						</p>
+					)}
+
+					<DialogFooter>
+						<div className="flex w-full flex-col items-stretch justify-center gap-2 sm:flex-row sm:items-center sm:gap-4">
+							<Button
+								type="submit"
+								className="text-dark w-full bg-blue-100 transition-colors hover:bg-blue-200 sm:w-auto"
+								disabled={
+									isBusy || deviceIds.length === 0 || !hasSelectedFields
+								}
+							>
+								{isBusy ? t('processing') : t('generateFile')}
+							</Button>
+
+							{actionData &&
+							'href' in actionData &&
+							actionData.href &&
+							isDownloadReady ? (
+								<a
+									href={actionData.href}
+									download={actionData.download}
+									className={`text-dark flex min-h-10 w-full items-center justify-center rounded px-4 py-2 text-center transition-colors sm:w-auto ${
+										downloadStarted
+											? 'animate-pulse bg-blue-300'
+											: 'bg-green-100 hover:bg-green-400'
+									}`}
+									onClick={handleDownloadStart}
+								>
+									<DownloadIcon className="mr-2 h-4 w-4" />
+
+									{downloadStarted
+										? t('downloading')
+										: `${format.toUpperCase()} ${t('data')} ${t('download')}`}
+								</a>
 							) : null}
 						</div>
-						{errorMessage && (
-							<div className="flex items-center rounded border border-red-300 bg-red-100 p-2 text-red-700">
-								<svg
-									xmlns="http://www.w3.org/2000/svg"
-									width="50"
-									height="50"
-									viewBox="0 0 24 24"
-									fill="none"
-									stroke="currentColor"
-									strokeWidth="2"
-									strokeLinecap="round"
-									strokeLinejoin="round"
-									className="mr-2 animate-pulse text-red-500"
-								>
-									<circle cx="12" cy="12" r="10"></circle>
-									<line x1="12" y1="8" x2="12" y2="12"></line>
-									<line x1="12" y1="16" x2="12.01" y2="16"></line>
-								</svg>
-								<p>
-									{t('error')}{' '}
-									<a
-										href={actionData?.link}
-										className="text-blue-100"
-										target="_blank"
-									>
-										{t('clickHere')}
-									</a>{' '}
-									{t('toGoToArchive')}
-								</p>
-							</div>
-						)}
-						<DialogFooter>
-							<div className="mt-4 flex w-full items-center justify-center space-x-4">
-								<Button
-									type="submit"
-									className="text-dark bg-blue-100 transition-colors hover:bg-blue-200"
-									disabled={isLoading || deviceIDs.length === 0}
-								>
-									{isLoading ? t('processing') : t('generateFile')}
-								</Button>
-								{actionData && isDownloadReady ? (
-									<a
-										href={actionData.href}
-										download={actionData.download}
-										className={`px-4 py-2 ${downloadStarted ? 'animate-pulse bg-blue-300' : 'bg-green-100'} text-dark flex items-center rounded transition-colors hover:bg-green-400`}
-										onClick={handleDownloadStart}
-									>
-										<svg
-											xmlns="http://www.w3.org/2000/svg"
-											width="16"
-											height="16"
-											viewBox="0 0 24 24"
-											fill="none"
-											stroke="currentColor"
-											strokeWidth="2"
-											strokeLinecap="round"
-											strokeLinejoin="round"
-											className="mr-2"
-										>
-											<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-											<polyline points="7 10 12 15 17 10"></polyline>
-											<line x1="12" y1="15" x2="12" y2="3"></line>
-										</svg>
-										{downloadStarted
-											? t('downloading')
-											: `${format.toUpperCase()} ${t('data')} ${t('download')}`}
-									</a>
-								) : null}
-							</div>
-						</DialogFooter>
-					</Form>
-				</div>
+					</DialogFooter>
+				</fetcher.Form>
 			</DialogContent>
 		</Dialog>
 	)

@@ -1,14 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import {
-	Form,
-	useActionData,
-	data,
-	redirect,
-	type ActionFunctionArgs,
-	type LoaderFunctionArgs,
-} from 'react-router'
+import { Form, data, redirect } from 'react-router'
 import invariant from 'tiny-invariant'
+import { type Route } from './+types/settings.delete'
 import { Button } from '~/components/ui/button'
 import {
 	Card,
@@ -17,18 +11,18 @@ import {
 	CardHeader,
 	CardTitle,
 } from '~/components/ui/card'
-import { Input } from '~/components/ui/input'
 import { Label } from '~/components/ui/label'
+import { PasswordInput } from '~/components/ui/password-input'
 import { useToast } from '~/components/ui/use-toast'
 import {
 	deleteUserByEmail,
 	getUserByEmail,
 	verifyLogin,
-} from '~/models/user.server'
-import { getUserEmail, getUserId } from '~/utils/session.server'
+} from '~/db/models/user.server'
+import { getUserEmail, getUserId } from '~/services/session-service.server'
 
 //*****************************************************
-export async function loader({ request }: LoaderFunctionArgs) {
+export async function loader({ request }: Route.LoaderArgs) {
 	//* if user is not logged in, redirect to home
 	const userId = await getUserId(request)
 	if (!userId) return redirect('/')
@@ -42,7 +36,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
 }
 
 //*****************************************************
-export async function action({ request }: ActionFunctionArgs) {
+export async function action({ request }: Route.ActionArgs) {
 	const formData = await request.formData()
 
 	// get all values of the form
@@ -75,8 +69,9 @@ export async function action({ request }: ActionFunctionArgs) {
 	return redirect('')
 }
 
-export default function EditUserProfilePage() {
-	const actionData = useActionData<typeof action>()
+export default function EditUserProfilePage({
+	actionData,
+}: Route.ComponentProps) {
 	const [passwordDelVal, setPasswordVal] = useState('') //* to enable delete account button
 	//* To focus when an error occured
 	const passwordDelRef = useRef<HTMLInputElement>(null)
@@ -97,7 +92,7 @@ export default function EditUserProfilePage() {
 
 	return (
 		<Form method="post" className="space-y-6" noValidate>
-			<Card className="dark:border-white dark:bg-dark-boxes">
+			<Card>
 				<CardHeader>
 					<CardTitle>{t('delete_account')}</CardTitle>
 					<CardDescription>{t('delete_account_description')}</CardDescription>
@@ -105,10 +100,9 @@ export default function EditUserProfilePage() {
 				<CardContent className="grid gap-4">
 					<div className="grid gap-2">
 						<Label htmlFor="passwordDelete">{t('confirm_password')}</Label>
-						<Input
+						<PasswordInput
 							placeholder={t('enter_password')}
 							required
-							type="password"
 							id="passwordDelete"
 							name="passwordDelete"
 							ref={passwordDelRef}

@@ -1,16 +1,20 @@
 {
 	"exclude": [],
 	"include": [
-		"./types",
-		"env.ts",
-		"env.d.ts",
+		"app/env.ts",
+		"app/types.d.ts",
 		"**/*.ts",
 		"**/*.tsx",
 		".react-router/types/**/*"
 	],
 	"compilerOptions": {
-		"lib": ["DOM", "DOM.Iterable", "ES2020"],
-		"types": ["@react-router/node", "vite/client", "vitest/globals"],
+		"lib": ["DOM", "DOM.Iterable", "ES2022"],
+		"types": [
+			"node",
+			"@react-router/node",
+			"vite/client",
+			"vite-plus/test/globals"
+		],
 		"isolatedModules": true,
 		"esModuleInterop": true,
 		"jsx": "react-jsx",
@@ -21,10 +25,12 @@
 		"strict": true,
 		"allowJs": true,
 		"forceConsistentCasingInFileNames": true,
-		"baseUrl": ".",
 		"paths": {
-			"~/*": ["app/*"],
-			"@/*": ["app/*"]
+			"~/*": ["./app/*"],
+			"@/*": ["./app/*"],
+			"db/*": ["./db/*"],
+			"emails/*": ["./emails/*"],
+			"tests/*": ["./tests/*"]
 		},
 		"skipLibCheck": true,
 		"rootDirs": [".", "./.react-router/types"],

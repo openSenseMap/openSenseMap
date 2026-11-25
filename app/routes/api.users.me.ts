@@ -1,390 +1,415 @@
+import { z } from 'zod'
+import { type ZodOpenApiPathItemObject } from 'zod-openapi'
+import { getUserDeviceIds } from '~/db/models/device.server'
+import { type User } from '~/db/schema/user'
+import { withAuthenticatedUser } from '~/lib/jwt'
+import { StandardResponse } from '~/lib/responses'
+import { deleteUser, updateUserDetails } from '~/services/user-service.server'
+import { type Route } from './+types/api.users.me'
 import {
-	type ActionFunctionArgs,
-	type ActionFunction,
-	type LoaderFunction,
-	type LoaderFunctionArgs,
-} from 'react-router'
-import { getUserFromJwt } from '~/lib/jwt'
-import { deleteUser, updateUserDetails } from '~/lib/user-service.server'
-import { type User } from '~/schema/user'
-import { StandardResponse } from '~/utils/response-utils'
+	UserLanguageSchema,
+	UserSchema,
+	UserWithBoxesSchema,
+} from '~/lib/openapi/schemas/user'
+import {
+	BadRequestErrorSchema,
+	badRequestResponse,
+	ForbiddenErrorSchema,
+	forbiddenResponse,
+	internalServerErrorResponse,
+	InternalServerErrorSchema,
+	MethodNotAllowedErrorSchema,
+	methodNotAllowedResponse,
+	UnauthorizedErrorSchema,
+	unauthorizedResponse,
+} from '~/lib/openapi/errors'
+import { apiMessages } from '~/lib/openapi/messages'
+import { transformUserToApiFormat } from '~/lib/user-transform'
+import {
+	requestContentTypeJson,
+	requestContentTypeJsonOrForm,
+} from '~/middleware/content-type-header.server'
+import { parseFormRequest, parseJsonBody } from '~/lib/request-parsing'
+import { NewPasswordSchema } from '~/lib/openapi/schemas/auth'
 
-/**
- * @openapi
- * /api/users/me:
- *   get:
- *     tags:
- *       - User Management
- *     summary: Get current user profile
- *     description: Retrieves the authenticated user's profile information
- *     operationId: getCurrentUser
- *     security:
- *       - bearerAuth: []
- *     responses:
- *       200:
- *         description: Successfully retrieved user profile
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 code:
- *                   type: string
- *                   example: Ok
- *                 data:
- *                   type: object
- *                   properties:
- *                     me:
- *                       $ref: '#/components/schemas/User'
- *       403:
- *         description: Invalid or missing JWT token
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 code:
- *                   type: string
- *                   example: Forbidden
- *                 message:
- *                   type: string
- *                   example: Invalid JWT authorization. Please sign in to obtain new JWT.
- *       500:
- *         description: Internal server error
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 error:
- *                   type: string
- *                   example: Internal Server Error
- *                 message:
- *                   type: string
- *                   example: The server was unable to complete your request. Please try again later.
- *   put:
- *     tags:
- *       - User Management
- *     summary: Update user profile
- *     description: Updates the authenticated user's profile information
- *     operationId: updateUserProfile
- *     security:
- *       - bearerAuth: []
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             properties:
- *               email:
- *                 type: string
- *                 format: email
- *                 description: New email address
- *                 example: newemail@example.com
- *               language:
- *                 type: string
- *                 description: Preferred language setting
- *                 example: en
- *               name:
- *                 type: string
- *                 description: User's display name
- *                 example: John Doe
- *               currentPassword:
- *                 type: string
- *                 format: password
- *                 description: Current password (required for password change)
- *                 example: currentPassword123
- *               newPassword:
- *                 type: string
- *                 format: password
- *                 description: New password
- *                 example: newPassword456
- *     responses:
- *       200:
- *         description: User profile updated successfully or no changes made
- *         content:
- *           application/json:
- *             schema:
- *               oneOf:
- *                 - type: object
- *                   description: Profile updated successfully
- *                   properties:
- *                     code:
- *                       type: string
- *                       example: Ok
- *                     message:
- *                       type: string
- *                       example: User successfully saved. Password updated.
- *                     data:
- *                       type: object
- *                       properties:
- *                         me:
- *                           $ref: '#/components/schemas/User'
- *                 - type: object
- *                   description: No changes made
- *                   properties:
- *                     code:
- *                       type: string
- *                       example: Ok
- *                     message:
- *                       type: string
- *                       example: No changed properties supplied. User remains unchanged.
- *       400:
- *         description: Bad request - validation errors
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 code:
- *                   type: string
- *                   example: Bad Request
- *                 message:
- *                   type: string
- *                   example: Current password is incorrect
- *       403:
- *         description: Invalid or missing JWT token
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/ForbiddenError'
- *       500:
- *         description: Internal server error
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/InternalServerError'
- *   delete:
- *     tags:
- *       - User Management
- *     summary: Delete user account
- *     description: Permanently deletes the authenticated user's account
- *     operationId: deleteUserAccount
- *     security:
- *       - bearerAuth: []
- *     requestBody:
- *       required: true
- *       content:
- *         application/x-www-form-urlencoded:
- *           schema:
- *             type: object
- *             required:
- *               - password
- *             properties:
- *               password:
- *                 type: string
- *                 format: password
- *                 description: Current password for account deletion confirmation
- *                 example: myCurrentPassword123
- *     responses:
- *       200:
- *         description: Account successfully deleted
- *         content:
- *           application/json:
- *             schema:
- *               type: "null"
- *               description: Empty response indicating successful deletion
- *       400:
- *         description: Bad request - missing password
- *         content:
- *           text/plain:
- *             schema:
- *               type: string
- *               example: Bad Request
- *       401:
- *         description: Unauthorized - incorrect password
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 message:
- *                   type: string
- *                   example: Password incorrect
- *       403:
- *         description: Invalid or missing JWT token
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/ForbiddenError'
- *       500:
- *         description: Internal server error
- *         content:
- *           text/plain:
- *             schema:
- *               type: string
- *               example: Internal Server Error
- * components:
- *   securitySchemes:
- *     bearerAuth:
- *       type: http
- *       scheme: bearer
- *       bearerFormat: JWT
- *       description: JWT token obtained from sign-in endpoint
- *   schemas:
- *     User:
- *       type: object
- *       description: User profile information
- *       properties:
- *         id:
- *           type: string
- *           description: Unique user identifier
- *           example: user_123456
- *         email:
- *           type: string
- *           format: email
- *           description: User's email address
- *           example: user@example.com
- *         name:
- *           type: string
- *           description: User's display name
- *           example: John Doe
- *         language:
- *           type: string
- *           description: User's preferred language
- *           example: en
- *         createdAt:
- *           type: string
- *           format: date-time
- *           description: Account creation timestamp
- *           example: 2024-01-15T10:30:00Z
- *         updatedAt:
- *           type: string
- *           format: date-time
- *           description: Last account update timestamp
- *           example: 2024-01-20T14:45:00Z
- *     ForbiddenError:
- *       type: object
- *       properties:
- *         code:
- *           type: string
- *           example: Forbidden
- *         message:
- *           type: string
- *           example: Invalid JWT authorization. Please sign in to obtain new JWT.
- *     InternalServerError:
- *       type: object
- *       properties:
- *         error:
- *           type: string
- *           example: Internal Server Error
- *         message:
- *           type: string
- *           example: The server was unable to complete your request. Please try again later.
- */
-export const loader: LoaderFunction = async ({
-	request,
-}: LoaderFunctionArgs) => {
+const messages = {
+	noChanges: 'No changed properties supplied. User remains unchanged.',
+	badRequest: 'Bad Request',
+	currentPasswordRequired:
+		'Current password is required when setting a new password',
+	passwordIncorrect: 'Password incorrect',
+} as const
+
+const GetMeResponseSchema = z
+	.object({
+		code: z.literal('Ok').default('Ok'),
+		data: z.object({
+			me: UserWithBoxesSchema,
+		}),
+	})
+	.meta({
+		id: 'GetCurrentUserResponse',
+		description: 'Current authenticated user including device ids.',
+	})
+
+const UpdateCurrentUserRequestSchema = z
+	.object({
+		email: z.email().optional().meta({
+			description: 'New email address',
+			example: 'newemail@example.com',
+		}),
+		language: UserLanguageSchema.optional(),
+		name: z
+			.string()
+			.min(1)
+			.refine((value) => value === value.trim(), {
+				message: 'Name must not start or end with whitespace',
+			})
+			.optional(),
+		currentPassword: z.string().min(1).optional().meta({
+			description: 'Current password, required when setting a new password',
+			example: 'currentPassword123',
+			format: 'password',
+		}),
+		newPassword: NewPasswordSchema.optional(),
+		newsletterOptIn: z.boolean().optional().meta({
+			description:
+				'Whether to request or disable newsletter messages. Enabling sends a double opt-in confirmation email before the subscription becomes active.',
+			example: true,
+		}),
+	})
+	.superRefine((data, ctx) => {
+		if (data.email && data.newPassword) {
+			ctx.addIssue({
+				code: 'custom',
+				message:
+					'You cannot change your email address and password in the same request.',
+			})
+			return
+		}
+
+		if (data.newPassword && !data.currentPassword) {
+			ctx.addIssue({
+				code: 'custom',
+				path: ['currentPassword'],
+				message: messages.currentPasswordRequired,
+			})
+		}
+	})
+	.meta({
+		id: 'UpdateCurrentUserRequest',
+		description: 'Payload for updating the authenticated user profile.',
+	})
+
+const UpdateCurrentUserResponseSchema = z
+	.object({
+		code: z.literal('Ok').default('Ok'),
+		message: z.string().meta({
+			example: 'User successfully saved. Password updated.',
+		}),
+		data: z
+			.object({
+				me: UserSchema,
+			})
+			.optional(),
+	})
+	.meta({
+		id: 'UpdateCurrentUserResponse',
+		description:
+			'Response returned after updating the current user. `data` is omitted when no changed properties are supplied.',
+	})
+
+const DeleteCurrentUserRequestSchema = z
+	.object({
+		password: z.string().min(1, messages.badRequest).meta({
+			description: 'Current password for account deletion confirmation',
+			example: 'myCurrentPassword123',
+			format: 'password',
+		}),
+	})
+	.meta({
+		id: 'DeleteCurrentUserRequest',
+		description: 'Payload for deleting the authenticated user account.',
+	})
+
+export const openapi: ZodOpenApiPathItemObject = {
+	get: {
+		tags: ['User Management'],
+		summary: 'Get current user profile',
+		description:
+			"Retrieves the authenticated user's profile information, including the ids of the user's devices.",
+		security: [{ bearerAuth: [] }],
+
+		responses: {
+			200: {
+				description: 'Successfully retrieved user profile.',
+				content: {
+					'application/json': {
+						schema: GetMeResponseSchema,
+					},
+				},
+			},
+
+			403: forbiddenResponse(
+				ForbiddenErrorSchema,
+				'Invalid or missing JWT authorization.',
+			),
+
+			500: internalServerErrorResponse(
+				InternalServerErrorSchema,
+				'Internal server error.',
+			),
+		},
+	},
+
+	put: {
+		tags: ['User Management'],
+		summary: 'Update current user profile',
+		description:
+			"Updates the authenticated user's profile information. To change the password, `currentPassword` must be supplied together with `newPassword`.",
+		security: [{ bearerAuth: [] }],
+
+		requestBody: {
+			required: true,
+			content: {
+				'application/json': {
+					schema: UpdateCurrentUserRequestSchema,
+				},
+			},
+		},
+
+		responses: {
+			200: {
+				description:
+					'User profile updated successfully, or no changed properties were supplied.',
+				content: {
+					'application/json': {
+						schema: UpdateCurrentUserResponseSchema,
+					},
+				},
+			},
+
+			400: badRequestResponse(
+				BadRequestErrorSchema,
+				'Bad request. This can happen for invalid JSON, invalid request data, missing current password for password changes, or rejected update data.',
+			),
+
+			403: forbiddenResponse(
+				ForbiddenErrorSchema,
+				'Invalid or missing JWT authorization.',
+			),
+
+			405: methodNotAllowedResponse(
+				MethodNotAllowedErrorSchema,
+				'Method not allowed.',
+			),
+
+			500: internalServerErrorResponse(
+				InternalServerErrorSchema,
+				'Internal server error.',
+			),
+		},
+	},
+
+	delete: {
+		tags: ['User Management'],
+		summary: 'Delete current user account',
+		description:
+			"Permanently deletes the authenticated user's account. The current password must be supplied as form data.",
+		security: [{ bearerAuth: [] }],
+
+		requestBody: {
+			required: true,
+			content: {
+				'application/x-www-form-urlencoded': {
+					schema: DeleteCurrentUserRequestSchema,
+				},
+			},
+		},
+
+		responses: {
+			200: {
+				description: 'Account successfully deleted.',
+				content: {
+					'application/json': {
+						schema: z.null().meta({
+							description:
+								'JSON null response indicating successful account deletion.',
+						}),
+					},
+				},
+			},
+
+			400: badRequestResponse(
+				BadRequestErrorSchema,
+				'Bad request. This can happen when the form body cannot be parsed or the password is missing.',
+			),
+
+			401: unauthorizedResponse(
+				UnauthorizedErrorSchema,
+				'Unauthorized. The provided password is incorrect.',
+			),
+
+			403: forbiddenResponse(
+				ForbiddenErrorSchema,
+				'Invalid or missing JWT authorization.',
+			),
+
+			405: methodNotAllowedResponse(
+				MethodNotAllowedErrorSchema,
+				'Method not allowed.',
+			),
+
+			500: internalServerErrorResponse(
+				InternalServerErrorSchema,
+				'Internal server error.',
+			),
+		},
+	},
+}
+
+const getBearerToken = (request: Request) => {
+	const rawAuthorizationHeader = request.headers.get('authorization')
+	if (!rawAuthorizationHeader) return undefined
+
+	const [scheme, token] = rawAuthorizationHeader.split(' ')
+	if (scheme?.toLowerCase() !== 'bearer' || !token) return undefined
+
+	return token
+}
+
+export const middleware: Route.MiddlewareFunction[] = [
+	requestContentTypeJson(['PUT']),
+	requestContentTypeJsonOrForm(['DELETE']),
+]
+
+export const loader = async ({ request }: Route.LoaderArgs) => {
 	try {
-		const jwtResponse = await getUserFromJwt(request)
+		return await withAuthenticatedUser(request, async (user) => {
+			const deviceIds = await getUserDeviceIds(user.id)
 
-		if (typeof jwtResponse === 'string')
-			return StandardResponse.forbidden(
-				'Invalid JWT authorization. Please sign in to obtain new JWT.',
-			)
+			const responseParsed = await GetMeResponseSchema.safeParseAsync({
+				code: 'Ok',
+				data: {
+					me: {
+						...transformUserToApiFormat(user),
+						boxes: deviceIds,
+					},
+				},
+			})
 
-		return StandardResponse.ok({ code: 'Ok', data: { me: jwtResponse } })
-	} catch (err) {
-		console.warn(err)
+			if (!responseParsed.success) {
+				return StandardResponse.internalServerError()
+			}
+
+			return StandardResponse.ok(responseParsed.data)
+		})
+	} catch {
 		return StandardResponse.internalServerError()
 	}
 }
 
-export const action: ActionFunction = async ({
-	request,
-}: ActionFunctionArgs) => {
-	const loaderValue = (await loader({
-		request,
-	} as LoaderFunctionArgs)) as Response
-	if (loaderValue.status !== 200) return loaderValue
+export const action = async ({ request }: Route.ActionArgs) => {
+	return await withAuthenticatedUser(request, async (user) => {
+		switch (request.method) {
+			case 'PUT':
+				return await put(user, request)
 
-	const user = (await loaderValue.json()).data.me as User
+			case 'DELETE':
+				return await del(user, request)
 
-	switch (request.method) {
-		case 'PUT':
-			return await put(user, request)
-		case 'DELETE':
-			return await del(user, request)
-		default:
-			return StandardResponse.methodNotAllowed('Method Not Allowed')
-	}
+			default:
+				return StandardResponse.methodNotAllowed('Method Not Allowed')
+		}
+	})
 }
 
 const put = async (user: User, request: Request): Promise<Response> => {
-	const { email, language, name, currentPassword, newPassword } =
-		await request.json()
 	try {
-		const rawAuthorizationHeader = request.headers.get('authorization')
-		if (!rawAuthorizationHeader) throw new Error('no_token')
-		const [, jwtString] = rawAuthorizationHeader.split(' ')
-
-		const { updated, messages, updatedUser } = await updateUserDetails(
-			user,
-			jwtString,
-			{
-				email,
-				language,
-				name,
-				currentPassword,
-				newPassword,
-			},
+		const requestData = await parseJsonBody(
+			request,
+			UpdateCurrentUserRequestSchema,
 		)
-		const messageText = messages.join('.')
 
-		if (updated === false) {
-			if (messages.length > 0) {
+		if (requestData instanceof Response) {
+			return requestData
+		}
+
+		const jwtString = getBearerToken(request)
+
+		if (!jwtString) {
+			return StandardResponse.forbidden(apiMessages.invalidJwt)
+		}
+
+		const {
+			updated,
+			messages: updateMessages,
+			updatedUser,
+		} = await updateUserDetails(user, jwtString, requestData)
+
+		const messageText = updateMessages.join('.')
+
+		if (updated === false || updateMessages.length === 0) {
+			if (updated === false && updateMessages.length > 0) {
 				return StandardResponse.badRequest(messageText)
 			}
 
-			return StandardResponse.ok({
-				code: 'Ok',
-				message: 'No changed properties supplied. User remains unchanged.',
-			})
+			const responseParsed =
+				await UpdateCurrentUserResponseSchema.safeParseAsync({
+					code: 'Ok',
+					message: messages.noChanges,
+				})
+
+			if (!responseParsed.success) {
+				return StandardResponse.internalServerError()
+			}
+
+			return StandardResponse.ok(responseParsed.data)
 		}
 
-		return StandardResponse.ok({
-			code: 'Ok',
-			message: `User successfully saved. ${messageText}`,
-			data: { me: updatedUser },
-		})
-	} catch (err) {
-		console.warn(err)
+		const responseParsed = await UpdateCurrentUserResponseSchema.safeParseAsync(
+			{
+				code: 'Ok',
+				message: `User successfully saved. ${messageText}`,
+				data: { me: transformUserToApiFormat(updatedUser) },
+			},
+		)
+
+		if (!responseParsed.success) {
+			return StandardResponse.internalServerError()
+		}
+
+		return StandardResponse.ok(responseParsed.data)
+	} catch {
 		return StandardResponse.internalServerError()
 	}
 }
 
-const del = async (user: User, r: Request): Promise<Response> => {
+const del = async (user: User, request: Request): Promise<Response> => {
 	try {
-		let formData = new FormData()
-		try {
-			formData = await r.formData()
-		} catch {
-			// Just continue, it will fail in the next check
+		const requestData = await parseFormRequest(
+			request,
+			DeleteCurrentUserRequestSchema,
+		)
+
+		if (requestData instanceof Response) {
+			return requestData
 		}
 
-		if (
-			!formData.has('password') ||
-			formData.get('password')?.toString().length === 0
-		)
-			return StandardResponse.badRequest('Bad Request')
+		const jwtString = getBearerToken(request)
 
-		const rawAuthorizationHeader = r.headers.get('authorization')
-		if (!rawAuthorizationHeader) throw new Error('no_token')
-		const [, jwtString] = rawAuthorizationHeader.split(' ')
+		if (!jwtString) {
+			return StandardResponse.forbidden(apiMessages.invalidJwt)
+		}
 
-		const deleted = await deleteUser(
-			user,
-			formData.get('password')!.toString(), // ! operator is fine, we check formData.has above
-			jwtString,
-		)
+		const deleted = await deleteUser(user, requestData.password, jwtString)
 
-		if (deleted === 'unauthorized')
-			return StandardResponse.unauthorized('Password incorrect')
+		if (deleted === 'unauthorized') {
+			return StandardResponse.unauthorized(apiMessages.passwordIncorrect)
+		}
 
 		return StandardResponse.ok(null)
-	} catch (err) {
-		console.warn(err)
+	} catch {
 		return StandardResponse.internalServerError()
 	}
 }

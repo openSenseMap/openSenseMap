@@ -1,12 +1,13 @@
-import { type Params, type LoaderFunctionArgs } from 'react-router'
+import { type Params } from 'react-router'
 import { generateTestUserCredentials } from 'tests/data/generate_test_user'
-import { BASE_URL } from 'vitest.setup'
-import { registerUser } from '~/lib/user-service.server'
-import { createDevice, deleteDevice } from '~/models/device.server'
-import { getSensors } from '~/models/sensor.server'
-import { deleteUserByEmail } from '~/models/user.server'
+import { type Route } from '../../.react-router/types/app/routes/+types/api.boxes.$deviceId.sensors.$sensorId'
+import { BASE_URL } from '../../vitest.setup'
+import { createDevice, deleteDevice } from '~/db/models/device.server'
+import { getSensors } from '~/db/models/sensor.server'
+import { deleteUserByEmail } from '~/db/models/user.server'
+import { type Sensor, type Device } from '~/db/schema'
 import { loader } from '~/routes/api.boxes.$deviceId.sensors.$sensorId'
-import { type Sensor, type Device, type User } from '~/schema'
+import { registerUser } from '~/services/user-service.server'
 
 const DEVICE_SENSORS_ID_USER = generateTestUserCredentials()
 
@@ -50,7 +51,7 @@ describe('openSenseMap API Routes: /boxes/:deviceId/sensors/:sensorId', () => {
 			DEVICE_SENSORS_ID_USER.email,
 			DEVICE_SENSORS_ID_USER.password,
 			'en_US',
-			true
+			true,
 		)
 
 		expect(registration.ok).toBe(true)
@@ -83,7 +84,7 @@ describe('openSenseMap API Routes: /boxes/:deviceId/sensors/:sensorId', () => {
 					deviceId: `${deviceId}`,
 					sensorId: `${sensors[0].id}`,
 				} as Params<string>,
-			} as LoaderFunctionArgs) // Assuming a separate loader for single sensor
+			} as Route.LoaderArgs) // Assuming a separate loader for single sensor
 			const response = dataFunctionValue as Response
 			const body = await response?.json()
 
@@ -109,7 +110,7 @@ describe('openSenseMap API Routes: /boxes/:deviceId/sensors/:sensorId', () => {
 					deviceId: `${deviceId}`,
 					sensorId: `${sensors[0].id}`,
 				} as Params<string>,
-			} as LoaderFunctionArgs)
+			} as Route.LoaderArgs) // Assuming a separate loader for single sensor
 			const response = dataFunctionValue as Response
 			const body = await response?.json()
 

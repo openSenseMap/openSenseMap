@@ -2,10 +2,8 @@
 	"features": "Features",
 	"description": "Die openSenseMap-Plattform hat viel zu bieten, was die Auffindbarkeit und den Austausch von Umwelt- und Sensordaten einfach macht.",
 	"dataAggregation": "Erfassung von Daten",
-	"noDataRetention": "Keine Datenrückhaltung",
 	"dataPublished": "Veröffentlichung der Daten als ODbL",
 	"discoverDevices": "Entdecke Geräte",
-	"compareDevices": "Vergleiche Geräte",
 	"downloadOptions": "Downloadoptionen",
 	"httpRestApi": "HTTP REST API"
 }

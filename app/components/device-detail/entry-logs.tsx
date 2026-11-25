@@ -1,6 +1,6 @@
-import { useMediaQuery } from '@mantine/hooks'
 import { Activity, Clock, ExternalLink } from 'lucide-react'
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Button } from '../ui/button'
 import {
 	Dialog,
@@ -10,25 +10,10 @@ import {
 	DialogTitle,
 	DialogTrigger,
 } from '../ui/dialog'
-import {
-	Drawer,
-	DrawerClose,
-	DrawerContent,
-	DrawerDescription,
-	DrawerFooter,
-	DrawerHeader,
-	DrawerTitle,
-	DrawerTrigger,
-} from '../ui/drawer'
-import {
-	Tooltip,
-	TooltipContent,
-	TooltipProvider,
-	TooltipTrigger,
-} from '../ui/tooltip'
+import { Tooltip, TooltipContent, TooltipTrigger } from '../ui/tooltip'
 import { Card } from '@/components/ui/card'
 import { ScrollArea } from '@/components/ui/scroll-area'
-import { type LogEntry } from '~/schema/log-entry'
+import { type LogEntry } from '~/db/schema/log-entry'
 
 export default function EntryLogs({
 	entryLogs = [],
@@ -36,126 +21,87 @@ export default function EntryLogs({
 	entryLogs: LogEntry[]
 }) {
 	const [open, setOpen] = useState(false)
-	const isDesktop = useMediaQuery('(min-width: 768px)')
+	const { t, i18n } = useTranslation('device-detail-box')
+	const latestEntry = entryLogs[0]
 
-	if (isDesktop) {
-		return (
-			<div className="flex flex-col">
-				<p className="pb-4 font-bold">Logs</p>
-				<div className="flex items-center">
-					<div className="flex w-full items-start space-x-4">
-						<div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border-4 border-muted-foreground text-muted-foreground">
-							<Activity className="h-5 w-5" />
-						</div>
-						<div className="flex-grow">
-							<p className="mb-2 text-sm font-medium">
-								{entryLogs[entryLogs.length - 1].content}
-							</p>
-							<div className="flex items-center text-xs text-muted-foreground">
-								<Clock className="mr-1 h-3 w-3" />
-								{new Date(entryLogs[0].createdAt).toLocaleString()}
-							</div>
-						</div>
-					</div>
-					<div className="shrink">
-						<Dialog open={open} onOpenChange={setOpen}>
-							<DialogTrigger asChild>
-								<Button variant="ghost">
-									<TooltipProvider>
-										<Tooltip>
-											<TooltipTrigger>
-												{' '}
-												<ExternalLink className="ml-2 h-5 w-5" />
-											</TooltipTrigger>
-											<TooltipContent className="z-auto overflow-visible">
-												<p>Show all logs.</p>
-											</TooltipContent>
-										</Tooltip>
-									</TooltipProvider>
-								</Button>
-							</DialogTrigger>
-							<DialogContent className="sm:max-w-2/3">
-								<DialogHeader>
-									<DialogTitle>Device Logs</DialogTitle>
-									<DialogDescription>
-										If this is your device, you can make changes in your device
-										settings.
-									</DialogDescription>
-								</DialogHeader>
-								<LogList entryLogs={entryLogs} />
-							</DialogContent>
-						</Dialog>
-					</div>
-				</div>
-			</div>
-		)
-	}
+	if (!latestEntry) return null
 
 	return (
 		<div className="flex flex-col">
-			<p className="pb-4 font-bold">Logs</p>
-			<div className="flex items-center">
-				<div className="flex w-full items-start space-x-4">
-					<div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary">
-						<Activity className="h-5 w-5 text-primary-foreground" />
+			<p className="pb-4 font-bold">{t('logs')}</p>
+			<div className="flex min-w-0 items-center">
+				<div className="flex min-w-0 flex-1 items-start space-x-4">
+					<div className="border-muted-foreground text-muted-foreground flex h-10 w-10 shrink-0 items-center justify-center rounded-full border-4">
+						<Activity className="h-5 w-5" />
 					</div>
-					<div className="flex-grow">
-						<p className="mb-2 text-sm font-medium">{entryLogs[0].content}</p>
-						<div className="flex items-center text-xs text-muted-foreground">
+					<div className="min-w-0 grow">
+						<p className="mb-2 text-sm font-medium wrap-break-word">
+							{latestEntry.content}
+						</p>
+						<div className="text-muted-foreground flex items-center text-xs">
 							<Clock className="mr-1 h-3 w-3" />
-							{new Date(entryLogs[0].createdAt).toLocaleString()}
+							{new Date(latestEntry.createdAt).toLocaleString(i18n.language)}
 						</div>
 					</div>
 				</div>
-				<div className="shrink"></div>
-				<Drawer open={open} onOpenChange={setOpen}>
-					<DrawerTrigger asChild>
-						<Button variant="ghost">
-							<ExternalLink className="ml-2 h-5 w-5" />
-						</Button>
-					</DrawerTrigger>
-					<DrawerContent>
-						<DrawerHeader className="text-left">
-							<DrawerTitle>Device Logs</DrawerTitle>
-							<DrawerDescription>
-								If this is your device, you can make changes in your device
-								settings.
-							</DrawerDescription>
-						</DrawerHeader>
-						<LogList entryLogs={entryLogs} />
-						<DrawerFooter className="pt-2">
-							<DrawerClose asChild>
-								<Button variant="outline">Close</Button>
-							</DrawerClose>
-						</DrawerFooter>
-					</DrawerContent>
-				</Drawer>
+				<Dialog open={open} onOpenChange={setOpen}>
+					<Tooltip>
+						<TooltipTrigger asChild>
+							<DialogTrigger asChild>
+								<Button
+									variant="ghost"
+									size="icon"
+									className="shrink-0"
+									aria-label={t('show_all_logs')}
+								>
+									<ExternalLink className="h-5 w-5" />
+								</Button>
+							</DialogTrigger>
+						</TooltipTrigger>
+						<TooltipContent>
+							<p>{t('show_all_logs')}</p>
+						</TooltipContent>
+					</Tooltip>
+					<DialogContent className="sm:max-w-2/3">
+						<DialogHeader>
+							<DialogTitle>{t('device_logs')}</DialogTitle>
+							<DialogDescription>{t('logs_owner_hint')}</DialogDescription>
+						</DialogHeader>
+						<LogList entryLogs={entryLogs} locale={i18n.language} />
+					</DialogContent>
+				</Dialog>
 			</div>
 		</div>
 	)
 }
 
-function LogList({ entryLogs = [] }: { entryLogs: LogEntry[] }) {
+function LogList({
+	entryLogs = [],
+	locale,
+}: {
+	entryLogs: LogEntry[]
+	locale: string
+}) {
 	return (
-		<ScrollArea className="h-[300px] w-full rounded-md border p-4">
+		<ScrollArea className="h-75 w-full rounded-md border p-4">
 			<div className="space-y-4 pr-4">
 				{entryLogs.map((log, index) => (
 					<div key={log.id} className="relative flex items-start space-x-4">
-						<div className="z-10 flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary">
-							<Activity className="h-5 w-5 text-primary-foreground" />
+						<div className="bg-primary z-10 flex h-10 w-10 shrink-0 items-center justify-center rounded-full">
+							<Activity className="text-primary-foreground h-5 w-5" />
 						</div>
-						<div className="flex-grow">
+						<div className="grow">
 							<Card className="p-4 shadow-lg transition-all duration-300 hover:-translate-y-1 hover:shadow-xl">
 								<p className="mb-2 text-sm font-medium">{log.content}</p>
-								<div className="flex items-center text-xs text-muted-foreground">
+								<div className="text-muted-foreground flex items-center text-xs">
 									<Clock className="mr-1 h-3 w-3" />
-									{new Date(log.createdAt).toLocaleString()}
+									{new Date(log.createdAt).toLocaleString(locale)}
 								</div>
 							</Card>
 						</div>
 						{index < entryLogs.length - 1 && (
 							<div
-								className="absolute bottom-0 left-5 top-10 w-[1px] bg-border"
+								className="bg-border absolute top-10 bottom-0 left-5 w-px"
 								aria-hidden="true"
 							/>
 						)}

@@ -5,7 +5,6 @@ import { Switch } from '~/components/ui/switch'
 import {
 	Tooltip,
 	TooltipContent,
-	TooltipProvider,
 	TooltipTrigger,
 } from '~/components/ui/tooltip'
 
@@ -44,7 +43,7 @@ export default function MapLegend({
 
 	return (
 		<Card
-			className={`absolute w-40 ${positionClasses[position]} rounded-lg bg-white bg-opacity-90 p-2 shadow-md`}
+			className={`absolute w-40 ${positionClasses[position]} bg-opacity-90 rounded-lg bg-white p-2 shadow-md`}
 		>
 			<div className="flex items-center justify-between">
 				<h3 className="text-sm font-semibold">Trips</h3>
@@ -53,28 +52,25 @@ export default function MapLegend({
 					checked={showOriginalColors}
 					onCheckedChange={toggleTrips}
 				/>
-				<TooltipProvider>
-					<Tooltip>
-						<TooltipTrigger asChild>
-							<Button variant="ghost" size="icon">
-								<Info className="h-4 w-4" />
-								<span className="sr-only">Toggle color information</span>
-							</Button>
-						</TooltipTrigger>
-						<TooltipContent side="bottom">
-							{showOriginalColors ? (
-								<p>
-									We have tried to organise your data into trips. This may not
-									be accurate.
-								</p>
-							) : (
-								<p>
-									You are viewing raw data right now. Activate to see trips.
-								</p>
-							)}
-						</TooltipContent>
-					</Tooltip>
-				</TooltipProvider>
+
+				<Tooltip>
+					<TooltipTrigger asChild>
+						<Button variant="ghost" size="icon">
+							<Info className="h-4 w-4" />
+							<span className="sr-only">Toggle color information</span>
+						</Button>
+					</TooltipTrigger>
+					<TooltipContent side="bottom">
+						{showOriginalColors ? (
+							<p>
+								We have tried to organise your data into trips. This may not be
+								accurate.
+							</p>
+						) : (
+							<p>You are viewing raw data right now. Activate to see trips.</p>
+						)}
+					</TooltipContent>
+				</Tooltip>
 			</div>
 			{showOriginalColors && (
 				<ul className="flex flex-wrap gap-2">

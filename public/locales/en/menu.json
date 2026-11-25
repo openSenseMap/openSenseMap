@@ -3,7 +3,9 @@
 	"subtitle": "Please sign in to see more content",
 	"explore_label": "Explore",
 	"profile_label": "Profile",
+	"about_label": "About",
 	"settings_label": "Settings",
+	"download_label": "Download data",
 	"my_devices_label": "My Devices",
 	"add_device_label": "Add Device",
 	"tutorials_label": "Tutorials",
@@ -17,8 +19,12 @@
 	"promotion_label": "Promotion",
 	"login_label": "Log in",
 	"logout_label": "Log out",
-
 	"toast_login_success": "Successfully logged in",
 	"toast_logout_success": "Successfully logged out",
-	"toast_user_creation_success": "Successfully created account"
+	"toast_user_creation_success": "Successfully created account",
+	"community_label": "Community Forum",
+	"devices": "Devices",
+	"measurements": "Measurements",
+	"returnToGlobeView": "Return to globe view",
+	"zoomToMyArea": "Zoom to my area"
 }

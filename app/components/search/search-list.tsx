@@ -1,166 +1,167 @@
 import { Cpu, Globe, MapPin } from 'lucide-react'
-import { useState, useEffect, useCallback, useContext } from 'react'
-import { useMap } from 'react-map-gl'
+import { useCallback, useContext, useEffect, useMemo } from 'react'
+import { useMap } from 'react-map-gl/maplibre'
 import { useMatches, useNavigate, useSearchParams } from 'react-router'
 import { useGlobalCompareMode } from '../device-detail/useGlobalCompareMode'
 import { NavbarContext } from '../header/nav-bar'
 import useKeyboardNav from '../header/nav-bar/use-keyboard-nav'
 import SearchListItem from './search-list-item'
 import { goTo } from '~/lib/search-map-helper'
+import {
+	type DeviceSearchResult,
+	type LocationSearchResult,
+	type SearchResult,
+} from './search-types'
 
 interface SearchListProps {
-	searchResultsLocation: any[]
-	searchResultsDevice: any[]
+	searchResultsLocation: LocationSearchResult[]
+	searchResultsDevice: DeviceSearchResult[]
 }
 
 export default function SearchList(props: SearchListProps) {
 	const { osem } = useMap()
 	const navigate = useNavigate()
+	const matches = useMatches()
+	const [searchParams] = useSearchParams()
 	const { setOpen } = useContext(NavbarContext)
 	const [compareMode] = useGlobalCompareMode()
-	const matches = useMatches()
+
+	const searchResultsAll = useMemo<SearchResult[]>(
+		() => [...props.searchResultsDevice, ...props.searchResultsLocation],
+		[props.searchResultsDevice, props.searchResultsLocation],
+	)
+
+	const length = searchResultsAll.length
 
 	const { cursor, setCursor, enterPress, controlPress } = useKeyboardNav(
 		0,
 		0,
-		props.searchResultsDevice.length + props.searchResultsLocation.length,
+		length,
 	)
 
-	const length =
-		props.searchResultsDevice.length + props.searchResultsLocation.length
-	const searchResultsAll = props.searchResultsDevice.concat(
-		props.searchResultsLocation,
-	)
-	const [selected, setSelected] = useState(searchResultsAll[cursor])
-	const [searchParams] = useSearchParams()
-	const [navigateTo, setNavigateTo] = useState(
-		compareMode
-			? `/explore/${matches[2].params.deviceId}/compare/${selected.deviceId}`
-			: selected.type === 'device'
-				? `/explore/${selected.deviceId + '?' + searchParams.toString()}}`
-				: `/explore?${searchParams.toString()}`,
-	)
+	const selected = searchResultsAll[cursor]
+
+	const closeSearch = useCallback(() => {
+		setOpen(false)
+	}, [setOpen])
 
 	const handleNavigate = useCallback(
-		(result: any) => {
-			return compareMode
-				? `/explore/${matches[2].params.deviceId}/compare/${selected.deviceId}`
-				: result.type === 'device'
-					? `/explore/${result.deviceId + '?' + searchParams.toString()}`
-					: `/explore?${searchParams.toString()}`
+		(result: SearchResult) => {
+			const params = searchParams.toString()
+			const suffix = params ? `?${params}` : ''
+
+			if (result.type === 'device') {
+				const baseDeviceId = matches[2]?.params?.deviceId
+
+				if (compareMode && baseDeviceId) {
+					return `/explore/${baseDeviceId}/compare/${result.deviceId}`
+				}
+
+				return `/explore/${result.deviceId}${suffix}`
+			}
+
+			return `/explore${suffix}`
 		},
-		[searchParams, compareMode, matches, selected],
+		[searchParams, compareMode, matches],
 	)
 
-	const setShowSearchCallback = useCallback(
-		(state: boolean) => {
-			setOpen(state)
+	const selectResult = useCallback(
+		(result: SearchResult) => {
+			goTo(osem, result)
+			closeSearch()
+			void navigate(handleNavigate(result))
 		},
-		[setOpen],
+		[osem, closeSearch, navigate, handleNavigate],
 	)
 
 	const handleDigitPress = useCallback(
-		(event: any) => {
+		(event: KeyboardEvent) => {
+			const digit = Number(event.key)
+
 			if (
-				typeof Number(event.key) === 'number' &&
-				Number(event.key) <= length &&
-				controlPress
+				!controlPress ||
+				!Number.isInteger(digit) ||
+				digit < 1 ||
+				digit > length
 			) {
-				event.preventDefault()
-				setCursor(Number(event.key) - 1)
-				goTo(osem, searchResultsAll[Number(event.key) - 1])
-				setTimeout(() => {
-					setShowSearchCallback(false)
-					void navigate(handleNavigate(searchResultsAll[Number(event.key) - 1]))
-				}, 500)
+				return
 			}
+
+			event.preventDefault()
+
+			const result = searchResultsAll[digit - 1]
+
+			setCursor(digit - 1)
+			goTo(osem, result)
+
+			window.setTimeout(() => {
+				closeSearch()
+				void navigate(handleNavigate(result))
+			}, 500)
 		},
 		[
 			controlPress,
 			length,
-			navigate,
-			osem,
 			searchResultsAll,
 			setCursor,
-			setShowSearchCallback,
+			osem,
+			closeSearch,
+			navigate,
 			handleNavigate,
 		],
 	)
 
 	useEffect(() => {
-		setSelected(searchResultsAll[cursor])
-	}, [cursor, searchResultsAll])
-
-	useEffect(() => {
-		const navigate = handleNavigate(selected)
-		setNavigateTo(navigate)
-	}, [selected, handleNavigate])
-
-	useEffect(() => {
-		if (length !== 0 && enterPress) {
-			goTo(osem, selected)
-			setShowSearchCallback(false)
-			void navigate(navigateTo)
+		if (length !== 0 && enterPress && selected) {
+			selectResult(selected)
 		}
-	}, [
-		enterPress,
-		osem,
-		navigate,
-		selected,
-		setShowSearchCallback,
-		navigateTo,
-		length,
-	])
+	}, [enterPress, length, selected, selectResult])
 
 	useEffect(() => {
-		// attach the event listener
 		window.addEventListener('keydown', handleDigitPress)
 
-		// remove the event listener
 		return () => {
 			window.removeEventListener('keydown', handleDigitPress)
 		}
-	})
+	}, [handleDigitPress])
 
 	return (
-		<div className="w-full overflow-visible rounded-[1.25rem] bg-white pb-2 text-black dark:bg-zinc-800 dark:text-zinc-200 dark:opacity-90">
+		<div className="max-h-[min(52dvh,22rem)] w-full overflow-y-auto overscroll-contain rounded-[1.25rem] bg-white pb-2 text-black dark:bg-zinc-800 dark:text-zinc-200 dark:opacity-90">
 			{props.searchResultsDevice.length > 0 && (
 				<hr className="solid mx-2 mb-2 border-t-2" />
 			)}
-			{props.searchResultsDevice.map((device: any, i) => (
+
+			{props.searchResultsDevice.map((device, index) => (
 				<SearchListItem
-					key={device.deviceId}
-					index={i}
-					active={i === cursor}
-					name={device.display_name}
+					key={device.id}
+					index={index}
+					active={index === cursor}
+					name={device.displayName}
 					icon={Cpu}
 					controlPress={controlPress}
-					onMouseEnter={() => setCursor(i)}
-					onClick={() => {
-						goTo(osem, device)
-						setShowSearchCallback(false)
-						void navigate(navigateTo)
-					}}
+					onMouseEnter={() => setCursor(index)}
+					onClick={() => selectResult(device)}
 				/>
 			))}
+
 			{props.searchResultsLocation.length > 0 && (
 				<hr className="solid m-2 border-t-2" />
 			)}
-			{props.searchResultsLocation.map((location: any, i) => {
+
+			{props.searchResultsLocation.map((location, index) => {
+				const globalIndex = index + props.searchResultsDevice.length
+				const Icon = location.locationKind === 'country' ? Globe : MapPin
+
 				return (
 					<SearchListItem
 						key={location.id}
-						index={i + props.searchResultsDevice.length}
-						active={i + props.searchResultsDevice.length === cursor}
-						name={location.place_name}
-						icon={location.place_type.includes('country') ? Globe : MapPin}
+						index={globalIndex}
+						active={globalIndex === cursor}
+						name={location.displayName}
+						icon={Icon}
 						controlPress={controlPress}
-						onMouseEnter={() => setCursor(i + props.searchResultsDevice.length)}
-						onClick={() => {
-							goTo(osem, location)
-							setShowSearchCallback(false)
-							void navigate(navigateTo)
-						}}
+						onMouseEnter={() => setCursor(globalIndex)}
+						onClick={() => selectResult(location)}
 					/>
 				)
 			})}

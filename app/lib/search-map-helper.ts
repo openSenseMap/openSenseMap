@@ -1,13 +1,12 @@
-import { type LngLatBounds, type LngLatLike, type MapRef } from 'react-map-gl'
+import { type LngLatLike, type MapRef } from 'react-map-gl/maplibre'
+import {
+	type SearchResult,
+	type SearchBBox,
+} from '~/components/search/search-types'
 
-/**
- * The function that is called when the user clicks on a location without bbox property in the search results. It flies the map to the location and closes the search results.
- *
- * @param center the coordinate of the center of the location to fly to
- */
 export const goToLocation = (map: MapRef | undefined, center: LngLatLike) => {
 	map?.flyTo({
-		center: center,
+		center,
 		animate: true,
 		speed: 1.6,
 		zoom: 20,
@@ -15,7 +14,6 @@ export const goToLocation = (map: MapRef | undefined, center: LngLatLike) => {
 	})
 }
 
-//function to zoom back out of map
 export const zoomOut = (map: MapRef | undefined) => {
 	map?.flyTo({
 		center: [0, 0],
@@ -26,33 +24,18 @@ export const zoomOut = (map: MapRef | undefined) => {
 	})
 }
 
-/**
- * The function that is called when the user clicks on a location with the bbox property in the search results. It flies the map to the location and closes the search results.
- *
- * @param bbox
- */
-export const goToLocationBBox = (
-	map: MapRef | undefined,
-	bbox: LngLatBounds,
-) => {
+export const goToLocationBBox = (map: MapRef | undefined, bbox: SearchBBox) => {
 	map?.fitBounds(bbox, {
 		animate: true,
 		speed: 1.6,
+		padding: 48,
 	})
 }
 
-/**
- * The function that is called when the user clicks on a device in the search results. It flies the map to the device and closes the search results.
- *
- * @param lng longitude of the device
- * @param lat latitude of the device
- * @param _id id of the device
- */
 export const goToDevice = (
 	map: MapRef | undefined,
 	lng: number,
 	lat: number,
-	_id: string,
 ) => {
 	map?.flyTo({
 		center: [lng, lat],
@@ -63,14 +46,16 @@ export const goToDevice = (
 	})
 }
 
-export const goTo = (map: MapRef | undefined, item: any) => {
+export const goTo = (map: MapRef | undefined, item: SearchResult) => {
 	if (item.type === 'device') {
-		goToDevice(map, item.lng, item.lat, item.deviceId)
-	} else if (item.type === 'location') {
-		if (item.bbox) {
-			goToLocationBBox(map, item.bbox)
-		} else {
-			goToLocation(map, item.center)
-		}
+		goToDevice(map, item.lng, item.lat)
+		return
 	}
+
+	if (item.bbox) {
+		goToLocationBBox(map, item.bbox)
+		return
+	}
+
+	goToLocation(map, item.center)
 }

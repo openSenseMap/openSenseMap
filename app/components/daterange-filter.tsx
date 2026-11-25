@@ -1,12 +1,12 @@
-import { PopoverClose } from '@radix-ui/react-popover'
-import { format } from 'date-fns'
-import { Clock } from 'lucide-react'
-import { useEffect, useState } from 'react'
-import { type DateRange } from 'react-day-picker'
-import { useLoaderData, useSearchParams, useSubmit } from 'react-router'
+import { format, type Locale } from 'date-fns'
+import { de, enGB } from 'date-fns/locale'
+import { CalendarIcon } from 'lucide-react'
+import { useEffect, useMemo, useState } from 'react'
+import { type DateRange } from '@daypicker/react'
+import { useLoaderData, useSearchParams } from 'react-router'
+
 import { Badge } from './ui/badge'
 import { Button } from './ui/button'
-import { Calendar } from './ui/calendar'
 import {
 	Command,
 	CommandEmpty,
@@ -15,46 +15,93 @@ import {
 	CommandItem,
 	CommandList,
 } from './ui/command'
+import { Input } from './ui/input'
 import { Popover, PopoverContent, PopoverTrigger } from './ui/popover'
 import { Separator } from './ui/separator'
-import dateTimeRanges from '~/lib/date-ranges'
+
+import { getDateTimeRanges } from '~/lib/date-ranges'
 import { type loader } from '~/routes/explore.$deviceId.$sensorId.$'
+import { useTranslation } from 'react-i18next'
+import { type TFunction } from 'i18next'
+
+function formatDateRange(t: TFunction, date?: DateRange) {
+	if (!date?.from) return t('pick_range')
+
+	if (date.to) {
+		return `${format(date.from, 'LLL dd, y HH:mm')} - ${format(
+			date.to,
+			'LLL dd, y HH:mm',
+		)}`
+	}
+
+	return format(date.from, 'LLL dd, y HH:mm')
+}
+
+function toDateTimeLocalValue(date?: Date) {
+	if (!date) return ''
+
+	return format(date, "yyyy-MM-dd'T'HH:mm")
+}
+
+function fromDateTimeLocalValue(value: string) {
+	if (!value) return undefined
+
+	const [datePart, timePart] = value.split('T')
+	const [year, month, day] = datePart.split('-').map(Number)
+	const [hours, minutes] = timePart.split(':').map(Number)
+
+	return new Date(year, month - 1, day, hours, minutes)
+}
+
+function getInitialDateRange(
+	loaderData: ReturnType<typeof useLoaderData<typeof loader>>,
+) {
+	if (loaderData.startDate || loaderData.endDate) {
+		return {
+			from: loaderData.startDate ? new Date(loaderData.startDate) : undefined,
+			to: loaderData.endDate ? new Date(loaderData.endDate) : undefined,
+		}
+	}
+
+	const data = loaderData.sensors?.[0]?.data ?? []
+
+	if (data.length === 0) return undefined
+
+	const timestamps = data
+		.map((measurement) => new Date(measurement.time!).getTime())
+		.filter(Number.isFinite)
+
+	if (timestamps.length === 0) return undefined
+
+	return {
+		from: new Date(Math.min(...timestamps)),
+		to: new Date(Math.max(...timestamps)),
+	}
+}
 
 export function DateRangeFilter() {
-	// Get data from the loader
 	const loaderData = useLoaderData<typeof loader>()
+	const [searchParams, setSearchParams] = useSearchParams()
+	const { t, i18n } = useTranslation('graph')
 
-	// Form submission handler
-	const submit = useSubmit()
-	const [searchParams] = useSearchParams()
+	const dateFnsLocale: Locale = i18n.language.startsWith('de') ? de : enGB
+
+	const dateTimeRanges = useMemo(() => {
+		return getDateTimeRanges(dateFnsLocale)
+	}, [dateFnsLocale])
 
 	const [open, setOpen] = useState(false)
 
-	// State for selected date range and aggregation
-	const [date, setDate] = useState<DateRange | undefined>({
-		from: loaderData.startDate ? new Date(loaderData.startDate) : undefined,
-		to: loaderData.endDate ? new Date(loaderData.endDate) : undefined,
-	})
+	const initialDateRange = useMemo(() => {
+		return getInitialDateRange(loaderData)
+	}, [loaderData])
 
-	if (
-		!date?.from &&
-		!date?.to &&
-		loaderData.sensors &&
-		loaderData.sensors.length > 0 &&
-		loaderData.sensors[0].data &&
-		loaderData.sensors[0].data.length > 0
-	) {
-		const firstDate = loaderData.sensors[0].data[0]?.time
-		const lastDate =
-			loaderData.sensors[0].data[loaderData.sensors[0].data.length - 1]?.time
+	const [date, setDate] = useState<DateRange | undefined>(initialDateRange)
 
-		setDate({
-			from: lastDate ? new Date(lastDate) : undefined,
-			to: firstDate ? new Date(firstDate) : undefined,
-		})
-	}
+	useEffect(() => {
+		setDate(initialDateRange)
+	}, [initialDateRange])
 
-	// Shortcut to open date range selection
 	useEffect(() => {
 		const down = (e: KeyboardEvent) => {
 			if (e.key === 'd' && (e.metaKey || e.ctrlKey)) {
@@ -70,99 +117,166 @@ export function DateRangeFilter() {
 		}
 	}, [])
 
-	// Update search params when date or aggregation changes
-	useEffect(() => {
+	function handleFromChange(value: string) {
+		setDate((previousDate) => ({
+			from: fromDateTimeLocalValue(value),
+			to: previousDate?.to,
+		}))
+	}
+
+	function handleToChange(value: string) {
+		setDate((previousDate) => ({
+			from: previousDate?.from,
+			to: fromDateTimeLocalValue(value),
+		}))
+	}
+
+	function applyDateRange() {
+		const nextSearchParams = new URLSearchParams(searchParams)
+
 		if (date?.from) {
-			searchParams.set('date_from', date?.from?.toISOString() ?? '')
+			nextSearchParams.set('date_from', date.from.toISOString())
+		} else {
+			nextSearchParams.delete('date_from')
 		}
+
 		if (date?.to) {
-			searchParams.set('date_to', date?.to?.toISOString() ?? '')
+			nextSearchParams.set('date_to', date.to.toISOString())
+		} else {
+			nextSearchParams.delete('date_to')
 		}
-	}, [date, searchParams])
+
+		setSearchParams(nextSearchParams)
+		setOpen(false)
+	}
+
+	function clearDateRange() {
+		setDate(undefined)
+	}
+
+	const isInvalidRange = Boolean(date?.from && date?.to && date.from > date.to)
 
 	return (
 		<Popover open={open} onOpenChange={setOpen}>
 			<PopoverTrigger asChild>
-				<Button variant="outline" size="sm" className="h-8">
-					<Clock className="mr-2 h-4 w-4" />
-					Time Range
-					<>
-						<Separator orientation="vertical" className="mx-2 h-4" />
-						<Badge variant="secondary" className="rounded-sm px-1 font-normal">
-							{date?.from ? (
-								date.to ? (
-									<>
-										{format(date.from, 'PPpp')} - {format(date.to, 'PPpp')}
-									</>
-								) : (
-									format(date.from, 'PPpp')
-								)
-							) : (
-								<span>Pick a date</span>
-							)}
-						</Badge>
-					</>
+				<Button
+					variant="outline"
+					size="sm"
+					className="no-drag h-8 justify-start gap-2 px-2.5 font-normal"
+				>
+					<CalendarIcon className="h-4 w-4" />
+
+					<span className="hidden sm:inline">{t('time_range')}</span>
+
+					<Separator orientation="vertical" className="mx-1 h-4" />
+
+					<Badge
+						variant="secondary"
+						className="max-w-[320px] truncate rounded-sm px-1 font-normal"
+					>
+						{formatDateRange(t, date)}
+					</Badge>
 				</Button>
 			</PopoverTrigger>
+
 			<PopoverContent
-				className="flex w-[500px] p-0"
+				className="no-drag z-50 w-90 max-w-[calc(100vw-2rem)] p-0"
 				align="start"
 				side="bottom"
 			>
-				<div className="flex flex-col rounded ring-1 dark:bg-dark-background dark:ring-white">
-					<div className="flex">
-						<div className="flex flex-col">
-							<div className="flex h-11 items-center justify-around border-b">
-								Absolute time range
-							</div>
-							<Calendar
-								mode="range"
-								selected={date}
-								onSelect={(dates) => {
-									setDate(dates)
-								}}
-								initialFocus
+				<div className="flex flex-col rounded-md bg-white text-zinc-950 shadow-md ring-1 ring-zinc-200 dark:bg-zinc-900 dark:text-zinc-50 dark:ring-zinc-700">
+					<div className="grid gap-3 p-3">
+						<div className="grid gap-1.5">
+							<label
+								htmlFor="date-from"
+								className="text-xs font-medium text-zinc-600 dark:text-zinc-300"
+							>
+								{t('from')}
+							</label>
+
+							<Input
+								id="date-from"
+								type="datetime-local"
+								value={toDateTimeLocalValue(date?.from)}
+								onChange={(event) => handleFromChange(event.target.value)}
 							/>
 						</div>
-						<Separator orientation="vertical" className="mx-4"></Separator>
-						<Command>
-							<CommandInput placeholder="Search quick ranges" />
-							<CommandList>
-								<CommandEmpty>No range found.</CommandEmpty>
-								<CommandGroup>
-									{dateTimeRanges.map((dateTimeRange) => (
-										<CommandItem
-											key={dateTimeRange.value}
-											value={dateTimeRange.value}
-											onSelect={(value) => {
-												const selectedDateTimeRange = dateTimeRanges.find(
-													(range) => range.value === value,
-												)
 
-												const timeRange = selectedDateTimeRange?.convert()
+						<div className="grid gap-1.5">
+							<label
+								htmlFor="date-to"
+								className="text-xs font-medium text-zinc-600 dark:text-zinc-300"
+							>
+								{t('to')}
+							</label>
+
+							<Input
+								id="date-to"
+								type="datetime-local"
+								value={toDateTimeLocalValue(date?.to)}
+								onChange={(event) => handleToChange(event.target.value)}
+							/>
+						</div>
+
+						{isInvalidRange && (
+							<p className="text-xs text-red-500">
+								{t('start_before_end_error')}
+							</p>
+						)}
+					</div>
+
+					<Separator />
+
+					<Command>
+						<CommandInput placeholder={t('search_quick_range')} />
+
+						<CommandList className="max-h-60 overflow-auto">
+							<CommandEmpty>{t('time_range_not_found')}</CommandEmpty>
+
+							<CommandGroup>
+								{dateTimeRanges.map((dateTimeRange) => {
+									const label = t(dateTimeRange.labelKey)
+
+									return (
+										<CommandItem
+											key={dateTimeRange.id}
+											value={label}
+											keywords={[dateTimeRange.id]}
+											onSelect={() => {
+												const timeRange = dateTimeRange.convert()
 
 												setDate({
-													from: timeRange?.from,
-													to: timeRange?.to,
+													from: timeRange.from,
+													to: timeRange.to,
 												})
 											}}
 										>
-											<span>{dateTimeRange.label}</span>
+											<span>{label}</span>
 										</CommandItem>
-									))}
-								</CommandGroup>
-							</CommandList>
-						</Command>
-					</div>
-					<div className="flex w-full items-center justify-evenly py-2 dark:bg-zinc-800 dark:text-zinc-200 dark:opacity-95">
-						<PopoverClose
-							className="inline-flex h-10 items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground ring-offset-background transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50"
-							onClick={() => {
-								void submit(searchParams)
-							}}
+									)
+								})}
+							</CommandGroup>
+						</CommandList>
+					</Command>
+
+					<div className="flex items-center justify-end gap-2 border-t p-3 dark:border-zinc-700">
+						<Button
+							variant="ghost"
+							size="sm"
+							type="button"
+							onClick={clearDateRange}
 						>
-							Apply
-						</PopoverClose>
+							{t('clear')}
+						</Button>
+
+						<Button
+							size="sm"
+							type="button"
+							onClick={applyDateRange}
+							disabled={isInvalidRange || (!date?.from && !date?.to)}
+						>
+							{t('apply')}
+						</Button>
 					</div>
 				</div>
 			</PopoverContent>

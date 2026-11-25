@@ -38,7 +38,7 @@ export function ColorPicker({
 	}
 
 	return (
-		<div className="w-72 rounded-lg border bg-background p-4 shadow-lg">
+		<div className="bg-background w-72 rounded-lg border p-4 shadow-lg">
 			<div className="mb-4 flex items-center justify-between">
 				<h4 className="text-lg font-semibold">Choose or set a color</h4>
 				<Button variant="ghost" size="icon" onClick={onClose}>
@@ -67,7 +67,7 @@ export function ColorPicker({
 				<Input
 					id="custom"
 					value={colorPickerState.color}
-					className="flex-grow"
+					className="grow"
 					onChange={(e) => {
 						handleColorChange(e.target.value, colorPickerState.index)
 						setColorPickerState({ ...colorPickerState, color: e.target.value })

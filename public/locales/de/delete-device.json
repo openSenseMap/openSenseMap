@@ -1,6 +1,6 @@
 {
-    "delete_device": "Gerät löschen",
-    "confirm_permanent_deletion": "Dadurch werden <b>{{device}}</b> und alle zugehörigen Daten dauerhaft gelöscht. Bitte bestätigen Sie mit Ihrem Passwort.",
-    "password": "Passwort",
-    "integration_cleanup_failed": "Die Geräteintegrationen konnten nicht entfernt werden. Bitte versuchen Sie später erneut, das Gerät zu löschen."
+	"delete_device": "Gerät löschen",
+	"confirm_permanent_deletion": "Dadurch werden <b>{{device}}</b> und alle zugehörigen Daten dauerhaft gelöscht. Bitte bestätigen Sie mit Ihrem Passwort.",
+	"password": "Passwort",
+	"integration_cleanup_failed": "Die Geräteintegrationen konnten nicht entfernt werden. Bitte versuchen Sie später erneut, das Gerät zu löschen."
 }

@@ -1,0 +1,218 @@
+import { z } from 'zod'
+import { ApiDeviceModelZodSchema } from '~/lib/device-enums'
+import { getSensorTemplateValidationError } from '~/lib/model-definitions'
+import { ElevationLookupConsentSchema } from '~/lib/openapi/schemas/consent'
+import {
+	DeviceLocationInputSchema,
+	HeightSchema,
+	LatitudeSchema,
+	LongitudeSchema,
+} from '~/lib/openapi/schemas/location'
+
+const DeviceLocationArrayInputSchema = z
+	.union([
+		z.tuple([LongitudeSchema, LatitudeSchema]).meta({
+			override: { minItems: 2, maxItems: 2, items: false },
+		}),
+		z
+			.tuple([
+				LongitudeSchema,
+				LatitudeSchema,
+				HeightSchema.meta({
+					description:
+						'Device height above the local ground surface in meters.',
+					example: 3.5,
+				}),
+			])
+			.meta({
+				override: { minItems: 3, maxItems: 3, items: false },
+			}),
+	])
+	.meta({
+		description:
+			'Coordinates as [longitude, latitude, height?], where height is above the local ground surface in meters.',
+		example: [7.68123, 51.9123, 3.5],
+	})
+
+export const CreateDeviceSchema = z
+	.object({
+		// public API request shape
+		name: z.string().min(1).max(100),
+		description: z
+			.string()
+			.max(5000, 'Description should not exceed 5000 characters')
+			.optional()
+			.nullable(),
+		exposure: z
+			.enum(['indoor', 'outdoor', 'mobile', 'unknown'])
+			.optional()
+			.default('unknown'),
+		location: z
+			.union([DeviceLocationArrayInputSchema, DeviceLocationInputSchema])
+			.transform((loc) => {
+				if (Array.isArray(loc)) return loc
+				return [
+					loc.lng,
+					loc.lat,
+					...(loc.height !== undefined ? [loc.height] : []),
+				]
+			}),
+		elevationLookupConsent: ElevationLookupConsentSchema.optional(),
+		grouptag: z.array(z.string()).optional().default([]),
+		model: ApiDeviceModelZodSchema.optional().default('custom'),
+		sensorTemplates: z.array(z.string()).optional().meta({
+			description:
+				'Required for model luftdaten.info so incoming values can be routed without ambiguity.',
+		}),
+		sensors: z
+			.array(
+				z.object({
+					icon: z.string().optional(),
+					title: z.string().min(1),
+					unit: z.string().min(1),
+					sensorType: z.string().min(1),
+				}),
+			)
+			.optional()
+			.default([]),
+	})
+	.superRefine((data, ctx) => {
+		if (data.sensors.length > 0 && data.model !== 'custom') {
+			ctx.addIssue({
+				code: 'custom',
+				path: ['sensors'],
+				message:
+					'Parameters model and sensors cannot be specified at the same time.',
+			})
+			return
+		}
+		if (data.sensors.length > 0) return
+
+		const message = getSensorTemplateValidationError(
+			data.model,
+			data.sensorTemplates,
+		)
+		if (message) {
+			ctx.addIssue({
+				code: 'custom',
+				path: ['sensorTemplates'],
+				message,
+			})
+		}
+	})
+
+export const DevicesQuerySchema = z.object({
+	format: z
+		.enum(['json', 'geojson'], {
+			error: () => "Format must be either 'json' or 'geojson'",
+		})
+		.default('json'),
+	minimal: z
+		.enum(['true', 'false'])
+		.default('false')
+		.transform((v) => v === 'true'),
+	full: z
+		.enum(['true', 'false'])
+		.default('false')
+		.transform((v) => v === 'true'),
+	limit: z
+		.string()
+		.default('5')
+		.transform((val) => parseInt(val, 10))
+		.refine((val) => !isNaN(val), { message: 'Limit must be a number' })
+		.refine((val) => val >= 1, { message: 'Limit must be at least 1' })
+		.refine((val) => val <= 20, { message: 'Limit must not exceed 20' }),
+
+	name: z.string().optional(),
+	date: z
+		.preprocess(
+			(val) => {
+				if (typeof val === 'string') return [val]
+				if (Array.isArray(val)) return val
+				return val
+			},
+			z
+				.array(z.string())
+				.min(1, 'At least one date required')
+				.max(2, 'At most two dates allowed')
+				.refine(
+					(arr) => arr.every((value) => !isNaN(new Date(value).getTime())),
+					'Invalid date',
+				)
+				.transform((arr) => {
+					const [fromDateStr, toDateStr] = arr
+					const fromDate = new Date(fromDateStr)
+
+					if (!toDateStr) {
+						return {
+							fromDate: new Date(fromDate.getTime() - 4 * 60 * 60 * 1000),
+							toDate: new Date(fromDate.getTime() + 4 * 60 * 60 * 1000),
+						}
+					}
+
+					const toDate = new Date(toDateStr)
+					return { fromDate, toDate }
+				}),
+		)
+		.optional(),
+	phenomenon: z.string().optional(),
+	grouptag: z
+		.string()
+		.transform((v) => [v])
+		.optional(),
+	model: z
+		.string()
+		.transform((v) => [v])
+		.optional(),
+	exposure: z
+		.string()
+		.transform((v) => [v])
+		.optional(),
+
+	near: z
+		.string()
+		.regex(/^[-+]?\d+(\.\d+)?,[-+]?\d+(\.\d+)?$/, {
+			message: "Invalid 'near' parameter format. Expected: 'lat,lng'",
+		})
+		.transform((val) => val.split(',').map(Number) as [number, number])
+		.optional(),
+
+	maxDistance: z
+		.string()
+		.transform((v) => Number(v))
+		.optional(),
+
+	bbox: z
+		.string()
+		.refine((val) => {
+			const coords = val.split(',').map(Number)
+			return coords.length === 4 && coords.every((n) => !isNaN(n))
+		}, 'Invalid bbox parameter')
+		.transform((val) => {
+			const coords = val.split(',').map(Number)
+			const [swLng, swLat, neLng, neLat] = coords
+			return {
+				coordinates: [
+					[
+						[swLat, swLng],
+						[neLat, swLng],
+						[neLat, neLng],
+						[swLat, neLng],
+						[swLat, swLng],
+					],
+				],
+			}
+		})
+		.optional(),
+
+	fromDate: z
+		.string()
+		.datetime()
+		.transform((v) => new Date(v))
+		.optional(),
+	toDate: z
+		.string()
+		.datetime()
+		.transform((v) => new Date(v))
+		.optional(),
+})

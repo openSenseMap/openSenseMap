@@ -2,27 +2,28 @@ import { useTranslation } from 'react-i18next'
 
 export default function Footer() {
 	const { t } = useTranslation('footer')
+	const currentYear = new Date().getFullYear()
 	return (
 		<footer
 			id="footer"
-			className="w-full bg-white px-4 text-gray-300 dark:bg-black dark:text-gray-100 sm:p-6 lg:text-lg"
+			className="w-full bg-white px-4 text-gray-300 sm:p-6 lg:text-lg dark:bg-black dark:text-gray-100"
 		>
-			<hr className="my-6 border-gray-300 dark:border-gray-100 sm:mx-auto lg:my-8" />
-			<div className="mx-auto w-full max-w-screen-xl p-4 md:flex md:items-center md:justify-between">
-				<span className="text-sm text-gray-500 dark:text-gray-400 sm:text-center">
-					© 2025{' '}
+			<hr className="my-6 border-gray-300 sm:mx-auto lg:my-8 dark:border-gray-100" />
+			<div className="mx-auto w-full max-w-(--breakpoint-xl) p-4 md:flex md:flex-wrap md:items-center md:justify-between md:gap-4 lg:flex-nowrap">
+				<span className="text-sm text-gray-500 sm:text-center dark:text-gray-400">
+					© {currentYear}{' '}
 					<a href="https://opensenselab.org/" className="hover:underline">
 						openSenseLab
 					</a>
 					. {t('rightsReserved')}
 				</span>
-				<ul className="mt-3 flex flex-wrap items-center text-sm font-medium text-gray-500 dark:text-gray-400 sm:mt-0">
+				<ul className="mt-3 flex flex-wrap items-center justify-center gap-x-2 gap-y-1 text-sm font-medium text-gray-500 sm:mt-0 md:justify-end dark:text-gray-400">
 					<li>
 						<a
 							href="/imprint"
 							target="_blank"
 							rel="noopener noreferrer"
-							className="px-2 hover:text-light-green dark:hover:text-green-200 md:px-8"
+							className="hover:text-light-green px-2 lg:px-8 dark:hover:text-green-200"
 						>
 							{t('imprint')}
 						</a>
@@ -32,7 +33,7 @@ export default function Footer() {
 							href="/privacy"
 							target="_blank"
 							rel="noopener noreferrer"
-							className="px-2 hover:text-light-green dark:hover:text-green-200 md:px-8"
+							className="hover:text-light-green px-2 lg:px-8 dark:hover:text-green-200"
 						>
 							{t('dataProtection')}
 						</a>
@@ -42,7 +43,7 @@ export default function Footer() {
 							href="https://www.instagram.com/opensenselab/"
 							target="_blank"
 							rel="noopener noreferrer"
-							className="px-2 hover:text-light-green dark:hover:text-green-200 md:px-8"
+							className="hover:text-light-green px-2 lg:px-8 dark:hover:text-green-200"
 						>
 							<svg
 								className="h-10 w-10"
@@ -64,7 +65,7 @@ export default function Footer() {
 							href="https://twitter.com/openSenseLab"
 							target="_blank"
 							rel="noopener noreferrer"
-							className="px-2 hover:text-light-green dark:hover:text-green-200 md:px-8"
+							className="hover:text-light-green px-2 lg:px-8 dark:hover:text-green-200"
 						>
 							<svg
 								className="h-10 w-10"
@@ -72,7 +73,7 @@ export default function Footer() {
 								viewBox="0 0 24 24"
 								aria-hidden="true"
 							>
-								<path d="M8.29 20.251c7.547 0 11.675-6.253 11.675-11.675 0-.178 0-.355-.012-.53A8.348 8.348 0 0022 5.92a8.19 8.19 0 01-2.357.646 4.118 4.118 0 001.804-2.27 8.224 8.224 0 01-2.605.996 4.107 4.107 0 00-6.993 3.743 11.65 11.65 0 01-8.457-4.287 4.106 4.106 0 001.27 5.477A4.072 4.072 0 012.8 9.713v.052a4.105 4.105 0 003.292 4.022 4.095 4.095 0 01-1.853.07 4.108 4.108 0 003.834 2.85A8.233 8.233 0 012 18.407a11.616 11.616 0 006.29 1.84" />
+								<path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231 5.45-6.231Zm-1.161 17.52h1.833L7.084 4.126H5.117L17.083 19.77Z" />
 							</svg>
 							<span className="sr-only">{t('twitter')}</span>
 						</a>
@@ -82,7 +83,7 @@ export default function Footer() {
 							href="https://github.com/opensensemap"
 							target="_blank"
 							rel="noopener noreferrer"
-							className="px-2 hover:text-light-green dark:hover:text-green-200 md:px-8"
+							className="hover:text-light-green px-2 lg:px-8 dark:hover:text-green-200"
 						>
 							<svg
 								className="h-10 w-10"

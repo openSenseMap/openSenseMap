@@ -1,12 +1,12 @@
 import { AnimatePresence, motion } from 'framer-motion'
 import { Box, Rocket } from 'lucide-react'
 import { useState } from 'react'
-import { type MarkerProps, Marker, useMap } from 'react-map-gl'
+import { type MarkerProps, Marker, useMap } from 'react-map-gl/maplibre'
 import { useMatches, useNavigate, useSearchParams } from 'react-router'
 import { useGlobalCompareMode } from '~/components/device-detail/useGlobalCompareMode'
+import { type Device } from '~/db/schema'
 import { validLngLat } from '~/lib/location'
 import { cn } from '~/lib/utils'
-import { type Device } from '~/schema'
 
 interface BoxMarkerProps extends MarkerProps {
 	device: Device
@@ -64,8 +64,8 @@ export default function BoxMarker({ device, ...props }: BoxMarkerProps) {
 			<AnimatePresence mode="popLayout">
 				<motion.div
 					className={cn(
-						'group absolute flex w-fit cursor-pointer items-center rounded-full bg-white p-1 text-sm shadow hover:z-10 hover:shadow-lg',
-						isFullZoom ? '-left-4 -top-4' : '-left-[10px] -top-[10px]',
+						'group absolute flex w-fit cursor-pointer items-center rounded-full bg-white p-1 text-sm shadow-sm hover:z-10 hover:shadow-lg',
+						isFullZoom ? '-top-5 -left-5' : '-top-3.75 -left-3.75',
 					)}
 					onClick={() => {
 						if (searchParams.has('sensor')) {
@@ -100,7 +100,7 @@ export default function BoxMarker({ device, ...props }: BoxMarkerProps) {
 						{device.status === 'active' ? (
 							<div
 								className={cn(
-									'absolute left-0 top-0 h-full w-full animate-ping rounded-full opacity-50',
+									'absolute top-0 left-0 h-full w-full animate-ping rounded-full opacity-50',
 									getStatusColor(device),
 								)}
 							/>
@@ -109,7 +109,7 @@ export default function BoxMarker({ device, ...props }: BoxMarkerProps) {
 					{isFullZoom ? (
 						<motion.span
 							layoutId={device.id}
-							className="max-w-[100px] overflow-hidden overflow-ellipsis whitespace-nowrap px-1 text-black group-hover:max-w-fit group-hover:overflow-auto"
+							className="max-w-[100px] overflow-hidden px-1 text-ellipsis whitespace-nowrap text-black group-hover:max-w-fit group-hover:overflow-auto"
 							initial={{ opacity: 0, translateX: -20 }}
 							animate={{ opacity: 1, translateX: 0 }}
 							exit={{ opacity: 0, translateX: -20 }}

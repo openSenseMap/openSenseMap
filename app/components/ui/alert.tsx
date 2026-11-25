@@ -12,22 +12,22 @@ import { useTranslation } from 'react-i18next'
 import { cn } from '@/lib/utils'
 
 const alertVariants = cva(
-	'relative w-full rounded-md border border-slate-200 p-4 dark:border-slate-800 [&:has(svg)]:pl-12 [&>svg+div]:translate-y-[-3px] [&>svg]:absolute [&>svg]:left-4 [&>svg]:top-4 [&>svg]:text-slate-950 dark:[&>svg]:text-slate-50',
+	'relative w-full rounded-md border border-slate-200 p-4 dark:border-slate-800 [&:has(svg)]:pl-12 [&>svg]:absolute [&>svg]:top-4 [&>svg]:left-4 [&>svg]:text-slate-950 dark:[&>svg]:text-slate-50 [&>svg+div]:translate-y-[-3px]',
 	{
 		variants: {
 			variant: {
 				default:
-					'bg-white text-slate-950 dark:bg-dark-boxes dark:text-dark-text',
+					'dark:bg-dark-boxes dark:text-dark-text bg-white text-slate-950',
 				destructive:
-					'border-red-500/50 dark:border-red-900/50 text-red-500 dark:border-red-500 dark:dark:border-red-900 dark:text-red-900 [&>svg]:text-red-500 dark:[&>svg]:text-red-900',
-				note: 'border-blue-500/50 dark:border-blue-900/50 dark:bg-blue-900/20 bg-blue-50 text-blue-900 dark:text-blue-200 [&>svg]:text-blue-500 dark:[&>svg]:text-blue-400',
-				tip: 'border-green-500/50 dark:border-green-900/50 dark:bg-green-900/20 bg-green-50 text-green-900 dark:text-green-200 [&>svg]:text-green-500 dark:[&>svg]:text-green-400',
+					'border-red-500/50 text-red-500 dark:border-red-500 dark:border-red-900/50 dark:dark:border-red-900 dark:text-red-900 [&>svg]:text-red-500 dark:[&>svg]:text-red-900',
+				note: 'border-blue-500/50 bg-blue-50 text-blue-900 dark:border-blue-900/50 dark:bg-blue-900/20 dark:text-blue-200 [&>svg]:text-blue-500 dark:[&>svg]:text-blue-400',
+				tip: 'border-green-500/50 bg-green-50 text-green-900 dark:border-green-900/50 dark:bg-green-900/20 dark:text-green-200 [&>svg]:text-green-500 dark:[&>svg]:text-green-400',
 				important:
-					'border-violet-500/50 dark:border-violet-900/50 dark:bg-violet-900/20 bg-violet-50 text-violet-900 dark:text-violet-200 [&>svg]:text-violet-500 dark:[&>svg]:text-violet-400',
+					'border-violet-500/50 bg-violet-50 text-violet-900 dark:border-violet-900/50 dark:bg-violet-900/20 dark:text-violet-200 [&>svg]:text-violet-500 dark:[&>svg]:text-violet-400',
 				warning:
-					'border-yellow-500/50 dark:border-yellow-900/50 dark:bg-yellow-900/20 bg-yellow-50 text-yellow-900 dark:text-yellow-200 [&>svg]:text-yellow-500 dark:[&>svg]:text-yellow-400',
+					'border-yellow-500/50 bg-yellow-50 text-yellow-900 dark:border-yellow-900/50 dark:bg-yellow-900/20 dark:text-yellow-200 [&>svg]:text-yellow-500 dark:[&>svg]:text-yellow-400',
 				caution:
-					'border-red-500/50 dark:border-red-900/50 dark:bg-red-900/20 bg-red-50 text-red-900 dark:text-red-200 [&>svg]:text-red-500 dark:[&>svg]:text-red-400',
+					'border-red-500/50 bg-red-50 text-red-900 dark:border-red-900/50 dark:bg-red-900/20 dark:text-red-200 [&>svg]:text-red-500 dark:[&>svg]:text-red-400',
 			},
 		},
 		defaultVariants: {
@@ -56,7 +56,7 @@ const AlertTitle = React.forwardRef<
 	<h5
 		ref={ref}
 		className={cn(
-			'my-1 text-base font-medium leading-none tracking-tight',
+			'my-1 text-base leading-none font-medium tracking-tight',
 			className,
 		)}
 		{...props}

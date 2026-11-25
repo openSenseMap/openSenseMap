@@ -1,13 +1,14 @@
 import { useEffect } from 'react'
-import { type LoaderFunctionArgs, useFetcher } from 'react-router'
+import { useFetcher } from 'react-router'
+import { type Route } from './+types/resources.user-avatar'
 import { Avatar, AvatarFallback, AvatarImage } from '~/components/ui/avatar'
-import { getProfileByUserId } from '~/models/profile.server'
-import { getInitials } from '~/utils/misc'
-import { requireUser } from '~/utils/session.server'
+import { getSettingsProfileByUserId } from '~/db/models/profile.server'
+import { getInitials } from '~/lib/strings'
+import { requireUser } from '~/services/session-service.server'
 
-export async function loader({ request }: LoaderFunctionArgs) {
+export async function loader({ request }: Route.LoaderArgs) {
 	const user = await requireUser(request)
-	const profile = await getProfileByUserId(user.id)
+	const profile = await getSettingsProfileByUserId(user.id)
 
 	if (!user || !profile) {
 		throw new Error()
@@ -29,7 +30,11 @@ export function UserAvatar() {
 		<Avatar className="h-8 w-8">
 			<AvatarImage
 				className="aspect-auto h-full w-full rounded-full object-cover"
-				src={'/resources/file/' + fetcher.data?.profile?.profileImage?.id}
+				src={
+					fetcher.data?.profile.image
+						? `/resources/profile-image/${fetcher.data.profile.id}?v=${encodeURIComponent(fetcher.data.profile.image)}`
+						: undefined
+				}
 				alt={fetcher.data?.profile.displayName}
 			/>
 			<AvatarFallback>

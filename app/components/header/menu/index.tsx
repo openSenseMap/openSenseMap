@@ -1,16 +1,11 @@
 import {
-	Globe,
 	LogIn,
 	LogOut,
-	Puzzle,
-	Menu as MenuIcon,
-	FileLock2,
-	Coins,
 	User2,
-	ExternalLink,
 	Settings,
 	Compass,
-	ScrollText,
+	PlusIcon,
+	Info,
 } from 'lucide-react'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
@@ -33,201 +28,174 @@ import {
 import Spinner from '~/components/spinner'
 import { toast } from '~/components/ui/use-toast'
 import { useOptionalUser } from '~/utils'
-
+import { Button } from '~/components/ui/button'
 export default function Menu() {
 	const [searchParams] = useSearchParams()
 	const redirectTo =
 		searchParams.size > 0 ? '/explore?' + searchParams.toString() : '/explore'
+
 	const [open, setOpen] = useState(false)
+
 	const navigation = useNavigation()
 	const isLoggingOut = Boolean(navigation.state === 'submitting')
 	const user = useOptionalUser()
 	const matches = useMatches()
-
 	const { t } = useTranslation('menu')
 
+	const isExplore = matches.some((match) => match.pathname === '/explore')
+
 	return (
-		<DropdownMenu open={open} onOpenChange={setOpen} modal={false}>
-			<DropdownMenuTrigger asChild>
-				<div className="pointer-events-auto box-border h-10 w-10">
-					<button
-						type="button"
-						className="h-10 w-10 rounded-full border border-gray-100 bg-white text-center text-black hover:bg-gray-100"
-					>
-						{!user ? (
-							<MenuIcon className="mx-auto h-6 w-6" />
-						) : (
-							<User2 className="mx-auto h-6 w-6" />
-						)}
-					</button>
-				</div>
-			</DropdownMenuTrigger>
-			<DropdownMenuContent
-				className="w-56 dark:bg-zinc-800 dark:text-zinc-200 dark:opacity-95"
-				align="end"
-				forceMount
-			>
-				<div
-					className={
-						navigation.state === 'loading' ? 'pointer-events-none' : ''
-					}
+		<>
+			<DropdownMenu open={open} onOpenChange={setOpen} modal={false}>
+				<DropdownMenuTrigger asChild>
+					<div className="pointer-events-auto box-border h-10 w-10">
+						<Button variant="topbar" size="topbarIcon">
+							<User2 />
+						</Button>
+					</div>
+				</DropdownMenuTrigger>
+
+				<DropdownMenuContent
+					className="w-56 dark:bg-zinc-800 dark:text-zinc-200 dark:opacity-95"
+					align="end"
+					forceMount
 				>
-					<DropdownMenuLabel className="font-normal">
-						{!user ? (
-							<div className="flex flex-col space-y-1">
-								<p className="text-sm font-medium leading-none">{t('title')}</p>
-								<p className="text-xs leading-none text-muted-foreground">
-									{t('subtitle')}
-								</p>
-							</div>
-						) : (
-							<div className="flex flex-col space-y-1 p-2">
-								<p className="text-sm font-medium leading-none">
-									{/* Max Mustermann */}
-									{user?.name}
-								</p>
-								<p className="text-xs leading-none text-muted-foreground">
-									{user?.email}
-								</p>
-							</div>
-						)}
-					</DropdownMenuLabel>
-					<DropdownMenuSeparator />
-					{user && (
-						<DropdownMenuGroup>
-							{navigation.state === 'loading' && (
-								<div className="bg-white/30 dark:bg-zinc-800/30 absolute inset-0 z-50 flex items-center justify-center backdrop-blur-sm">
-									<Spinner />
+					<div
+						className={
+							navigation.state === 'loading' ? 'pointer-events-none' : ''
+						}
+					>
+						<DropdownMenuLabel className="font-normal">
+							{!user ? (
+								<div className="flex flex-col space-y-1">
+									<p className="text-sm leading-none font-medium">
+										{t('title')}
+									</p>
+									<p className="text-muted-foreground text-xs leading-none">
+										{t('subtitle')}
+									</p>
+								</div>
+							) : (
+								<div className="flex flex-col space-y-1 p-2">
+									<p className="text-sm leading-none font-medium">
+										{user?.name}
+									</p>
+									<p className="text-muted-foreground text-xs leading-none">
+										{user?.email}
+									</p>
 								</div>
 							)}
-							{!(matches[1].pathname === '/explore') && (
-								<Link to="/explore">
+						</DropdownMenuLabel>
+
+						<DropdownMenuSeparator />
+
+						{user && (
+							<DropdownMenuGroup>
+								{navigation.state === 'loading' && (
+									<div className="absolute inset-0 z-50 flex items-center justify-center bg-white/30 backdrop-blur-xs dark:bg-zinc-800/30">
+										<Spinner />
+									</div>
+								)}
+
+								<Link to="/about" prefetch="intent">
 									<DropdownMenuItem className="cursor-pointer">
-										<Compass className="mr-2 h-5 w-5" />
-										<span>{t('explore_label')}</span>
+										<Info className="mr-2 h-5 w-5" />
+										<span>{t('about_label')}</span>
 									</DropdownMenuItem>
 								</Link>
-							)}
-							{!(matches[1].pathname === '/profile') && (
-								<Link to="/profile/me">
-									<DropdownMenuItem className="cursor-pointer">
-										<User2 className="mr-2 h-5 w-5" />
-										{t('profile_label')}
-									</DropdownMenuItem>
-								</Link>
-							)}
+								{!isExplore && (
+									<Link to="/explore" prefetch="intent">
+										<DropdownMenuItem className="cursor-pointer">
+											<Compass className="mr-2 h-5 w-5" />
+											<span>{t('explore_label')}</span>
+										</DropdownMenuItem>
+									</Link>
+								)}
 
-							{!(matches[1].pathname === '/settings') && (
-								<Link to="/settings/profile">
-									<DropdownMenuItem className="cursor-pointer">
-										<Settings className="mr-2 h-5 w-5" />
-										<span>{t('settings_label')}</span>
-									</DropdownMenuItem>
-									<DropdownMenuSeparator />
-								</Link>
-							)}
-						</DropdownMenuGroup>
-					)}
-					<DropdownMenuGroup>
-						<Link to="https://docs.opensensemap.org/" target="_blank">
-							<DropdownMenuItem className="cursor-pointer">
-								<Globe className="mr-2 h-5 w-5" />
-								<span>{t('api_docs_label')}</span>
-								<ExternalLink className="ml-auto h-4 w-4 text-gray-300" />
-							</DropdownMenuItem>
-						</Link>
-					</DropdownMenuGroup>
-					<DropdownMenuSeparator />
-					<DropdownMenuGroup>
-						<Link to={'/privacy'}>
-							<DropdownMenuItem className="cursor-pointer">
-								<FileLock2 className="mr-2 h-5 w-5" />
-								<span>{t('data_protection_label')}</span>
-							</DropdownMenuItem>
-						</Link>
-					</DropdownMenuGroup>
-					<DropdownMenuGroup>
-						<Link to={'/terms'} target="_blank">
-							<DropdownMenuItem
-								onSelect={(e) => e.preventDefault()}
-								className="cursor-pointer"
-							>
-								<ScrollText className="mr-2 inline h-5 w-5" />
-								<span> {t('tos')}</span>
-								<ExternalLink className="ml-auto h-4 w-4 text-gray-300" />
-							</DropdownMenuItem>
-						</Link>
-					</DropdownMenuGroup>
-					<DropdownMenuSeparator />
+								{matches[1]?.pathname !== '/settings' && (
+									<Link to="/settings/profile" prefetch="intent">
+										<DropdownMenuItem className="cursor-pointer">
+											<Settings className="mr-2 h-5 w-5" />
+											{t('settings_label')}
+										</DropdownMenuItem>
+									</Link>
+								)}
 
-					<DropdownMenuGroup>
-						<Link
-							to={
-								'https://www.betterplace.org/de/projects/89947-opensensemap-org-die-freie-karte-fuer-umweltdaten'
-							}
-							target="_blank"
-						>
-							<DropdownMenuItem
-								onSelect={(e) => e.preventDefault()}
-								className="cursor-pointer"
-							>
-								<Coins className="mr-2 inline h-5 w-5" />
-								<span> {t('donate_label')}</span>
-								<ExternalLink className="ml-auto h-4 w-4 text-gray-300" />
-							</DropdownMenuItem>
-						</Link>
-					</DropdownMenuGroup>
-
-					<DropdownMenuSeparator />
-
-					<DropdownMenuGroup>
-						<DropdownMenuItem
-							onSelect={(e) => {
-								// Prevent dropdown from closing
-								e.preventDefault()
-							}}
-						>
-							{!user ? (
-								<Link
-									to={{
-										pathname: 'login',
-										search: searchParams.toString(),
-									}}
-									onClick={() => setOpen(false)}
-									className="w-full cursor-pointer"
-								>
-									<button className="relative flex w-full select-none items-center rounded-sm text-sm outline-none transition-colors hover:bg-accent focus:bg-accent focus:text-accent-foreground">
-										<LogIn className="mr-2 h-5 w-5" />
-										<span className="text-light-green">{t('login_label')}</span>
-									</button>
-								</Link>
-							) : (
-								<Form
-									action="/logout"
-									method="post"
-									onSubmit={() => {
-										setOpen(false)
-										toast({
-											description: 'Successfully logged out.',
-										})
-									}}
-									className="w-full cursor-pointer"
-								>
-									<input type="hidden" name="redirectTo" value={redirectTo} />
-									<button
-										type="submit"
-										className="relative flex w-full select-none items-center rounded-sm text-sm outline-none transition-colors hover:bg-accent focus:bg-accent focus:text-accent-foreground"
-										disabled={isLoggingOut}
+								{matches[1]?.pathname !== '/profile' && (
+									<Link
+										to={`/profile/${encodeURIComponent(user.name)}`}
+										prefetch="intent"
+										onClick={() => setOpen(false)}
 									>
-										<LogOut className="mr-2 h-5 w-5" />
-										<span className="text-red-500">{t('logout_label')}</span>
-									</button>
-								</Form>
-							)}
-						</DropdownMenuItem>
-					</DropdownMenuGroup>
-				</div>
-			</DropdownMenuContent>
-		</DropdownMenu>
+										<DropdownMenuItem className="cursor-pointer">
+											<User2 className="mr-2 h-5 w-5" />
+											{t('my_devices_label')}
+										</DropdownMenuItem>
+									</Link>
+								)}
+
+								{matches[1]?.pathname !== '/profile' && (
+									<Link to="/device/new" prefetch="intent">
+										<DropdownMenuItem className="cursor-pointer">
+											<PlusIcon className="mr-2 h-5 w-5" />
+											{t('add_device_label')}
+										</DropdownMenuItem>
+									</Link>
+								)}
+							</DropdownMenuGroup>
+						)}
+
+						<DropdownMenuGroup>
+							<DropdownMenuItem
+								onSelect={(e) => {
+									e.preventDefault()
+								}}
+							>
+								{!user ? (
+									<Link
+										to={{
+											pathname: 'login',
+											search: searchParams.toString(),
+										}}
+										prefetch="intent"
+										onClick={() => setOpen(false)}
+										className="w-full cursor-pointer"
+									>
+										<button className="hover:bg-accent focus:bg-accent focus:text-accent-foreground relative flex w-full items-center rounded-sm text-sm outline-hidden transition-colors select-none">
+											<LogIn className="mr-2 h-5 w-5" />
+											<span className="text-light-green">
+												{t('login_label')}
+											</span>
+										</button>
+									</Link>
+								) : (
+									<Form
+										action="/logout"
+										method="post"
+										onSubmit={() => {
+											setOpen(false)
+											toast({
+												description: 'Successfully logged out.',
+											})
+										}}
+										className="w-full cursor-pointer"
+									>
+										<input type="hidden" name="redirectTo" value={redirectTo} />
+										<button
+											type="submit"
+											className="hover:bg-accent focus:bg-accent focus:text-accent-foreground relative flex w-full items-center rounded-sm text-sm outline-hidden transition-colors select-none"
+											disabled={isLoggingOut}
+										>
+											<LogOut className="mr-2 h-5 w-5" />
+											<span className="text-red-500">{t('logout_label')}</span>
+										</button>
+									</Form>
+								)}
+							</DropdownMenuItem>
+						</DropdownMenuGroup>
+					</div>
+				</DropdownMenuContent>
+			</DropdownMenu>
+		</>
 	)
 }

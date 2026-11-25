@@ -1,0 +1,35 @@
+{
+	"schemaType": "opensensemap.deviceSchema",
+	"schemaVersion": "1.0.0",
+	"id": "example-custom-device",
+	"name": "Example Custom Device",
+	"version": "1.0.0",
+	"description": "Example schema for a custom device with temperature, humidity, and particulate matter sensors.",
+	"tags": [],
+	"sensors": [
+		{
+			"id": "temperature",
+			"title": "Temperature",
+			"unit": "°C",
+			"sensorType": "HDC1080",
+			"sensorWikiPhenomenon": "temperature",
+			"sensorWikiUnit": "Cel"
+		},
+		{
+			"id": "relative-humidity",
+			"title": "Relative humidity",
+			"unit": "%",
+			"sensorType": "HDC1080",
+			"sensorWikiPhenomenon": "relative_humidity",
+			"sensorWikiUnit": "%"
+		},
+		{
+			"id": "pm10",
+			"title": "PM10",
+			"unit": "µg/m³",
+			"sensorType": "SDS011",
+			"sensorWikiPhenomenon": "pm10",
+			"sensorWikiUnit": "ug/m3"
+		}
+	]
+}

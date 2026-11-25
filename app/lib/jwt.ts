@@ -3,10 +3,12 @@ import { eq } from 'drizzle-orm'
 import jsonwebtoken, { type JwtPayload, type Algorithm } from 'jsonwebtoken'
 import invariant from 'tiny-invariant'
 import { v4 as uuidv4 } from 'uuid'
+import { getUserByEmail } from '~/db/models/user.server'
+import { type Device, type User } from '~/db/schema'
+import { refreshToken, tokenRevocation } from '~/db/schema/refreshToken'
 import { drizzleClient } from '~/db.server'
-import { getUserByEmail } from '~/models/user.server'
-import { device, Device, type User } from '~/schema'
-import { refreshToken, tokenRevocation } from '~/schema/refreshToken'
+import { StandardResponse } from './responses'
+import { apiMessages } from './openapi/messages'
 
 const { sign, verify } = jsonwebtoken
 
@@ -145,6 +147,19 @@ export const getUserFromJwt = async (
 	if (!user)
 		throw new Error('User was not found despite a verified jwt provided')
 	return user
+}
+
+export const withAuthenticatedUser = async (
+	request: Request,
+	handler: (user: User) => Promise<Response> | Response,
+): Promise<Response> => {
+	const jwtResponse = await getUserFromJwt(request)
+
+	if (typeof jwtResponse === 'string') {
+		return StandardResponse.forbidden(apiMessages.invalidJwt)
+	}
+
+	return handler(jwtResponse)
 }
 
 const decodeJwtString = (

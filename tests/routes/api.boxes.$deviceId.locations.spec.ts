@@ -1,19 +1,20 @@
 import { or, sql } from 'drizzle-orm'
-import { type Params, type LoaderFunctionArgs } from 'react-router'
+import { type Params } from 'react-router'
 import { generateTestUserCredentials } from 'tests/data/generate_test_user'
-import { BASE_URL } from 'vitest.setup'
-import { drizzleClient } from '~/db.server'
-import { registerUser } from '~/lib/user-service.server'
-import { createDevice, deleteDevice } from '~/models/device.server'
+import { type Route } from '../../.react-router/types/app/routes/+types/api.boxes.$deviceId.locations'
+import { BASE_URL } from '../../vitest.setup'
+import { createDevice, deleteDevice } from '~/db/models/device.server'
 import {
 	deleteMeasurementsForSensor,
 	deleteMeasurementsForTime,
 	saveMeasurements,
-} from '~/models/measurement.server'
-import { getSensors } from '~/models/sensor.server'
-import { deleteUserByEmail } from '~/models/user.server'
+} from '~/db/models/measurement.server'
+import { getSensors } from '~/db/models/sensor.server'
+import { deleteUserByEmail } from '~/db/models/user.server'
+import { type Sensor, location } from '~/db/schema'
+import { drizzleClient } from '~/db.server'
 import { loader } from '~/routes/api.boxes.$deviceId.locations'
-import { type Sensor, type User, location } from '~/schema'
+import { registerUser } from '~/services/user-service.server'
 
 const DEVICE_SENSORS_ID_USER = generateTestUserCredentials()
 
@@ -88,7 +89,7 @@ describe('openSenseMap API Routes: /api/boxes/:deviceId/locations', () => {
 			DEVICE_SENSORS_ID_USER.email,
 			DEVICE_SENSORS_ID_USER.password,
 			'en_US',
-			true
+			true,
 		)
 
 		expect(registration.ok).toBe(true)
@@ -123,7 +124,7 @@ describe('openSenseMap API Routes: /api/boxes/:deviceId/locations', () => {
 				params: {
 					deviceId: `${deviceId}`,
 				} as Params<string>,
-			} as LoaderFunctionArgs) // Assuming a separate loader for single sensor
+			} as Route.LoaderArgs) // Assuming a separate loader for single sensor
 			const response = dataFunctionValue as Response
 			const body = await response?.json()
 
@@ -158,7 +159,7 @@ describe('openSenseMap API Routes: /api/boxes/:deviceId/locations', () => {
 				params: {
 					deviceId: `${deviceId}`,
 				} as Params<string>,
-			} as LoaderFunctionArgs) // Assuming a separate loader for single sensor
+			} as Route.LoaderArgs) // Assuming a separate loader for single sensor
 			const response = dataFunctionValue as Response
 			const body = await response?.json()
 

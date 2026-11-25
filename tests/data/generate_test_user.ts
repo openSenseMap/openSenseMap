@@ -11,7 +11,7 @@ export const generateTestUserCredentials = (): {
 } => {
 	return {
 		name: randomUUID().toString(),
-		email: `${randomBytes(6).toString('hex')}@${randomBytes(6).toString('hex')}.${randomBytes(2).toString('hex')}`,
+		email: `${randomBytes(6).toString('hex')}@example.com`,
 		password: randomBytes(20).toString('hex'),
 	}
 }

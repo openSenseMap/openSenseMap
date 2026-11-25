@@ -1,20 +1,20 @@
 {
-  "notConfigured": "No Terms of Service configured.",
-  "effectiveFrom": "Effective from {{date}}",
-  "info": {
-    "accepted": "Thank you. You have successfully accepted the Terms of Service.",
-    "alreadyAccepted": "These Terms of Service were already accepted for your account.",
-    "invalid": "This acceptance link is invalid or expired.",
-    "missing": "No acceptance token was provided.",
-    "notConfigured": "No Terms of Service are currently configured."
-  },
-  "form": {
-    "acceptLabel": "I have read and accept the current Terms of Service.",
-    "errors": {
-      "mustAccept": "Please confirm that you accept the Terms of Service.",
-      "invalidOrExpiredLink": "This acceptance link is invalid or expired.",
-      "notConfigured": "No Terms of Service are currently configured."
-    },
-    "submit": "Accept Terms of Service"
-  }
+	"notConfigured": "No Terms of Service configured.",
+	"effectiveFrom": "Effective from {{date}}",
+	"info": {
+		"accepted": "Thank you. You have successfully accepted the Terms of Service.",
+		"alreadyAccepted": "These Terms of Service were already accepted for your account.",
+		"invalid": "This acceptance link is invalid or expired.",
+		"missing": "No acceptance token was provided.",
+		"notConfigured": "No Terms of Service are currently configured."
+	},
+	"form": {
+		"acceptLabel": "I have read and accept the current Terms of Service.",
+		"errors": {
+			"mustAccept": "Please confirm that you accept the Terms of Service.",
+			"invalidOrExpiredLink": "This acceptance link is invalid or expired.",
+			"notConfigured": "No Terms of Service are currently configured."
+		},
+		"submit": "Accept Terms of Service"
+	}
 }

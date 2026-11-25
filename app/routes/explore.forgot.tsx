@@ -1,17 +1,14 @@
 import * as React from 'react'
 import { useTranslation } from 'react-i18next'
 import {
-	type ActionFunctionArgs,
-	type LoaderFunctionArgs,
-	type MetaFunction,
 	data,
 	redirect,
 	Form,
 	Link,
-	useActionData,
 	useNavigation,
 	useSearchParams,
 } from 'react-router'
+import { type Route } from './+types/explore.forgot'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import Spinner from '~/components/spinner'
@@ -24,17 +21,17 @@ import {
 	CardHeader,
 	CardTitle,
 } from '~/components/ui/card'
-import { requestPasswordReset } from '~/lib/user-service.server'
+import { getUserId } from '~/services/session-service.server'
+import { requestPasswordReset } from '~/services/user-service.server'
 import { validateEmail } from '~/utils'
-import { getUserId } from '~/utils/session.server'
 
-export async function loader({ request }: LoaderFunctionArgs) {
+export async function loader({ request }: Route.LoaderArgs) {
 	const userId = await getUserId(request)
 	if (userId) return redirect('/explore')
 	return {}
 }
 
-export async function action({ request }: ActionFunctionArgs) {
+export async function action({ request }: Route.ActionArgs) {
 	const formData = await request.formData()
 	const email = formData.get('email')
 
@@ -69,13 +66,10 @@ export async function action({ request }: ActionFunctionArgs) {
 	}
 }
 
-export const meta: MetaFunction = () => {
-	return [{ title: 'Forgot Password' }]
-}
-
-export default function ForgotPasswordPage() {
+export default function ForgotPasswordPage({
+	actionData,
+}: Route.ComponentProps) {
 	const [searchParams] = useSearchParams()
-	const actionData = useActionData<typeof action>()
 	const emailRef = React.useRef<HTMLInputElement>(null)
 
 	const { t } = useTranslation('forgot-password')
@@ -88,18 +82,18 @@ export default function ForgotPasswordPage() {
 	}, [actionData])
 
 	return (
-		<div className="flex h-screen items-center justify-center">
+		<div className="relative flex h-full w-full items-start justify-center overflow-y-auto p-4 sm:items-center">
 			<Link
 				to={{
 					pathname: '/explore',
 					search: searchParams.toString(),
 				}}
 			>
-				<div className="fixed inset-0 z-40 h-full w-full bg-black opacity-25" />
+				<div className="absolute inset-0 z-40 h-full w-full bg-black opacity-25" />
 			</Link>
-			<Card className="z-50 w-full max-w-md">
+			<Card className="relative z-50 my-auto w-full max-w-md min-w-0">
 				{navigation.state === 'loading' && (
-					<div className="bg-white/30 dark:bg-zinc-800/30 absolute inset-0 z-50 flex items-center justify-center backdrop-blur-sm">
+					<div className="absolute inset-0 z-50 flex items-center justify-center bg-white/30 backdrop-blur-xs dark:bg-zinc-800/30">
 						<Spinner />
 					</div>
 				)}
@@ -107,8 +101,8 @@ export default function ForgotPasswordPage() {
 					<div className="w-full max-w-md rounded-md bg-white p-6 text-center shadow-lg">
 						<h2 className="mb-4 text-2xl font-bold">{t('request_sent')}</h2>
 						<p className="mb-6">{t('request_sent_description')}</p>
-						<Link to="/explore/login">
-							<Button className="w-full bg-light-blue">
+						<Link to="/explore/login" prefetch="intent">
+							<Button className="bg-light-blue w-full">
 								{t('back_to_login')}
 							</Button>
 						</Link>
@@ -145,10 +139,10 @@ export default function ForgotPasswordPage() {
 								</div>
 							</CardContent>
 							<CardFooter className="flex flex-col items-center gap-2">
-								<Button type="submit" className="w-full bg-light-blue">
+								<Button type="submit" className="bg-light-blue w-full">
 									{t('reset_password_button')}
 								</Button>
-								<p className="text-sm text-muted-foreground">
+								<p className="text-muted-foreground text-center text-sm">
 									{t('remember_password')}{' '}
 									<Link
 										className="font-medium underline"
@@ -156,6 +150,7 @@ export default function ForgotPasswordPage() {
 											pathname: '/explore/login',
 											search: searchParams.toString(),
 										}}
+										prefetch="intent"
 									>
 										{t('login_label')}
 									</Link>

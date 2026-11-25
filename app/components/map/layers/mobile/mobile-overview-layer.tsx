@@ -1,15 +1,15 @@
 import bbox from '@turf/bbox'
 import { point, featureCollection } from '@turf/helpers'
-import { format } from 'date-fns'
 import { type FeatureCollection, type Point } from 'geojson'
 import { CalendarClock } from 'lucide-react'
 import { useState, useEffect, useMemo, useCallback } from 'react'
-import { Source, Layer, useMap, Popup } from 'react-map-gl'
+import { Source, Layer, useMap, Popup } from 'react-map-gl/maplibre'
 import MapLegend from './mobile-overview-legend'
 import {
 	type LocationPoint,
 	categorizeIntoTrips,
 } from '~/lib/mobile-box-helper'
+import { useTranslation } from 'react-i18next'
 
 const FIT_PADDING = 100
 
@@ -121,6 +121,12 @@ export default function MobileOverviewLayer({
 }: {
 	locations: LocationPoint[]
 }) {
+	const { i18n } = useTranslation()
+	const dateTimeFormat = new Intl.DateTimeFormat(i18n.language, {
+		dateStyle: 'short',
+		timeStyle: 'short',
+	})
+
 	// Generate trips and assign colors once
 	const trips = useMemo(() => categorizeIntoTrips(locations, 50), [locations])
 
@@ -439,29 +445,29 @@ export default function MobileOverviewLayer({
 					anchor="top"
 				>
 					<div className="mb-2 flex items-center justify-center">
-						<CalendarClock className="h-4 w-4 text-primary" />
+						<CalendarClock className="text-primary h-4 w-4" />
 					</div>
 					<div className="space-y-1 text-center">
 						{popupInfo.isCluster && (
 							<div className="mb-2">
-								<p className="text-xs font-medium text-muted-foreground">
+								<p className="text-muted-foreground text-xs font-medium">
 									Cluster of {popupInfo.pointCount} points
 								</p>
 							</div>
 						)}
 						<div>
-							<p className="text-sm font-bold text-primary">
-								{format(new Date(popupInfo.startTime), 'Pp')}
+							<p className="text-primary text-sm font-bold">
+								{dateTimeFormat.format(new Date(popupInfo.startTime))}
 							</p>
 						</div>
 						{popupInfo.isCluster &&
 							popupInfo.startTime !== popupInfo.endTime && (
 								<div>
-									<span className="text-xs font-medium text-muted-foreground">
+									<span className="text-muted-foreground text-xs font-medium">
 										To
 									</span>
-									<p className="text-sm font-bold text-primary">
-										{format(new Date(popupInfo.endTime), 'Pp')}
+									<p className="text-primary text-sm font-bold">
+										{dateTimeFormat.format(new Date(popupInfo.endTime))}
 									</p>
 								</div>
 							)}

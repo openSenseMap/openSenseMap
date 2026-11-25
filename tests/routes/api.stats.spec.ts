@@ -1,5 +1,5 @@
-import { type LoaderFunctionArgs } from 'react-router'
-import { BASE_URL } from 'vitest.setup'
+import { type Route } from '../../.react-router/types/app/routes/+types/api.stats'
+import { BASE_URL } from '../../vitest.setup'
 import { loader } from '~/routes/api.stats'
 
 describe('openSenseMap API Routes: /stats', () => {
@@ -13,7 +13,7 @@ describe('openSenseMap API Routes: /stats', () => {
 		// Act
 		const dataFunctionValue = await loader({
 			request: request,
-		} as LoaderFunctionArgs)
+		} as Route.LoaderArgs)
 		const response = dataFunctionValue as Response
 		const body = await response.json()
 
@@ -39,7 +39,7 @@ describe('openSenseMap API Routes: /stats', () => {
 		// Act
 		const dataFunctionValue = await loader({
 			request: request,
-		} as LoaderFunctionArgs)
+		} as Route.LoaderArgs)
 		const response = dataFunctionValue as Response
 		const body = await response.json()
 
@@ -65,7 +65,7 @@ describe('openSenseMap API Routes: /stats', () => {
 		// Act
 		const dataFunctionValue = await loader({
 			request: request,
-		} as LoaderFunctionArgs)
+		} as Route.LoaderArgs)
 		const response = dataFunctionValue as Response
 		const body = await response.json()
 
@@ -99,7 +99,7 @@ describe('openSenseMap API Routes: /stats', () => {
 			requests.map((request) =>
 				loader({
 					request: request,
-				} as LoaderFunctionArgs),
+				} as Route.LoaderArgs),
 			),
 		)
 		const bodies = await Promise.all(responses.map((res) => res.json()))

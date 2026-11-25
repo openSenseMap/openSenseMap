@@ -4,7 +4,9 @@
 	"explore_label": "Erkunden",
 	"profile_label": "Profil",
 	"settings_label": "Einstellungen",
+	"about_label": "Über OpenSenseMap",
 	"my_devices_label": "Meine Geräte",
+	"download_label": "Datendownload",
 	"add_device_label": "Gerät hinzufügen",
 	"tutorials_label": "Tutorials",
 	"api_docs_label": "API Dokumentation",
@@ -17,8 +19,12 @@
 	"promotion_label": "Förderung",
 	"login_label": "Einloggen",
 	"logout_label": "Ausloggen",
-
 	"toast_login_success": "Erfolgreich eingeloggt",
 	"toast_logout_success": "Erfolgreich ausgeloggt",
-	"toast_user_creation_success": "Benutzer erfolgreich erstellt"
+	"toast_user_creation_success": "Benutzer erfolgreich erstellt",
+	"community_label": "Community Forum",
+	"devices": "Geräte",
+	"measurements": "Messungen",
+	"returnToGlobeView": "Zur Globusansicht zurückkehren",
+	"zoomToMyArea": "Zu meinem Bereich zoomen"
 }

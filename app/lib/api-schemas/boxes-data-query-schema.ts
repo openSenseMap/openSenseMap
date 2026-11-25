@@ -1,6 +1,6 @@
 import { z } from 'zod'
-import { type DeviceExposureType } from '~/schema'
-import { StandardResponse } from '~/utils/response-utils'
+import { type DeviceExposureType } from '../device-enums'
+import { StandardResponse } from '~/lib/responses'
 
 export type BoxesDataColumn =
 	| 'createdAt'
@@ -63,8 +63,7 @@ const BoxesDataQuerySchemaBase = z
 			.refine((d) => !isNaN(d.getTime()), {
 				message: 'from-date is invalid',
 			})
-			.optional()
-			.default(() =>
+			.prefault(() =>
 				new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
 			),
 		toDate: z
@@ -73,12 +72,11 @@ const BoxesDataQuerySchemaBase = z
 			.refine((d) => !isNaN(d.getTime()), {
 				message: 'to-date is invalid',
 			})
-			.optional()
-			.default(() => new Date().toISOString()),
+			.prefault(() => new Date().toISOString()),
 
 		format: z
 			.enum(['csv', 'json'], {
-				errorMap: () => ({ message: "Format must be either 'csv' or 'json'" }),
+				error: () => "Format must be either 'csv' or 'json'",
 			})
 			.default('csv'),
 
@@ -163,7 +161,7 @@ export async function parseBoxesDataQuery(
 	const parseResult = BoxesDataQuerySchemaBase.safeParse(params)
 
 	if (!parseResult.success) {
-		const firstError = parseResult.error.errors[0]
+		const firstError = parseResult.error.issues[0]
 		const message = firstError.message || 'Invalid query parameters'
 
 		if (firstError.path.includes('bbox')) {

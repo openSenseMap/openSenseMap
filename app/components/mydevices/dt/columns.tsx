@@ -1,12 +1,11 @@
 'use client'
 
-import { type ColumnDef } from '@tanstack/react-table'
 import {
-	ArrowUpDown,
-	ClipboardCopy,
-	Ellipsis,
-	LucideMapPin,
-} from 'lucide-react'
+	createColumnHelper,
+	type RowData,
+	type ColumnDef,
+} from '@tanstack/react-table'
+import { ArrowUpDown, Ellipsis, LucideMapPin } from 'lucide-react'
 import { type UseTranslationResponse } from 'react-i18next'
 import { Link } from 'react-router'
 import { Button } from '@/components/ui/button'
@@ -18,7 +17,9 @@ import {
 	DropdownMenuSeparator,
 	DropdownMenuTrigger,
 } from '~/components/ui/dropdown-menu'
-import { type Device } from '~/schema'
+import { type Device } from '~/db/schema'
+import { DeviceIdCell } from './device-id-cell'
+import { type CustomTableFeatures } from './data-table'
 
 export type SenseBox = {
 	id: string
@@ -34,13 +35,16 @@ const colStyle = 'pl-0 dark:text-white'
 
 export function getColumns(
 	useTranslation: UseTranslationResponse<'data-table', any>,
+	hydrated: boolean,
 	opts?: { isOwner?: boolean },
-): ColumnDef<SenseBox>[] {
-	const { t } = useTranslation
+): ColumnDef<CustomTableFeatures, SenseBox, unknown>[] {
+	const { t, i18n } = useTranslation
 	const isOwner = opts?.isOwner ?? false
-	return [
-		{
-			accessorKey: 'name',
+
+	const columnHelper = createColumnHelper<CustomTableFeatures, SenseBox>()
+
+	return columnHelper.columns([
+		columnHelper.accessor('name', {
 			header: ({ column }) => {
 				return (
 					<Button
@@ -69,17 +73,16 @@ export function getColumns(
 							{device.name}
 						</span>
 						{isArchived ? (
-							<span className="rounded-md border px-2 py-0.5 text-xs text-muted-foreground">
+							<span className="text-muted-foreground rounded-md border px-2 py-0.5 text-xs">
 								{t('archived')}
 							</span>
 						) : null}
 					</div>
 				)
 			},
-		},
-		{
-			accessorKey: 'createdAt',
-			sortingFn: 'datetime',
+		}),
+		columnHelper.accessor('createdAt', {
+			sortFn: 'datetime',
 			header: ({ column }) => {
 				return (
 					<Button
@@ -94,11 +97,10 @@ export function getColumns(
 			},
 			cell: ({ row }) => {
 				const date = new Date(row.getValue('createdAt'))
-				return <div>{date.toLocaleDateString()}</div>
+				return <div>{hydrated && date.toLocaleDateString(i18n.language)}</div>
 			},
-		},
-		{
-			accessorKey: 'exposure',
+		}),
+		columnHelper.accessor('exposure', {
 			header: ({ column }) => {
 				return (
 					<Button
@@ -111,9 +113,12 @@ export function getColumns(
 					</Button>
 				)
 			},
-		},
-		/* {
-    accessorKey: "model",
+			cell: ({ row }) => {
+				const exposure = row.original.exposure
+				return <div>{t(`exposure_values.${exposure}`)}</div>
+			},
+		}),
+		/*columnHelper.accessor("model", {
     header: ({ column }) => {
       return (
         <Button
@@ -127,28 +132,23 @@ export function getColumns(
       );
     },
   }, */
-		{
-			accessorKey: 'id',
+		columnHelper.accessor('id', {
 			header: () => (
-				<div className="pl-0 dark:text-white">{t('device_id')}</div>
+				<div className="text-muted-foreground pl-0">{t('device_id')}</div>
 			),
 			cell: ({ row }) => {
 				const device = row.original
 
 				return (
-					<div className="flex items-center">
-						<code className="rounded-sm bg-[#f9f2f4] px-1 py-[2px] text-[#c7254e]">
-							{device?.id}
-						</code>
-						<ClipboardCopy
-							onClick={() => navigator.clipboard.writeText(device?.id)}
-							className="ml-[6px] mr-1 inline-block h-4 w-4 cursor-pointer align-text-bottom text-[#818a91] dark:text-white"
-						/>
-					</div>
+					<DeviceIdCell
+						deviceId={device.id}
+						copyLabel={t('copy_id')}
+						copiedLabel={t('copied')}
+					/>
 				)
 			},
-		},
-		{
+		}),
+		columnHelper.display({
 			id: 'actions',
 			header: () => (
 				<div className="text-center dark:text-white">{t('actions')}</div>
@@ -173,27 +173,37 @@ export function getColumns(
 								<DropdownMenuLabel>{t('actions')}</DropdownMenuLabel>
 								<DropdownMenuSeparator />
 								<DropdownMenuItem asChild>
-									<a href={`/device/${device.id}/overview`}>{t('overview')}</a>
+									<Link to={`/device/${device.id}/overview`} prefetch="intent">
+										{t('overview')}
+									</Link>
 								</DropdownMenuItem>
 								<DropdownMenuItem disabled={isArchived} asChild>
-									<a href={`/explore/${device.id}`}>{t('show_on_map')}</a>
+									<Link to={`/explore/${device.id}`} prefetch="intent">
+										{t('show_on_map')}
+									</Link>
 								</DropdownMenuItem>
 								<DropdownMenuItem disabled={isArchived} asChild={!isArchived}>
 									{isArchived ? (
 										<span>{t('edit')}</span>
 									) : (
-										<a href={`/device/${device.id}/edit/general`}>
+										<Link
+											to={`/device/${device.id}/edit/general`}
+											prefetch="intent"
+										>
 											{t('edit')}
-										</a>
+										</Link>
 									)}
 								</DropdownMenuItem>
 								<DropdownMenuItem disabled={isArchived} asChild={!isArchived}>
 									{isArchived ? (
 										<span>{t('data_upload')}</span>
 									) : (
-										<a href={`/device/${device.id}/dataupload`}>
+										<Link
+											to={`/device/${device.id}/dataupload`}
+											prefetch="intent"
+										>
 											{t('data_upload')}
-										</a>
+										</Link>
 									)}
 								</DropdownMenuItem>
 								{((device.model?.toLowerCase() ?? '').indexOf('sensebox') >=
@@ -210,7 +220,6 @@ export function getColumns(
 									</DropdownMenuItem>
 								)}
 								<DropdownMenuItem
-									asChild
 									onClick={() => navigator.clipboard.writeText(device.id)}
 									className="cursor-pointer"
 								>
@@ -221,12 +230,16 @@ export function getColumns(
 					)
 				else
 					return (
-						<Link to={`/explore/${device.id}`} title={t('show_on_map')}>
+						<Link
+							to={`/explore/${device.id}`}
+							prefetch="intent"
+							title={t('show_on_map')}
+						>
 							<span className="sr-only">Show on map</span>
 							<LucideMapPin className="h-4 w-4" />
 						</Link>
 					)
 			},
-		},
-	]
+		}),
+	])
 }

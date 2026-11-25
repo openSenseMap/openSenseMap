@@ -1,154 +1,180 @@
-import {
-	type Params,
-	type LoaderFunction,
-	type LoaderFunctionArgs,
-} from 'react-router'
+import { type Params } from 'react-router'
+import { type Route } from './+types/api.boxes.$deviceId.data.$sensorId'
+import { getMeasurements } from '~/db/models/sensor.server'
+import { type Measurement } from '~/db/schema'
+import { convertToCsv } from '~/lib/csv'
 import {
 	type TransformedMeasurement,
 	transformOutliers,
 } from '~/lib/outlier-transform'
-import { getMeasurements } from '~/models/sensor.server'
-import { type Measurement } from '~/schema'
-import { convertToCsv } from '~/utils/csv'
-import { parseDateParam, parseEnumParam } from '~/utils/param-utils'
-import { StandardResponse } from '~/utils/response-utils'
+import { parseDateParam, parseEnumParam } from '~/lib/params'
+import { StandardResponse } from '~/lib/responses'
+import { z } from 'zod'
+import { type ZodOpenApiPathItemObject } from 'zod-openapi'
+import {
+	BadRequestErrorSchema,
+	badRequestResponse,
+	internalServerErrorResponse,
+	InternalServerErrorSchema,
+	NotFoundErrorSchema,
+	notFoundResponse,
+} from '~/lib/openapi/errors'
+import { DeviceSensorPathParamsSchema } from '~/lib/openapi/schemas/common'
+import {
+	DateRangeQuerySchema,
+	DelimiterSchema,
+	OutputFormatSchema,
+	QueryDownloadSchema,
+	SeparatorSchema,
+} from '~/lib/api-schemas/query'
 
-/**
- * @openapi
- * /boxes/{deviceId}/data/{sensorId}:
- *   get:
- *    tags:
- *      - Sensors
- *    summary: Get up to 10000 measurements from a sensor for a specific time frame
- *    description: Get up to 10000 measurements from a sensor for a specific time frame, parameters `from-date` and `to-date` are optional. If not set, the last 48 hours are used. The maximum time frame is 1 month. If `download=true` `Content-disposition` headers will be set. Allows for JSON or CSV format.
- *    parameters:
- *      - in: path
- *        name: deviceId
- *        required: true
- *        schema:
- *          type: string
- *        description: the ID of the device you are referring to
- *      - in: path
- *        name: sensorId
- *        required: true
- *        schema:
- *          type: string
- *        description: the ID of the sensor you are referring to
- *      - in: query
- *        name: outliers
- *        required: false
- *        schema:
- *          type: string
- *          enum:
- *            - replace
- *            - mark
- *        description: Specifying this parameter enables outlier calculation which adds a new field called `isOutlier` to the data. Possible values are "mark" and "replace".
- *      - in: query
- *        name: outlier-window
- *        required: false
- *        schema:
- *          type: integer
- *          minimum: 1
- *          maximum: 50
- *          default: 15
- *        description: Size of moving window used as base to calculate the outliers.
- *      - in: query
- *        name: from-date
- *        required: false
- *        schema:
- *          type: string
- *          description: RFC3339Date
- *          format: date-time
- *        description: "Beginning date of measurement data (default: 48 hours ago from now)"
- *      - in: query
- *        name: to-date
- *        required: false
- *        schema:
- *          type: string
- *          descrption: TFC3339Date
- *          format: date-time
- *        description: "End date of measurement data (default: now)"
- *      - in: query
- *        name: format
- *        required: false
- *        schema:
- *          type: string
- *          enum:
- *            - json
- *            - csv
- *          default: json
- *        description: "Can be 'json' (default) or 'csv' (default: json)"
- *      - in: query
- *        name: download
- *        required: false
- *        schema:
- *          type: boolean
- *        description: if specified, the api will set the `content-disposition` header thus forcing browsers to download instead of displaying. Is always true for format csv.
- *      - in: query
- *        name: delimiter
- *        required: false
- *        schema:
- *          type: string
- *          enum:
- *            - comma
- *            - semicolon
- *          default: comma
- *        description: "Only for csv: the delimiter for csv. Possible values: `semicolon`, `comma`. Per default a comma is used. Alternatively you can use separator as parameter name."
- *    responses:
- *       200:
- *         description: Success
- *         content:
- *           application/json:
- *             schema:
- *               type: array
- *               example: '[{"sensor_id":"6649b23072c4c40007105953","time":"2025-11-06 23:59:57.189+00","value":4.78,"location_id":"5752066"},{"sensor_id":"6649b23072c4c40007105953","time":"2025-11-06 23:57:06.03+00","value":4.13,"location_id":"5752066"}]'
- *           text/csv:
- *             example: "createdAt,value
- *                       2023-09-29T08:06:13.254Z,6.38
- *                       2023-09-29T08:06:12.312Z,6.38
- *                       2023-09-29T08:06:11.513Z,6.38
- *                       2023-09-29T08:06:10.380Z,6.38
- *                       2023-09-29T08:06:09.569Z,6.38
- *                       2023-09-29T08:06:05.967Z,6.38"
- *       400:
- *         description: Bad Request
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 error:
- *                   type: string
- *                 message:
- *                   type: string
- *       404:
- *         description: Not found
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 error:
- *                   type: string
- *                 message:
- *                   type: string
- *       500:
- *         description: Internal Server Error
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 error:
- *                   type: string
- *                 message:
- *                   type: string
- */
+const SensorDataQueryParamsSchema = DateRangeQuerySchema.extend({
+	outliers: z.enum(['replace', 'mark']).optional().meta({
+		description:
+			'Enables outlier calculation. `mark` adds `isOutlier` to each measurement. `replace` replaces outlier values according to the outlier transformation.',
+		example: 'mark',
+	}),
 
-export const loader: LoaderFunction = async ({
+	'outlier-window': z.coerce.number().int().min(1).max(50).default(15).meta({
+		description:
+			'Size of the moving window used as base to calculate outliers. Allowed values are numbers between 1 and 50.',
+		example: 15,
+	}),
+
+	format: OutputFormatSchema,
+
+	download: QueryDownloadSchema,
+
+	delimiter: DelimiterSchema.meta({
+		description:
+			'Only for CSV responses. Controls the CSV delimiter. Defaults to `comma`. Do not use together with `separator`.',
+	}),
+
+	separator: SeparatorSchema,
+}).meta({
+	id: 'SensorDataQueryParams',
+	description:
+		'Query parameters for retrieving measurements of a single sensor.',
+})
+
+const SensorMeasurementSchema = z
+	.object({
+		sensorId: z.string().meta({
+			description: 'ID of the sensor this measurement belongs to',
+			example: '6649b23072c4c40007105953',
+		}),
+
+		time: z.iso.datetime().meta({
+			description: 'Measurement timestamp',
+			example: '2025-11-06T23:59:57.189Z',
+		}),
+
+		value: z.number().nullable().meta({
+			description: 'Measured value',
+			example: 4.78,
+		}),
+
+		locationId: z.union([z.string(), z.number()]).nullable().meta({
+			description:
+				'ID of the location associated with this measurement. Depending on serialization this may be returned as a string or number.',
+			example: '5752066',
+		}),
+
+		isOutlier: z.boolean().optional().meta({
+			description:
+				'Only present when outlier calculation is enabled via the `outliers` query parameter.',
+			example: false,
+		}),
+	})
+	.meta({
+		id: 'SensorMeasurement',
+		description: 'Measurement of a single sensor.',
+	})
+
+const SensorMeasurementsJsonResponseSchema = z
+	.array(SensorMeasurementSchema)
+	.meta({
+		id: 'SensorMeasurementsJsonResponse',
+		description:
+			'Up to 10000 measurements from a sensor for the requested time frame.',
+		example: [
+			{
+				sensorId: '6649b23072c4c40007105953',
+				time: '2025-11-06T23:59:57.189Z',
+				value: 4.78,
+				locationId: '5752066',
+			},
+			{
+				sensorId: '6649b23072c4c40007105953',
+				time: '2025-11-06T23:57:06.030Z',
+				value: 4.13,
+				locationId: '5752066',
+			},
+		],
+	})
+
+const SensorMeasurementsCsvResponseSchema = z.string().meta({
+	id: 'SensorMeasurementsCsvResponse',
+	description:
+		'CSV response with one measurement per row. The delimiter is controlled by the `delimiter` or `separator` query parameter.',
+	example:
+		'createdAt,value\n2023-09-29T08:06:13.254Z,6.38\n2023-09-29T08:06:12.312Z,6.38',
+})
+
+export const openapi: ZodOpenApiPathItemObject = {
+	get: {
+		tags: ['Sensors'],
+		summary: 'Get measurements from a sensor',
+		description:
+			'Get up to 10000 measurements from a sensor for a specific time frame. `from-date` and `to-date` are optional; if omitted, the last 48 hours are used. The documented maximum time frame is one month. JSON and CSV response formats are supported. If `download=true`, a `Content-Disposition` header is set.',
+
+		requestParams: {
+			path: DeviceSensorPathParamsSchema,
+			query: SensorDataQueryParamsSchema,
+		},
+
+		responses: {
+			200: {
+				description: 'Measurements returned successfully.',
+				headers: {
+					'Content-Disposition': {
+						description:
+							'Only present when `download=true` or when `format=csv`. Forces browsers to download the response.',
+						schema: {
+							type: 'string',
+							example: 'attachment; filename=6649b23072c4c40007105953.csv',
+						},
+					},
+				},
+				content: {
+					'application/json': {
+						schema: SensorMeasurementsJsonResponseSchema,
+					},
+					'text/csv': {
+						schema: SensorMeasurementsCsvResponseSchema,
+					},
+				},
+			},
+
+			400: badRequestResponse(
+				BadRequestErrorSchema,
+				'Bad request. This can happen for invalid dates, invalid enum parameters, or an invalid outlier window.',
+			),
+
+			404: notFoundResponse(NotFoundErrorSchema, 'Device or sensor not found.'),
+
+			500: internalServerErrorResponse(
+				InternalServerErrorSchema,
+				'Internal server error.',
+			),
+		},
+	},
+}
+
+export const loader = async ({
 	request,
 	params,
-}: LoaderFunctionArgs): Promise<Response> => {
+}: Route.LoaderArgs): Promise<Response> => {
 	try {
 		const collected = collectParameters(request, params)
 		if (collected instanceof Response) return collected
@@ -179,10 +205,10 @@ export const loader: LoaderFunction = async ({
 					? 'application/json; charset=utf-8'
 					: 'text/csv; charset=utf-8',
 		}
-		if (download)
+		if (download) {
 			headers['Content-Disposition'] =
 				`attachment; filename=${sensorId}.${format}`
-
+		}
 		const responseInit: ResponseInit = {
 			status: 200,
 			headers: headers,
@@ -193,10 +219,33 @@ export const loader: LoaderFunction = async ({
 			const csv = getCsv(meas, delimiter == 'comma' ? ',' : ';')
 			return new Response(csv, responseInit)
 		}
-	} catch (err) {
-		console.warn(err)
+	} catch {
 		return StandardResponse.internalServerError()
 	}
+}
+
+function collectDelimiterParam(url: URL): 'comma' | 'semicolon' | Response {
+	const delimiterParam = url.searchParams.get('delimiter')
+	const separatorParam = url.searchParams.get('separator')
+
+	if (delimiterParam !== null && separatorParam !== null) {
+		return StandardResponse.badRequest(
+			'Please specify only one of delimiter or separator.',
+		)
+	}
+
+	const paramName = delimiterParam !== null ? 'delimiter' : 'separator'
+	const value = delimiterParam ?? separatorParam
+
+	if (value === null) return 'comma'
+
+	if (value !== 'comma' && value !== 'semicolon') {
+		return StandardResponse.badRequest(
+			`Illegal value for parameter ${paramName}. Allowed values: comma, semicolon`,
+		)
+	}
+
+	return value
 }
 
 function collectParameters(
@@ -212,7 +261,7 @@ function collectParameters(
 			fromDate: Date
 			toDate: Date
 			format: string | null
-			download: boolean | null
+			download: boolean
 			delimiter: string
 	  } {
 	// deviceId is there for legacy reasons
@@ -229,17 +278,20 @@ function collectParameters(
 	if (outliers instanceof Response) return outliers
 
 	const outlierWindowParam = url.searchParams.get('outlier-window')
-	let outlierWindow: number = 15
+	let outlierWindow = 15
+
 	if (outlierWindowParam !== null) {
+		outlierWindow = Number(outlierWindowParam)
+
 		if (
-			Number.isNaN(outlierWindowParam) ||
-			Number(outlierWindowParam) < 1 ||
-			Number(outlierWindowParam) > 50
-		)
+			!Number.isInteger(outlierWindow) ||
+			outlierWindow < 1 ||
+			outlierWindow > 50
+		) {
 			return StandardResponse.badRequest(
 				'Illegal value for parameter outlier-window. Allowed values: numbers between 1 and 50',
 			)
-		outlierWindow = Number(outlierWindowParam)
+		}
 	}
 
 	const fromDate = parseDateParam(
@@ -256,26 +308,21 @@ function collectParameters(
 	if (format instanceof Response) return format
 
 	const downloadParam = parseEnumParam(url, 'download', ['true', 'false'], null)
-	if (downloadParam instanceof Response) return downloadParam
-	const download = downloadParam == null ? null : downloadParam === 'true'
 
-	const delimiter = parseEnumParam(
-		url,
-		'delimiter',
-		['comma', 'semicolon'],
-		'comma',
-	)
+	if (downloadParam instanceof Response) return downloadParam
+
+	const delimiter = collectDelimiterParam(url)
 	if (delimiter instanceof Response) return delimiter
 
 	return {
 		deviceId,
 		sensorId,
-		outliers,
+		outliers: outliers as 'replace' | 'mark' | null,
 		outlierWindow,
 		fromDate,
 		toDate,
 		format,
-		download,
+		download: format === 'csv' || downloadParam === 'true',
 		delimiter,
 	}
 }

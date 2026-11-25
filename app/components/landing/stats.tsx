@@ -27,7 +27,7 @@ export default function Stats(stats: number[]) {
 	]
 
 	return (
-		<div className="mx-auto px-4 sm:max-w-xl md:max-w-full md:px-24 lg:max-w-screen-xl lg:px-8 lg:py-12">
+		<div className="mx-auto px-4 sm:max-w-xl md:max-w-full md:px-24 lg:max-w-(--breakpoint-xl) lg:px-8 lg:py-12">
 			<div className="row-gap-8 grid gap-10 lg:grid-cols-3">
 				{osemStats.map((stat) => (
 					<div key={stat.id} id={stat.name}>
@@ -43,10 +43,10 @@ export default function Stats(stats: number[]) {
 						>
 							<div className="flex flex-col items-center text-center">
 								<div className="flex-direction-row justify-content-center align-items-center flex">
-									<h6 className="text-5xl font-bold text-light-green">
+									<h6 className="text-light-green text-5xl font-bold">
 										<AnimatedCounter from={0} to={stat.value} />
 									</h6>
-									<h6 className="text-5xl font-bold text-light-green">
+									<h6 className="text-light-green text-5xl font-bold">
 										{stat.unit}
 									</h6>
 								</div>

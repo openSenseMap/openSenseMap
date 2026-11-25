@@ -6,47 +6,46 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '~/components/ui/tabs'
 export default function SettingsLayoutPage() {
 	const location = useLocation()
 	// get current tab from the URL
-	const currentTab = location.pathname.split('/')[2]
+	const currentTab = location.pathname.split('/')[2] || 'account'
 
 	const { t } = useTranslation('settings')
 
 	return (
-		<div className="h-screen bg-gray-100 dark:bg-dark-background dark:text-dark-text">
+		<div className="bg-background text-foreground min-h-screen">
 			<NavBar />
-			<div className="flex w-full items-start justify-center bg-gray-100 py-10 dark:bg-dark-background">
-				<div className="w-full max-w-3xl rounded-lg bg-transparent p-6 dark:bg-transparent dark:text-dark-text dark:shadow-none">
-					<Tabs
-						className="w-full"
-						defaultValue="account"
-						value={currentTab || 'account'}
-					>
-						<TabsList className="w-full justify-evenly">
-							<TabsTrigger
-								className="data-[state=active]:text-light-green"
-								value="profile"
-							>
-								<Link to={`/settings/profile`}>{t('public_profile')}</Link>
-							</TabsTrigger>
-							<TabsTrigger
-								className="data-[state=active]:text-light-green"
-								value="account"
-							>
-								<Link to={`/settings/account`}>{t('account')}</Link>
-							</TabsTrigger>
-							<TabsTrigger
-								className="data-[state=active]:text-light-green"
-								value="password"
-							>
-								<Link to={`/settings/password`}>{t('password')}</Link>
-							</TabsTrigger>
-							<TabsTrigger
-								className="data-[state=active]:text-light-green"
-								value="delete"
-							>
-								<Link to={`/settings/delete`}>{t('delete_account')}</Link>
-							</TabsTrigger>
-						</TabsList>
-						<TabsContent className="mt-6" value={currentTab || 'profile'}>
+			<div className="bg-background flex w-full items-start justify-center py-4 sm:py-8 lg:py-10">
+				<div className="w-full max-w-3xl rounded-lg bg-transparent p-4 sm:p-6">
+					<Tabs className="w-full" defaultValue="account" value={currentTab}>
+						<div className="w-full overflow-x-auto pb-1">
+							<TabsList className="h-auto w-full min-w-max justify-evenly">
+								<TabsTrigger value="profile" className="shrink-0" asChild>
+									<Link to="/settings/profile" prefetch="intent">
+										{t('public_profile')}
+									</Link>
+								</TabsTrigger>
+
+								<TabsTrigger value="account" className="shrink-0" asChild>
+									<Link to="/settings/account" prefetch="intent">
+										{t('account')}
+									</Link>
+								</TabsTrigger>
+
+								<TabsTrigger value="preferences" className="shrink-0" asChild>
+									<Link to="/settings/preferences" prefetch="intent">
+										{t('preferences')}
+									</Link>
+								</TabsTrigger>
+
+								<TabsTrigger
+									value="delete"
+									className="data-[state=active]:text-destructive shrink-0"
+									asChild
+								>
+									<Link to="/settings/delete">{t('delete_account')}</Link>
+								</TabsTrigger>
+							</TabsList>
+						</div>
+						<TabsContent className="mt-6" value={currentTab}>
 							<Outlet />
 						</TabsContent>
 					</Tabs>

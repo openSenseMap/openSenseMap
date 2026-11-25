@@ -3,10 +3,10 @@ import { resolve } from 'node:path'
 import Backend from 'i18next-fs-backend/cjs' // Even though unintuitive, cjs is what we want: https://github.com/i18next/i18next-fs-backend/issues/57
 import { initReactI18next } from 'react-i18next'
 import { createCookie } from 'react-router'
-import { createI18nextMiddleware } from 'remix-i18next/middleware'
+import { createI18nextMiddleware } from 'remix-i18next'
 import invariant from 'tiny-invariant'
 import { i18nextOptions } from '~/i18next-config'
-import { getUser } from '~/utils/session.server'
+import { getUser } from '~/services/session-service.server'
 
 invariant(process.env.SESSION_SECRET, 'SESSION_SECRET must be set')
 invariant(process.env.NODE_ENV, 'NODE_ENV must be set')
@@ -39,7 +39,7 @@ export const [i18nextMiddleware, getLocale, getInstance] =
 			cookie: i18nCookie,
 			// findLocale prefers a user's saved language to make sure their choice is respected.
 			// It then falls back to the cookie value and finally the accept-language header (for first time visits).
-			findLocale: async (request) => {
+			findLocale: async ({ request }) => {
 				const user = await getUser(request)
 				if (user?.language) return user.language.slice(0, 2)
 

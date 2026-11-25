@@ -1,14 +1,18 @@
-import { type ActionFunctionArgs } from 'react-router'
 import { generateTestUserCredentials } from 'tests/data/generate_test_user'
-import { BASE_URL } from 'vitest.setup'
+import { type Route as SignOutRoute } from '../../.react-router/types/app/routes/+types/api.sign-out'
+import { type Route as MeRoute } from '../../.react-router/types/app/routes/+types/api.users.me'
+import { type Route } from '../../.react-router/types/app/routes/+types/api.users.refresh-auth'
+import { type Route as SignInRoute } from '../../.react-router/types/app/routes/+types/api.users.sign-in'
+import { BASE_URL } from '../../vitest.setup'
+import { deleteUserByEmail } from '~/db/models/user.server'
+import { type User } from '~/db/schema'
 import { createToken } from '~/lib/jwt'
-import { registerUser } from '~/lib/user-service.server'
-import { deleteUserByEmail } from '~/models/user.server'
 import { action as signOutAction } from '~/routes/api.sign-out'
 import { action as meAction, loader as meLoader } from '~/routes/api.users.me'
 import { action } from '~/routes/api.users.refresh-auth'
 import { action as signInAction } from '~/routes/api.users.sign-in'
-import { type User } from '~/schema'
+import { registerUser } from '~/services/user-service.server'
+import { createSignInRequest } from './api.users.sign-in.spec'
 
 const VALID_REFRESH_AUTH_TEST_USER = generateTestUserCredentials()
 const CHANGED_PW_TO = 'some other very secure password'
@@ -24,16 +28,16 @@ describe('openSenseMap API Routes: /users', () => {
 				VALID_REFRESH_AUTH_TEST_USER.email,
 				VALID_REFRESH_AUTH_TEST_USER.password,
 				'en_US',
-				true
-			);
+				true,
+			)
 			expect(registration.ok).toBe(true)
 			if (!registration.ok) {
 				throw new Error(
 					`Test setup failed: ${registration.field} -> ${registration.code}`,
-			)
-			};
-			const user = registration.user;
-			({ token: jwt, refreshToken } = await createToken(user as User))
+				)
+			}
+			const user = registration.user
+			;({ token: jwt, refreshToken } = await createToken(user as User))
 		})
 
 		describe('/POST', () => {
@@ -53,7 +57,7 @@ describe('openSenseMap API Routes: /users', () => {
 				// Act
 				const dataFunctionValue = await action({
 					request,
-				} as ActionFunctionArgs)
+				} as Route.ActionArgs)
 				const response = dataFunctionValue as Response
 				const body = await response?.json()
 
@@ -65,7 +69,7 @@ describe('openSenseMap API Routes: /users', () => {
 				})
 				const meResponse = (await meLoader({
 					request: meRequest,
-				} as ActionFunctionArgs)) as Response
+				} as Route.ActionArgs)) as Response
 				const meBody = await meResponse?.json()
 
 				// Assert
@@ -90,18 +94,14 @@ describe('openSenseMap API Routes: /users', () => {
 
 			it('should allow to refresh jwt using JSON data', async () => {
 				// Arrange - First sign in to get a fresh refresh token
-				const signInParams = new URLSearchParams()
-				signInParams.append('email', VALID_REFRESH_AUTH_TEST_USER.email)
-				signInParams.append('password', VALID_REFRESH_AUTH_TEST_USER.password)
-				const signInRequest = new Request(`${BASE_URL}/users/sign-in`, {
-					method: 'POST',
-					headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-					body: signInParams.toString(),
-				})
+				const signInRequest = createSignInRequest(
+					VALID_REFRESH_AUTH_TEST_USER.email,
+					VALID_REFRESH_AUTH_TEST_USER.password,
+				)
 
 				const signInResponse = (await signInAction({
 					request: signInRequest,
-				} as ActionFunctionArgs)) as Response
+				} as SignInRoute.ActionArgs)) as Response
 				const signInBody = await signInResponse?.json()
 				const freshJwt = signInBody.token
 				const freshRefreshToken = signInBody.refreshToken
@@ -119,7 +119,7 @@ describe('openSenseMap API Routes: /users', () => {
 				// Act
 				const dataFunctionValue = await action({
 					request,
-				} as ActionFunctionArgs)
+				} as Route.ActionArgs)
 				const response = dataFunctionValue as Response
 				const body = await response?.json()
 
@@ -149,7 +149,7 @@ describe('openSenseMap API Routes: /users', () => {
 				// Act
 				const dataFunctionValue = await action({
 					request,
-				} as ActionFunctionArgs)
+				} as Route.ActionArgs)
 				const response = dataFunctionValue as Response
 
 				// Assert
@@ -186,14 +186,14 @@ describe('openSenseMap API Routes: /users', () => {
 				// Change password first
 				const changePwFunctionValue = await meAction({
 					request: changePasswordRequest,
-				} as ActionFunctionArgs)
+				} as MeRoute.ActionArgs)
 				const changePwResponse = changePwFunctionValue as Response
 				const changePwJson = await changePwResponse.json()
 
 				// Then try refreshing
 				const dataFunctionValue = await action({
 					request,
-				} as ActionFunctionArgs)
+				} as Route.ActionArgs)
 				const response = dataFunctionValue as Response
 
 				// Assert
@@ -209,14 +209,10 @@ describe('openSenseMap API Routes: /users', () => {
 
 			it('should deny to use the refreshToken after signing out', async () => {
 				// Arrange
-				const signInParams = new URLSearchParams()
-				signInParams.append('email', VALID_REFRESH_AUTH_TEST_USER.email)
-				signInParams.append('password', CHANGED_PW_TO)
-				const signInRequest = new Request(`${BASE_URL}/users/sign-in`, {
-					method: 'POST',
-					headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-					body: signInParams.toString(),
-				})
+				const signInRequest = createSignInRequest(
+					VALID_REFRESH_AUTH_TEST_USER.email,
+					CHANGED_PW_TO,
+				)
 
 				const signOutParams = new URLSearchParams()
 				const signOutRequest = new Request(`${BASE_URL}/users/sign-out`, {
@@ -240,7 +236,7 @@ describe('openSenseMap API Routes: /users', () => {
 				// Make sure to be signed in
 				const signInFunctionValue = await signInAction({
 					request: signInRequest,
-				} as ActionFunctionArgs)
+				} as SignInRoute.ActionArgs)
 				const signInResponse = signInFunctionValue as Response
 				const body = await signInResponse?.json()
 				const localJwt = body.token
@@ -253,13 +249,13 @@ describe('openSenseMap API Routes: /users', () => {
 				// Sign out
 				const signOutFunctionValue = await signOutAction({
 					request: signOutRequest,
-				} as ActionFunctionArgs)
+				} as SignOutRoute.ActionArgs)
 				const signOutResponse = signOutFunctionValue as Response
 
 				// Then try refreshing
 				const dataFunctionValue = await action({
 					request,
-				} as ActionFunctionArgs)
+				} as Route.ActionArgs)
 				const response = dataFunctionValue as Response
 
 				// Assert

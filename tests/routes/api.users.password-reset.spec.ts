@@ -1,5 +1,5 @@
-import { type ActionFunctionArgs } from 'react-router'
-import { BASE_URL } from 'vitest.setup'
+import { type Route } from '../../.react-router/types/app/routes/+types/api.users.password-reset'
+import { BASE_URL } from '../../vitest.setup'
 import { action } from '~/routes/api.users.password-reset'
 
 describe('openSenseMap API Routes: /users', () => {
@@ -18,7 +18,7 @@ describe('openSenseMap API Routes: /users', () => {
 				})
 				const response = (await action({
 					request,
-				} as ActionFunctionArgs)) as Response
+				} as Route.ActionArgs)) as Response
 				const body = await response.json()
 				expect(response.status).toBe(403)
 				expect(response.headers.get('content-type')).toBe(
@@ -42,7 +42,7 @@ describe('openSenseMap API Routes: /users', () => {
 				})
 				const response = (await action({
 					request,
-				} as ActionFunctionArgs)) as Response
+				} as Route.ActionArgs)) as Response
 				expect(response.status).toBe(400)
 			})
 		})

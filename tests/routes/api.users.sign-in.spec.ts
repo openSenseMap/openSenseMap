@@ -1,14 +1,18 @@
-import { type ActionFunctionArgs } from 'react-router'
-import { BASE_URL } from 'vitest.setup'
-import { registerUser } from '~/lib/user-service.server'
-import { deleteUserByEmail } from '~/models/user.server'
+import { generateTestUserCredentials } from 'tests/data/generate_test_user'
+import { type Route } from '../../.react-router/types/app/routes/+types/api.users.sign-in'
+import { BASE_URL } from '../../vitest.setup'
+import { deleteUserByEmail } from '~/db/models/user.server'
 import { action } from '~/routes/api.users.sign-in'
+import { registerUser } from '~/services/user-service.server'
 
-const VALID_SIGN_IN_TEST_USER = {
-	name: 'signingIn',
-	email: 'test@sign.in',
-	password: 'some secure password',
-}
+const VALID_SIGN_IN_TEST_USER = generateTestUserCredentials()
+
+export const createSignInRequest = (email: string, password: string) =>
+	new Request(`${BASE_URL}/users/sign-in`, {
+		method: 'POST',
+		headers: { 'Content-Type': 'application/json' },
+		body: JSON.stringify({ email, password }),
+	})
 
 describe('openSenseMap API Routes: /users', () => {
 	describe('/sign-in', () => {
@@ -18,26 +22,22 @@ describe('openSenseMap API Routes: /users', () => {
 				VALID_SIGN_IN_TEST_USER.email,
 				VALID_SIGN_IN_TEST_USER.password,
 				'en_US',
-				true
+				true,
 			)
 		})
 
 		describe('/POST', () => {
 			it('should deny to sign in with wrong password', async () => {
 				// Arrange
-				const params = new URLSearchParams()
-				params.append('email', VALID_SIGN_IN_TEST_USER.email)
-				params.append('password', 'wrong password')
-				const request = new Request(`${BASE_URL}/users/sign-in`, {
-					method: 'POST',
-					headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-					body: params.toString(),
-				})
+				const request = createSignInRequest(
+					VALID_SIGN_IN_TEST_USER.email,
+					'wrong password',
+				)
 
 				// Act
 				const dataFunctionValue = await action({
 					request,
-				} as ActionFunctionArgs)
+				} as Route.ActionArgs)
 				const response = dataFunctionValue as Response
 
 				// Assert
@@ -46,24 +46,18 @@ describe('openSenseMap API Routes: /users', () => {
 			})
 
 			it('should allow to sign in a user with email and password', async () => {
-				// Arrange
-				const params = new URLSearchParams()
-				params.append('email', VALID_SIGN_IN_TEST_USER.email)
-				params.append('password', VALID_SIGN_IN_TEST_USER.password)
-				const request = new Request(`${BASE_URL}/users/sign-in`, {
-					method: 'POST',
-					headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-					body: params.toString(),
-				})
+				const request = createSignInRequest(
+					VALID_SIGN_IN_TEST_USER.email,
+					VALID_SIGN_IN_TEST_USER.password,
+				)
 
-				// Act
 				const dataFunctionValue = await action({
 					request,
-				} as ActionFunctionArgs)
-				const response = dataFunctionValue as Response
-				const body = await response?.json()
+				} as Route.ActionArgs)
 
-				// Assert
+				const response = dataFunctionValue as Response
+				const body = await response.json()
+
 				expect(dataFunctionValue).toBeInstanceOf(Response)
 				expect(response.status).toBe(200)
 				expect(response.headers.get('content-type')).toBe(
@@ -75,19 +69,15 @@ describe('openSenseMap API Routes: /users', () => {
 
 			it('should allow to sign in a user with name and password', async () => {
 				// Arrange
-				const params = new URLSearchParams()
-				params.append('email', VALID_SIGN_IN_TEST_USER.name)
-				params.append('password', VALID_SIGN_IN_TEST_USER.password)
-				const request = new Request(`${BASE_URL}/users/sign-in`, {
-					method: 'POST',
-					headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-					body: params.toString(),
-				})
+				const request = createSignInRequest(
+					VALID_SIGN_IN_TEST_USER.name,
+					VALID_SIGN_IN_TEST_USER.password,
+				)
 
 				// Act
 				const dataFunctionValue = await action({
 					request,
-				} as ActionFunctionArgs)
+				} as Route.ActionArgs)
 				const response = dataFunctionValue as Response
 				const body = await response?.json()
 
@@ -103,19 +93,15 @@ describe('openSenseMap API Routes: /users', () => {
 
 			it('should allow to sign in a user with email (different case) and password', async () => {
 				// Arrange
-				const params = new URLSearchParams()
-				params.append('email', VALID_SIGN_IN_TEST_USER.email.toUpperCase())
-				params.append('password', VALID_SIGN_IN_TEST_USER.password)
-				const request = new Request(`${BASE_URL}/users/sign-in`, {
-					method: 'POST',
-					headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-					body: params.toString(),
-				})
+				const request = createSignInRequest(
+					VALID_SIGN_IN_TEST_USER.email.toUpperCase(),
+					VALID_SIGN_IN_TEST_USER.password,
+				)
 
 				// Act
 				const dataFunctionValue = await action({
 					request,
-				} as ActionFunctionArgs)
+				} as Route.ActionArgs)
 				const response = dataFunctionValue as Response
 				const body = await response?.json()
 
@@ -131,19 +117,15 @@ describe('openSenseMap API Routes: /users', () => {
 
 			it('should deny to sign in with name in different case', async () => {
 				// Arrange
-				const params = new URLSearchParams()
-				params.append('email', VALID_SIGN_IN_TEST_USER.name.toUpperCase())
-				params.append('password', VALID_SIGN_IN_TEST_USER.password)
-				const request = new Request(`${BASE_URL}/users/sign-in`, {
-					method: 'POST',
-					headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-					body: params.toString(),
-				})
+				const request = createSignInRequest(
+					VALID_SIGN_IN_TEST_USER.name.toUpperCase(),
+					VALID_SIGN_IN_TEST_USER.password,
+				)
 
 				// Act
 				const dataFunctionValue = await action({
 					request,
-				} as ActionFunctionArgs)
+				} as Route.ActionArgs)
 				const response = dataFunctionValue as Response
 
 				// Assert

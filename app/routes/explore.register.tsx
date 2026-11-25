@@ -1,20 +1,19 @@
 import * as React from 'react'
 import { useTranslation } from 'react-i18next'
 import {
-	type LoaderFunctionArgs,
-	type MetaFunction,
 	data,
 	redirect,
 	Form,
 	Link,
-	useActionData,
 	useNavigation,
 	useSearchParams,
 } from 'react-router'
 import invariant from 'tiny-invariant'
 import { type Route } from './+types/explore.register'
+import { Checkbox } from '@/components/ui/checkbox'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { PasswordInput } from '@/components/ui/password-input'
 import Spinner from '~/components/spinner'
 import { Button } from '~/components/ui/button'
 import {
@@ -25,14 +24,14 @@ import {
 	CardHeader,
 	CardTitle,
 } from '~/components/ui/card'
-import { registerUser } from '~/lib/user-service.server'
+import { getCurrentEffectiveTos } from '~/db/models/tos.server'
+import { getUserByEmail, getUserByUsername } from '~/db/models/user.server'
 import { getLocale } from '~/middleware/i18next'
-import { getCurrentEffectiveTos } from '~/models/tos.server'
-import { getUserByEmail, getUserByUsername } from '~/models/user.server'
+import { createUserSession, getUserId } from '~/services/session-service.server'
+import { registerUser } from '~/services/user-service.server'
 import { safeRedirect, validateEmail, validateName } from '~/utils'
-import { createUserSession, getUserId } from '~/utils/session.server'
 
-export async function loader({ request }: LoaderFunctionArgs) {
+export async function loader({ request }: Route.LoaderArgs) {
 	const userId = await getUserId(request)
 	if (userId) return redirect('/')
 	return {}
@@ -40,7 +39,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
 
 export async function action({ context, request }: Route.ActionArgs) {
 	const formData = await request.formData()
-	const { username, email, password, tosAccepted } =
+	const { username, email, password, tosAccepted, newsletterOptIn } =
 		Object.fromEntries(formData)
 	const redirectTo = safeRedirect(formData.get('redirectTo'), '/explore')
 
@@ -187,6 +186,7 @@ export async function action({ context, request }: Route.ActionArgs) {
 		password,
 		language,
 		tosAccepted === 'on',
+		newsletterOptIn === 'on',
 	)
 
 	if (!result.ok) {
@@ -216,15 +216,10 @@ export async function action({ context, request }: Route.ActionArgs) {
 	})
 }
 
-export const meta: MetaFunction = () => {
-	return [{ title: 'Explore' }]
-}
-
-export default function RegisterDialog() {
+export default function RegisterDialog({ actionData }: Route.ComponentProps) {
 	const { t } = useTranslation('register')
 	const navigation = useNavigation()
 	const [searchParams] = useSearchParams()
-	const actionData = useActionData<typeof action>()
 	const usernameRef = React.useRef<HTMLInputElement>(null)
 	const emailRef = React.useRef<HTMLInputElement>(null)
 	const passwordRef = React.useRef<HTMLInputElement>(null)
@@ -250,16 +245,16 @@ export default function RegisterDialog() {
 		actionData.emailDeliveryFailed
 	) {
 		return (
-			<div className="flex h-screen items-center justify-center">
+			<div className="relative flex h-full w-full items-start justify-center overflow-y-auto p-4 sm:items-center">
 				<Link
 					to={{
 						pathname: '/explore',
 						search: searchParams.toString(),
 					}}
 				>
-					<div className="fixed inset-0 z-40 h-full w-full bg-black opacity-25" />
+					<div className="absolute inset-0 z-40 h-full w-full bg-black opacity-25" />
 				</Link>
-				<Card className="z-50 w-full max-w-md">
+				<Card className="relative z-50 my-auto w-full max-w-md min-w-0">
 					<CardHeader>
 						<CardTitle className="text-2xl font-bold">
 							{t('account_created')}
@@ -269,8 +264,8 @@ export default function RegisterDialog() {
 						</CardDescription>
 					</CardHeader>
 					<CardFooter className="flex flex-col items-center gap-2">
-						<Link to="/explore/login" className="w-full">
-							<Button className="w-full bg-light-blue">
+						<Link to="/explore/login" prefetch="intent" className="w-full">
+							<Button className="bg-light-blue w-full">
 								{t('go_to_login')}
 							</Button>
 						</Link>
@@ -281,18 +276,18 @@ export default function RegisterDialog() {
 	}
 
 	return (
-		<div className="flex h-screen items-center justify-center">
+		<div className="relative flex h-full w-full items-start justify-center overflow-y-auto p-4 sm:items-center">
 			<Link
 				to={{
 					pathname: '/explore',
 					search: searchParams.toString(),
 				}}
 			>
-				<div className="fixed inset-0 z-40 h-full w-full bg-black opacity-25" />
+				<div className="absolute inset-0 z-40 h-full w-full bg-black opacity-25" />
 			</Link>
-			<Card className="z-50 w-full max-w-md">
+			<Card className="relative z-50 my-auto w-full max-w-md min-w-0">
 				{navigation.state === 'loading' && (
-					<div className="bg-white/30 dark:bg-zinc-800/30 absolute inset-0 z-50 flex items-center justify-center backdrop-blur-sm">
+					<div className="absolute inset-0 z-50 flex items-center justify-center bg-white/30 backdrop-blur-xs dark:bg-zinc-800/30">
 						<Spinner />
 					</div>
 				)}
@@ -308,17 +303,21 @@ export default function RegisterDialog() {
 							<Label htmlFor="username">{t('username')}</Label>
 							<Input
 								id="username"
+								aria-invalid={actionErrors?.username ? true : undefined}
+								aria-describedby={
+									actionErrors?.username ? 'username-error' : undefined
+								}
 								placeholder={t('enter_username')}
 								ref={usernameRef}
 								name="username"
 								type="text"
 								autoFocus={true}
 							/>
-							<p className="text-xs text-muted-foreground">
+							<p className="text-muted-foreground text-xs">
 								{t('username_hint')}
 							</p>
 							{actionErrors?.username && (
-								<div className="mt-1 text-sm text-red-500" id="password-error">
+								<div className="mt-1 text-sm text-red-500" id="username-error">
 									{t(actionErrors?.username)}
 								</div>
 							)}
@@ -345,9 +344,8 @@ export default function RegisterDialog() {
 						</div>
 						<div className="space-y-2">
 							<Label htmlFor="password">{t('password')}</Label>
-							<Input
+							<PasswordInput
 								id="password"
-								type="password"
 								placeholder={t('enter_password')}
 								ref={passwordRef}
 								name="password"
@@ -355,7 +353,7 @@ export default function RegisterDialog() {
 								aria-invalid={actionErrors?.password ? true : undefined}
 								aria-describedby="password-error"
 							/>
-							<p className="text-xs text-muted-foreground">
+							<p className="text-muted-foreground text-xs">
 								{t('password_hint')}
 							</p>
 							{actionErrors?.password && (
@@ -364,14 +362,14 @@ export default function RegisterDialog() {
 								</div>
 							)}
 						</div>
-						<div className="flex items-center gap-2">
-							<input
+						<div className="flex items-start gap-2">
+							<Checkbox
 								id="tosAccepted"
 								name="tosAccepted"
-								type="checkbox"
-								className="h-4 w-4"
+								value="on"
 								aria-invalid={actionErrors?.tosAccepted ? true : undefined}
 								aria-describedby="tos-error"
+								className="mt-1"
 							/>
 							<Label htmlFor="tosAccepted" className="text-sm leading-5">
 								{t('agree_tos_prefix')}{' '}
@@ -386,7 +384,18 @@ export default function RegisterDialog() {
 								{t('agree_tos_suffix')}
 							</Label>
 						</div>
-						<div className="flex items-center gap-2">
+						<div className="flex items-start gap-2">
+							<Checkbox
+								id="newsletterOptIn"
+								name="newsletterOptIn"
+								value="on"
+								className="mt-1"
+							/>
+							<Label htmlFor="newsletterOptIn" className="text-sm leading-5">
+								{t('newsletter_opt_in')}
+							</Label>
+						</div>
+						<div className="flex items-start gap-2">
 							<Label className="text-sm leading-5">
 								{t('privacy_policy_prefix')}{' '}
 								<Link
@@ -408,10 +417,10 @@ export default function RegisterDialog() {
 						)}
 					</CardContent>
 					<CardFooter className="flex flex-col items-center gap-2">
-						<Button className="w-full bg-light-blue">{t('register')}</Button>
-						<div className="text-sm text-muted-foreground">
+						<Button className="bg-light-blue w-full">{t('register')}</Button>
+						<div className="text-muted-foreground text-center text-sm">
 							{t('already_account')}{' '}
-							<Link to="/explore/login" className="underline">
+							<Link to="/explore/login" prefetch="intent" className="underline">
 								{t('login')}
 							</Link>
 						</div>

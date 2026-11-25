@@ -1,170 +1,117 @@
-import { X } from 'lucide-react'
-import { useContext, useEffect, useState } from 'react'
-import { useSearchParams, useNavigation } from 'react-router'
-import { NavbarContext } from '..'
-import Spinner from '../../../spinner'
-import { Button } from '~/components/ui/button'
 import { Label } from '~/components/ui/label'
 import { ToggleGroup, ToggleGroupItem } from '~/components/ui/toggle-group'
-import { type DeviceExposureType, type DeviceStatusType } from '~/schema/enum'
 
-export default function FilterOptions() {
-	const { setOpen } = useContext(NavbarContext)
-	const [searchParams, setSearchParams] = useSearchParams()
-	const navigation = useNavigation()
+import { useTranslation } from 'react-i18next'
+import {
+	type DeviceExposureType,
+	type DeviceStatusType,
+} from '~/lib/device-enums'
 
-	const [exposureVal, setExposureVal] = useState<DeviceExposureType | 'all'>(
-		(searchParams.get('exposure') as DeviceExposureType) ?? 'all',
-	)
-	const [statusVal, setStatusVal] = useState<DeviceStatusType | 'all'>(
-		(searchParams.get('status') as DeviceStatusType) ?? 'all',
-	)
+interface FilterOptionsProps {
+	exposure: DeviceExposureType[]
+	status: DeviceStatusType[]
+	onExposureChange: (value: DeviceExposureType[]) => void
+	onStatusChange: (value: DeviceStatusType[]) => void
+}
 
-	const [tempExposureVal, setTempExposureVal] = useState(exposureVal)
-	const [tempStatusVal, setTempStatusVal] = useState(statusVal)
-	const [isChanged, setIsChanged] = useState(false)
-
-	useEffect(() => {
-		setExposureVal(
-			(searchParams.get('exposure') as DeviceExposureType) ?? 'all',
-		)
-		setStatusVal((searchParams.get('status') as DeviceStatusType) ?? 'all')
-		setTempExposureVal(
-			(searchParams.get('exposure') as DeviceExposureType) ?? 'all',
-		)
-		setTempStatusVal((searchParams.get('status') as DeviceStatusType) ?? 'all')
-	}, [searchParams])
-
-	useEffect(() => {
-		setIsChanged(tempExposureVal !== exposureVal || tempStatusVal !== statusVal)
-	}, [tempExposureVal, tempStatusVal, exposureVal, statusVal])
-
-	const handleApplyChanges = () => {
-		setExposureVal(tempExposureVal)
-		setStatusVal(tempStatusVal)
-		searchParams.set('exposure', tempExposureVal)
-		searchParams.set('status', tempStatusVal)
-		setSearchParams(searchParams)
-		setIsChanged(false)
-		setOpen(false)
+function normalizeToggleValues<T extends string>(
+	values: string[],
+	currentValues: T[],
+): T[] {
+	if (values.length === 0) {
+		return []
 	}
 
-	const handleResetFilters = () => {
-		setTempExposureVal('all')
-		setTempStatusVal('all')
-		searchParams.set('exposure', 'all')
-		searchParams.set('status', 'all')
-		setSearchParams(searchParams)
-		setIsChanged(false)
+	if (values.includes('all')) {
+		if (currentValues.length === 0) {
+			return values.filter((value) => value !== 'all') as T[]
+		}
+
+		return []
 	}
 
+	return values as T[]
+}
+
+export default function FilterOptions({
+	exposure,
+	status,
+	onExposureChange,
+	onStatusChange,
+}: FilterOptionsProps) {
+	const { t } = useTranslation('filter')
 	return (
-		<div className="flex h-full flex-1 flex-col justify-around gap-2 dark:text-zinc-200">
-			{navigation.state === 'loading' && (
-				<div className="bg-white/30 dark:bg-zinc-800/30 absolute inset-0 z-50 flex items-center justify-center backdrop-blur-sm">
-					<Spinner />
-				</div>
-			)}
-			<div className="space-y-4">
-				<div className="flex items-center justify-between space-y-[2px]">
-					<Label className="text-base">Exposure: </Label>
-					<ToggleGroup
-						className="w-full"
-						rovingFocus={false}
-						type="multiple"
-						variant="outline"
-						value={tempExposureVal ? tempExposureVal.split(',') : ['all']}
-						onValueChange={(values: string[]) => {
-							if (values.length === 0) {
-								setTempExposureVal('all')
-							} else if (
-								values.includes('all') &&
-								values.indexOf('all') === 0
-							) {
-								const filteredValues = values.filter((value) => value !== 'all')
-								setTempExposureVal(
-									filteredValues.join(',') as DeviceExposureType | 'all',
-								)
-							} else if (values.includes('all')) {
-								setTempExposureVal('all')
-							} else {
-								setTempExposureVal(
-									values.join(',') as DeviceExposureType | 'all',
-								)
-							}
-						}}
+		<div className="flex flex-col gap-3">
+			<div className="grid gap-1.5 md:grid-cols-[5.5rem_1fr] md:items-center">
+				<Label className="text-sm text-gray-600 dark:text-zinc-400">
+					{t('exposure')}
+				</Label>
+
+				<ToggleGroup
+					className="flex flex-wrap justify-start gap-1"
+					rovingFocus={false}
+					type="multiple"
+					variant="gray"
+					value={exposure.length > 0 ? exposure : ['all']}
+					onValueChange={(values) => {
+						onExposureChange(
+							normalizeToggleValues<DeviceExposureType>(values, exposure),
+						)
+					}}
+				>
+					<ToggleGroupItem value="all" aria-label="Toggle all" size="sm">
+						{t('all')}
+					</ToggleGroupItem>
+					<ToggleGroupItem value="indoor" aria-label="Toggle indoor" size="sm">
+						{t('indoor')}
+					</ToggleGroupItem>
+					<ToggleGroupItem
+						value="outdoor"
+						aria-label="Toggle outdoor"
+						size="sm"
 					>
-						<ToggleGroupItem value="all" aria-label="Toggle all">
-							all
-						</ToggleGroupItem>
-						<ToggleGroupItem value="indoor" aria-label="Toggle indoor">
-							indoor
-						</ToggleGroupItem>
-						<ToggleGroupItem value="outdoor" aria-label="Toggle outdoor">
-							outdoor
-						</ToggleGroupItem>
-						<ToggleGroupItem value="mobile" aria-label="Toggle mobile">
-							mobile
-						</ToggleGroupItem>
-					</ToggleGroup>
-				</div>
-				<div className="flex items-center justify-between space-y-[2px]">
-					<Label className="text-base">Status: </Label>
-					<ToggleGroup
-						className="w-full"
-						type="multiple"
-						variant="outline"
-						value={tempStatusVal ? tempStatusVal.split(',') : ['active']}
-						onValueChange={(values: string[]) => {
-							if (values.length === 0) {
-								setTempStatusVal('all')
-							} else if (
-								values.includes('all') &&
-								values.indexOf('all') === 0
-							) {
-								const filteredValues = values.filter((value) => value !== 'all')
-								setTempStatusVal(
-									filteredValues.join(',') as DeviceStatusType | 'all',
-								)
-							} else if (values.includes('all')) {
-								setTempStatusVal('all')
-							} else {
-								setTempStatusVal(values.join(',') as DeviceStatusType | 'all')
-							}
-						}}
-					>
-						<ToggleGroupItem value="all" aria-label="Toggle all">
-							all
-						</ToggleGroupItem>
-						<ToggleGroupItem value="active" aria-label="Toggle active">
-							active
-						</ToggleGroupItem>
-						<ToggleGroupItem value="inactive" aria-label="Toggle inactive">
-							inactive
-						</ToggleGroupItem>
-						<ToggleGroupItem value="old" aria-label="Toggle old">
-							old
-						</ToggleGroupItem>
-					</ToggleGroup>
-				</div>
+						{t('outdoor')}
+					</ToggleGroupItem>
+					<ToggleGroupItem value="mobile" aria-label="Toggle mobile" size="sm">
+						{t('mobile')}
+					</ToggleGroupItem>
+				</ToggleGroup>
 			</div>
-			<div className="flex justify-end gap-4 align-bottom">
-				<Button
-					variant="outline"
-					className="rounded-[5px] border-[1px] border-[#e2e8f0] px-2 py-[1px] text-base"
-					onClick={handleResetFilters}
+
+			<div className="grid gap-1.5 md:grid-cols-[5.5rem_1fr] md:items-center">
+				<Label className="text-sm text-gray-600 dark:text-zinc-400">
+					{t('status')}
+				</Label>
+
+				<ToggleGroup
+					className="flex flex-wrap justify-start gap-1"
+					rovingFocus={false}
+					type="multiple"
+					variant="gray"
+					value={status.length > 0 ? status : ['all']}
+					onValueChange={(values) => {
+						onStatusChange(
+							normalizeToggleValues<DeviceStatusType>(values, status),
+						)
+					}}
 				>
-					<span className="flex items-center">
-						<X className="m-0 inline h-3.5 w-3.5 p-0 align-sub" /> Reset
-					</span>
-				</Button>
-				<Button
-					className="rounded-[5px] px-2 py-[1px] text-base"
-					onClick={handleApplyChanges}
-					disabled={!isChanged}
-				>
-					Apply
-				</Button>
+					<ToggleGroupItem value="all" aria-label="Toggle all" size="sm">
+						{t('all')}
+					</ToggleGroupItem>
+					<ToggleGroupItem value="active" aria-label="Toggle active" size="sm">
+						{t('active')}
+					</ToggleGroupItem>
+					<ToggleGroupItem
+						value="inactive"
+						aria-label="Toggle inactive"
+						size="sm"
+					>
+						{t('inactive')}
+					</ToggleGroupItem>
+					<ToggleGroupItem value="old" aria-label="Toggle old" size="sm">
+						{t('old')}
+					</ToggleGroupItem>
+				</ToggleGroup>
 			</div>
 		</div>
 	)

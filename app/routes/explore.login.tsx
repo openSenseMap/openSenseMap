@@ -1,19 +1,17 @@
 import * as React from 'react'
 import { useTranslation } from 'react-i18next'
 import {
-	type ActionFunctionArgs,
-	type LoaderFunctionArgs,
-	type MetaFunction,
 	data,
 	redirect,
 	Form,
 	Link,
-	useActionData,
 	useNavigation,
 	useSearchParams,
 } from 'react-router'
+import { type Route } from './+types/explore.login'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { PasswordInput } from '@/components/ui/password-input'
 import Spinner from '~/components/spinner'
 import { Button } from '~/components/ui/button'
 import {
@@ -26,17 +24,27 @@ import {
 } from '~/components/ui/card'
 import { Checkbox } from '~/components/ui/checkbox'
 import { toast } from '~/components/ui/use-toast'
-import { verifyLogin } from '~/models/user.server'
+import { verifyLogin } from '~/db/models/user.server'
+import { createUserSession, getUserId } from '~/services/session-service.server'
 import { safeRedirect } from '~/utils'
-import { createUserSession, getUserId } from '~/utils/session.server'
 
-export async function loader({ request }: LoaderFunctionArgs) {
+export async function loader({ request }: Route.LoaderArgs) {
+	const url = new URL(request.url)
 	const userId = await getUserId(request)
-	if (userId) return redirect('/explore')
-	return {}
+	if (userId) {
+		const redirectTo = safeRedirect(
+			url.searchParams.get('redirectTo'),
+			'/explore',
+		)
+		return redirect(redirectTo)
+	}
+
+	return data({
+		redirectTo: safeRedirect(url.searchParams.get('redirectTo'), '/explore'),
+	})
 }
 
-export async function action({ request }: ActionFunctionArgs) {
+export async function action({ request }: Route.ActionArgs) {
 	const formData = await request.formData()
 	const identifier = formData.get('identifier')
 	const password = formData.get('password')
@@ -100,13 +108,11 @@ export async function action({ request }: ActionFunctionArgs) {
 	})
 }
 
-export const meta: MetaFunction = () => {
-	return [{ title: 'Login' }]
-}
-
-export default function LoginPage() {
+export default function LoginPage({
+	loaderData,
+	actionData,
+}: Route.ComponentProps) {
 	const [searchParams] = useSearchParams()
-	const actionData = useActionData<typeof action>()
 	const identifierRef = React.useRef<HTMLInputElement>(null)
 	const passwordRef = React.useRef<HTMLInputElement>(null)
 
@@ -132,22 +138,27 @@ export default function LoginPage() {
 	}, [])
 
 	return (
-		<div className="flex h-screen items-center justify-center">
+		<div className="relative flex h-full w-full items-start justify-center overflow-y-auto p-4 sm:items-center">
 			<Link
 				to={{
 					pathname: '/explore',
 					search: searchParams.toString(),
 				}}
 			>
-				<div className="fixed inset-0 z-40 h-full w-full bg-black opacity-25" />
+				<div className="absolute inset-0 z-40 h-full w-full bg-black opacity-25" />
 			</Link>
-			<Card className="z-50 w-full max-w-md">
+			<Card className="relative z-50 my-auto w-full max-w-md min-w-0">
 				{navigation.state === 'loading' && (
-					<div className="bg-white/30 dark:bg-zinc-800/30 absolute inset-0 z-50 flex items-center justify-center backdrop-blur-sm">
+					<div className="absolute inset-0 z-50 flex items-center justify-center bg-white/30 backdrop-blur-xs dark:bg-zinc-800/30">
 						<Spinner />
 					</div>
 				)}
 				<Form method="post" className="space-y-6" noValidate>
+					<input
+						type="hidden"
+						name="redirectTo"
+						value={loaderData.redirectTo}
+					/>
 					<CardHeader className="space-y-1 text-center">
 						<CardTitle className="text-2xl font-bold">
 							{t('welcome_back')}
@@ -179,17 +190,20 @@ export default function LoginPage() {
 							)}
 						</div>
 						<div className="space-y-2">
-							<div className="flex items-center justify-between">
+							<div className="flex flex-col items-start gap-1 sm:flex-row sm:items-center sm:justify-between">
 								<Label htmlFor="password"> {t('password_label')}</Label>
-								<Link to="/explore/forgot" className="text-sm underline">
+								<Link
+									to="/explore/forgot"
+									prefetch="intent"
+									className="text-sm underline"
+								>
 									{t('forgot_password')}
 								</Link>
 							</div>
-							<Input
+							<PasswordInput
 								id="password"
 								ref={passwordRef}
 								name="password"
-								type="password"
 								autoComplete="current-password"
 								aria-invalid={actionData?.errors?.password ? true : undefined}
 								aria-describedby="password-error"
@@ -209,10 +223,10 @@ export default function LoginPage() {
 						</div>
 					</CardContent>
 					<CardFooter className="flex flex-col items-center gap-2">
-						<Button type="submit" className="w-full bg-light-blue">
+						<Button type="submit" className="bg-light-blue w-full">
 							{t('sign_in_button')}
 						</Button>
-						<p className="text-sm text-muted-foreground">
+						<p className="text-muted-foreground text-center text-sm">
 							{t('no_account_label')}{' '}
 							<Link
 								className="font-medium underline"
@@ -220,6 +234,7 @@ export default function LoginPage() {
 									pathname: '/explore/register',
 									search: searchParams.toString(),
 								}}
+								prefetch="intent"
 							>
 								{t('register_label')}
 							</Link>

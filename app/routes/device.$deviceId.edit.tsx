@@ -12,23 +12,18 @@ import {
 	NotepadText,
 } from 'lucide-react'
 import { useState } from 'react'
-import {
-	redirect,
-	Link,
-	Outlet,
-	useParams,
-	type LoaderFunctionArgs,
-	useLoaderData,
-} from 'react-router'
+import { redirect, Link, Outlet } from 'react-router'
+import { type Route } from './+types/device.$deviceId.edit'
 import { EditDeviceSidebarNav } from '~/components/mydevices/edit-device/edit-device-sidebar-nav'
 import { NavBar } from '~/components/nav-bar'
 import { Separator } from '~/components/ui/separator'
+import { getIntegrations } from '~/db/models/integration.server'
 import { getLucideIcon } from '~/lib/lucide-icon-map'
-import { getIntegrations } from '~/models/integration.server'
-import { getUserId } from '~/utils/session.server'
+import { getUserId } from '~/services/session-service.server'
+import { useTranslation } from 'react-i18next'
 
 //*****************************************************
-export async function loader({ request }: LoaderFunctionArgs) {
+export async function loader({ request }: Route.LoaderArgs) {
 	//* if user is not logged in, redirect to home
 	const userId = await getUserId(request)
 	if (!userId) return redirect('/')
@@ -44,29 +39,41 @@ export async function action() {
 }
 
 //**********************************
-export default function EditBox() {
+export default function EditBox({
+	loaderData: { integrations },
+	params: { deviceId },
+}: Route.ComponentProps) {
 	const [toastOpen, setToastOpen] = useState(false)
-
-	const { integrations } = useLoaderData<typeof loader>()
-
-	const { deviceId } = useParams()
+	const { t } = useTranslation('device-overview')
 
 	const staticNavItems = [
-		{ title: 'General', href: `/device/${deviceId}/edit/general`, icon: Sheet },
-		{ title: 'Sensors', href: `/device/${deviceId}/edit/sensors`, icon: Cpu },
 		{
-			title: 'Location',
+			title: t('sidebar.general'),
+			href: `/device/${deviceId}/edit/general`,
+			icon: Sheet,
+		},
+		{
+			title: t('sidebar.sensors'),
+			href: `/device/${deviceId}/edit/sensors`,
+			icon: Cpu,
+		},
+		{
+			title: t('sidebar.location'),
 			href: `/device/${deviceId}/edit/location`,
 			icon: MapPin,
 		},
-		{ title: 'Logs', href: `/device/${deviceId}/edit/logs`, icon: NotepadText },
 		{
-			title: 'Security',
+			title: t('sidebar.logs'),
+			href: `/device/${deviceId}/edit/logs`,
+			icon: NotepadText,
+		},
+		{
+			title: t('sidebar.security'),
 			href: `/device/${deviceId}/edit/security`,
 			icon: Lock,
 		},
 		{
-			title: 'Script',
+			title: t('sidebar.script'),
 			href: `/device/${deviceId}/edit/script`,
 			icon: FileText,
 		},
@@ -86,14 +93,14 @@ export default function EditBox() {
 		...staticNavItems,
 		...integrationItems,
 		{
-			title: 'Transfer',
+			title: t('sidebar.transfer'),
 			href: `/device/${deviceId}/edit/transfer`,
 			icon: ArrowRightLeft,
 		},
 	]
 
 	return (
-		<div className="space-y-6 px-10 pb-16 font-helvetica">
+		<div className="font-helvetica space-y-6 px-4 pb-16 sm:px-6 lg:px-10">
 			<NavBar />
 
 			{/*Toast notification */}
@@ -104,7 +111,7 @@ export default function EditBox() {
 						duration={3000}
 						onOpenChange={setToastOpen}
 						className={clsx(
-							'inset-x-4 bottom-4 z-50 w-auto rounded-lg border-[1px] border-[#bce8f1] shadow-lg md:bottom-auto md:left-auto md:right-4 md:top-4 md:w-full',
+							'inset-x-4 bottom-4 z-50 w-auto rounded-lg border border-[#bce8f1] shadow-lg md:top-4 md:right-4 md:bottom-auto md:left-auto md:w-full',
 							'bg-[#d9edf7] dark:bg-gray-800',
 							'radix-state-open:animate-toast-slide-in-bottom md:radix-state-open:animate-toast-slide-in-right',
 							'radix-state-closed:animate-toast-hide',
@@ -113,7 +120,7 @@ export default function EditBox() {
 							'radix-swipe-direction-down:radix-swipe-end:animate-toast-swipe-out-y',
 							'radix-swipe-direction-down:translate-y-radix-toast-swipe-move-y',
 							'radix-swipe-cancel:translate-x-0 radix-swipe-cancel:duration-200 radix-swipe-cancel:ease-&lsqb;ease&rsqb;',
-							'focus-visible:ring-purple-500 focus:outline-none focus-visible:ring focus-visible:ring-opacity-75',
+							'focus-visible:ring-opacity-75 focus:outline-hidden focus-visible:ring-3 focus-visible:ring-purple-500',
 						)}
 					>
 						<div className="flex">
@@ -122,11 +129,11 @@ export default function EditBox() {
 									<ToastPrimitive.Title className="flex justify-between text-base font-medium text-[#31708f] dark:text-gray-100">
 										{/* Account successfully deleted. */}
 										<div>
-											device succesfully updated -
-											<Link to={`/explore/${deviceId}`}>
+											{t('device_updated')} -
+											<Link to={`/explore/${deviceId}`} prefetch="intent">
 												{' '}
 												<span className="text-[#4eaf47] hover:underline">
-													view
+													{t('view')}
 												</span>{' '}
 											</Link>
 										</div>
@@ -143,24 +150,42 @@ export default function EditBox() {
 				</ToastPrimitive.Provider>
 			</div>
 
-			<div className="rounded text-[#676767]">
-				<ArrowLeft className="mr-2 inline h-5 w-5" />
-				<Link to="/profile/me">Back to Dashboard</Link>
+			<div className="flex flex-col items-start gap-2 rounded sm:flex-row sm:items-center sm:justify-between sm:gap-4">
+				<div className="min-w-0">
+					<ArrowLeft className="mr-2 inline h-5 w-5" />
+					<Link to="/profile/me" prefetch="intent">
+						{t('back_to_dashboard')}
+					</Link>
+				</div>
+				{deviceId && (
+					<Link
+						to={`/explore/${deviceId}`}
+						prefetch="intent"
+						className="text-primary inline-flex shrink-0 items-center gap-2 text-sm hover:underline"
+					>
+						<MapPin className="h-4 w-4" />
+						{t('show_on_map')}
+					</Link>
+				)}
 			</div>
 
 			<div className="space-y-0.5">
-				<h2 className="text-2xl font-bold tracking-tight">Device settings</h2>
-				<p className="text-muted-foreground">Manage your device data.</p>
+				<h2 className="text-2xl font-bold tracking-tight">
+					{t('device_settings')}
+				</h2>
+				<p className="text-muted-foreground">{t('manage_device_data')}</p>
 			</div>
+
 			<Separator />
-			<div className="flex flex-col space-y-8 lg:flex-row lg:space-x-12 lg:space-y-0">
-				{/* <div className="grid sm:flex sm:flex-col sm:space-x-12 lg:flex  lg:flex-row lg:space-x-12 lg:space-y-0"> */}
-				<aside className="-mx-4 lg:w-1/5">
+
+			<div className="flex flex-col gap-8 lg:flex-row lg:gap-12">
+				<aside className="w-full shrink-0 lg:w-1/5">
 					<EditDeviceSidebarNav items={sidebarNavItems} />
 				</aside>
-				<div className="flex-1">
+
+				<main className="min-w-0 flex-1">
 					<Outlet context={[setToastOpen]} />
-				</div>
+				</main>
 			</div>
 		</div>
 	)

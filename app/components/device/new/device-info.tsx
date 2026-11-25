@@ -12,16 +12,17 @@ import { cn } from '~/lib/utils'
 const devices = [
 	{
 		name: 'senseBox:Home',
-		image: '/device_images/senseBox_Home.jpg',
+		image: '/img/device_images/senseBox_Home.jpg',
 		imageHasPadding: true,
 	},
 	{
 		name: 'senseBox:Edu',
-		image: '/device_images/senseBox_edu.jpg',
+		image: '/img/device_images/senseBox_edu.jpg',
 		imageHasPadding: true,
 	},
 	{
 		name: 'luftdaten.info',
+		label: 'Sensor.Community',
 		image:
 			'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyNCIgaGVpZ2h0PSIyNCIgdmlld0JveD0iMCAwIDI0IDI0IiBmaWxsPSJub25lIiBzdHJva2U9ImN1cnJlbnRDb2xvciIgc3Ryb2tlLXdpZHRoPSIyIiBzdHJva2UtbGluZWNhcD0icm91bmQiIHN0cm9rZS1saW5lam9pbj0icm91bmQiIGNsYXNzPSJsdWNpZGUgbHVjaWRlLXdpbmQiPjxwYXRoIGQ9Ik0xMi44IDE5LjZBMiAyIDAgMSAwIDE0IDE2SDIiLz48cGF0aCBkPSJNMTcuNSA4YTIuNSAyLjUgMCAxIDEgMiA0SDIiLz48cGF0aCBkPSJNOS44IDQuNEEyIDIgMCAxIDEgMTEgOEgyIi8+PC9zdmc+',
 		imageHasPadding: false,
@@ -98,59 +99,76 @@ export function DeviceSelectionStep() {
 
 	const handleClose = () => {
 		setSelectedDevice(null)
+		setSelectedConnectionType('')
 		setValue('model', null)
 	}
+
+	const isConfiguringSenseBoxHome = selectedDevice === 'senseBox:Home'
 
 	return (
 		<div className="overflow-hidden p-4">
 			<div
 				className={cn(
 					'grid gap-6',
-					selectedDevice === 'senseBox:Home'
+					isConfiguringSenseBoxHome
 						? 'grid-cols-1'
 						: 'grid-cols-1 lg:grid-cols-2',
 				)}
 			>
 				{devices.map((device) => {
-					if (
-						selectedDevice === 'senseBox:Home' &&
-						device.name !== selectedDevice
-					)
+					if (isConfiguringSenseBoxHome && device.name !== selectedDevice)
 						return null
 
 					return (
 						<Card
 							key={device.name}
+							role="button"
+							tabIndex={0}
 							className={cn(
-								'relative transform cursor-pointer overflow-hidden transition-all duration-300 ease-in-out hover:scale-105',
-								selectedDevice === device.name
-									? 'bg-primary/10 ring-2 ring-primary'
-									: 'hover:bg-gray-50',
+								'border-border bg-card text-card-foreground relative transform cursor-pointer overflow-hidden rounded-xl border transition-all duration-300 ease-in-out',
+								'hover:border-primary/40 hover:bg-muted/40 hover:-translate-y-0.5 hover:shadow-md',
+								'focus-visible:ring-ring focus-visible:ring-2 focus-visible:outline-none',
+								selectedDevice === device.name &&
+									'border-primary bg-primary/10 ring-primary/40 shadow-sm ring-2',
 							)}
 							onClick={() => {
-								if (selectedDevice === 'senseBox:Home') {
+								if (isConfiguringSenseBoxHome) {
 									return
 								}
 								handleDeviceChange(device.name)
 							}}
+							onKeyDown={(event) => {
+								if (event.key === 'Enter' || event.key === ' ') {
+									event.preventDefault()
+
+									if (isConfiguringSenseBoxHome) {
+										return
+									}
+
+									handleDeviceChange(device.name)
+								}
+							}}
 						>
 							<CardContent className="flex flex-row p-0">
-								<img
-									src={device.image}
-									alt={device.name}
-									className={cn(
-										'w-24 self-stretch',
-										device.imageHasPadding
-											? 'object-cover'
-											: 'object-contain p-4',
-									)}
-								/>
+								<div className="border-border flex w-24 shrink-0 items-center justify-center border-r bg-white">
+									<img
+										src={device.image}
+										alt={'label' in device ? device.label : device.name}
+										className={cn(
+											'h-full w-full',
+											device.imageHasPadding
+												? 'object-cover'
+												: 'object-contain p-4',
+										)}
+									/>
+								</div>
+
 								<div className="flex min-w-0 flex-1 flex-col justify-center p-3">
-									{selectedDevice === 'senseBox:Home' && (
+									{isConfiguringSenseBoxHome && (
 										<Button
 											variant="ghost"
 											size="icon"
-											className="absolute right-2 top-2"
+											className="text-muted-foreground hover:bg-muted hover:text-foreground absolute top-2 right-2"
 											onClick={(e) => {
 												e.stopPropagation()
 												handleClose()
@@ -159,17 +177,21 @@ export function DeviceSelectionStep() {
 											<X className="h-4 w-4" />
 										</Button>
 									)}
-									<h3 className="break-words text-lg font-semibold">
-										{device.name}
+
+									<h3 className="text-foreground text-lg font-semibold wrap-break-word">
+										{'label' in device ? device.label : device.name}
 									</h3>
+
 									{device.name === 'senseBox:Home' &&
 										selectedDevice === 'senseBox:Home' && (
 											<>
 												<Separator className="my-2" />
+
 												<div className="w-full max-w-xs">
-													<h4 className="mb-2 text-sm font-medium">
+													<h4 className="text-muted-foreground mb-2 text-sm font-medium">
 														{t('connection_type')}
 													</h4>
+
 													<RadioGroup
 														value={selectedConnectionType}
 														onValueChange={(value) =>
@@ -183,7 +205,10 @@ export function DeviceSelectionStep() {
 																className="flex items-center space-x-2"
 															>
 																<RadioGroupItem value={type} id={type} />
-																<Label htmlFor={type} className="text-sm">
+																<Label
+																	htmlFor={type}
+																	className="text-foreground text-sm"
+																>
 																	{type}
 																</Label>
 															</div>

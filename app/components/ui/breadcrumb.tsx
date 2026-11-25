@@ -1,4 +1,4 @@
-import { Slot } from '@radix-ui/react-slot'
+import { Slot as SlotPrimitive } from 'radix-ui'
 import { ChevronRight, MoreHorizontal } from 'lucide-react'
 import * as React from 'react'
 
@@ -19,7 +19,7 @@ const BreadcrumbList = React.forwardRef<
 	<ol
 		ref={ref}
 		className={cn(
-			'flex flex-wrap items-center gap-1.5 break-words text-sm text-slate-500 dark:text-slate-400 sm:gap-2.5',
+			'flex flex-wrap items-center gap-1.5 text-sm wrap-break-word text-slate-500 sm:gap-2.5 dark:text-slate-400',
 			className,
 		)}
 		{...props}
@@ -45,7 +45,7 @@ const BreadcrumbLink = React.forwardRef<
 		asChild?: boolean
 	}
 >(({ asChild, className, ...props }, ref) => {
-	const Comp = asChild ? Slot : 'a'
+	const Comp = asChild ? SlotPrimitive.Slot : 'a'
 
 	return (
 		<Comp

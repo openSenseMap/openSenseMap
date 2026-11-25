@@ -1,11 +1,10 @@
-import { type LoaderFunctionArgs } from 'react-router'
 import { generateTestUserCredentials } from 'tests/data/generate_test_user'
-import { BASE_URL } from 'vitest.setup'
-import { registerUser } from '~/lib/user-service.server'
-import { createDevice, deleteDevice } from '~/models/device.server'
-import { deleteUserByEmail } from '~/models/user.server'
+import { type Route } from '../../.react-router/types/app/routes/+types/api.tags'
+import { BASE_URL } from '../../vitest.setup'
+import { createDevice, deleteDevice } from '~/db/models/device.server'
+import { deleteUserByEmail } from '~/db/models/user.server'
 import { loader } from '~/routes/api.tags'
-import { type User } from '~/schema'
+import { registerUser } from '~/services/user-service.server'
 
 const TAGS_TEST_USER = generateTestUserCredentials()
 const TEST_TAG_BOX = {
@@ -16,6 +15,7 @@ const TEST_TAG_BOX = {
 	latitude: 0,
 	longitude: 0,
 	model: 'luftdaten.info',
+	sensorTemplates: ['sds011_pm10'],
 	mqttEnabled: false,
 	ttnEnabled: false,
 }
@@ -30,7 +30,7 @@ describe('openSenseMap API Routes: /tags', () => {
 			TAGS_TEST_USER.email,
 			TAGS_TEST_USER.password,
 			'en_US',
-			true
+			true,
 		)
 		expect(registration.ok).toBe(true)
 
@@ -54,7 +54,7 @@ describe('openSenseMap API Routes: /tags', () => {
 		// Act
 		const dataFunctionValue = await loader({
 			request: request,
-		} as LoaderFunctionArgs)
+		} as Route.LoaderArgs)
 		const response = dataFunctionValue as Response
 		const body = await response.json()
 
@@ -79,7 +79,7 @@ describe('openSenseMap API Routes: /tags', () => {
 		// Act
 		const dataFunctionValue = await loader({
 			request: request,
-		} as LoaderFunctionArgs)
+		} as Route.LoaderArgs)
 		const response = dataFunctionValue as Response
 		const body = await response.json()
 

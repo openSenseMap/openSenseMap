@@ -1,21 +1,12 @@
-import { conform, useForm } from '@conform-to/react'
-import { getFieldsetConstraint, parse } from '@conform-to/zod'
+import { useForm, getInputProps, getFormProps } from '@conform-to/react'
+import { getZodConstraint, parseWithZod } from '@conform-to/zod/v4'
 import { type FileUpload, parseFormData } from '@mjackson/form-data-parser'
-import { eq } from 'drizzle-orm'
-import { useState } from 'react'
+import { and, eq, isNull } from 'drizzle-orm'
+import { useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import {
-	type LoaderFunctionArgs,
-	type ActionFunctionArgs,
-	data,
-	redirect,
-	Form,
-	useActionData,
-	useLoaderData,
-	useNavigate,
-} from 'react-router'
+import { data, redirect, Form, useNavigate } from 'react-router'
 import { z } from 'zod'
-import { LabelButton } from '~/components/label-button'
+import { type Route } from './+types/settings.profile.photo'
 import { Avatar, AvatarFallback, AvatarImage } from '~/components/ui/avatar'
 import { Button } from '~/components/ui/button'
 import {
@@ -24,15 +15,21 @@ import {
 	DialogHeader,
 	DialogTitle,
 } from '~/components/ui/dialog'
+import { getSettingsProfileByUserId } from '~/db/models/profile.server'
+import { getUserById } from '~/db/models/user.server'
+import { profile } from '~/db/schema'
 import { drizzleClient } from '~/db.server'
-import { getProfileByUserId } from '~/models/profile.server'
-import { getUserById } from '~/models/user.server'
-import { profileImage } from '~/schema'
-import { uploadHandler } from '~/utils/file-upload.server'
-import { getInitials } from '~/utils/misc'
-import { requireUserId } from '~/utils/session.server'
+import { uploadHandler } from '~/lib/file-upload.server'
+import { deleteProfileImage, uploadProfileImage } from '~/lib/s3.server'
+import { logServerWarning } from '~/lib/sentry.server'
+import { getInitials } from '~/lib/strings'
+import { shouldRevalidateExceptRootPreferences } from '~/lib/root-preference-revalidation'
+import { requireUserId } from '~/services/session-service.server'
+
+export { shouldRevalidateExceptRootPreferences as shouldRevalidate }
 
 const MAX_SIZE = 1024 * 1024 * 3 // 3MB
+const SUPPORTED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp']
 
 /*
 The preprocess call is needed because a current bug in @remix-run/web-fetch
@@ -50,14 +47,18 @@ const PhotoFormSchema = z.object({
 			)
 			.refine((file) => {
 				return file.size <= MAX_SIZE
-			}, 'Image size must be less than 3MB'),
+			}, 'Image size must be less than 3MB')
+			.refine(
+				(file) => SUPPORTED_IMAGE_TYPES.includes(file.type),
+				'Image must be a JPEG, PNG, or WebP file',
+			),
 	),
 })
 
-export async function loader({ request }: LoaderFunctionArgs) {
+export async function loader({ request }: Route.LoaderArgs) {
 	const userId = await requireUserId(request)
 	const user = await getUserById(userId)
-	const profile = await getProfileByUserId(userId)
+	const profile = await getSettingsProfileByUserId(userId)
 	if (!user) {
 		throw new Error()
 		// throw await authenticator.logout(request, { redirectTo: "/" });
@@ -65,7 +66,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
 	return { user, profile }
 }
 
-export async function action({ request }: ActionFunctionArgs) {
+export async function action({ request }: Route.ActionArgs) {
 	const userId = await requireUserId(request)
 	const formData = await parseFormData(
 		request,
@@ -73,12 +74,9 @@ export async function action({ request }: ActionFunctionArgs) {
 		async (file: FileUpload) => uploadHandler(file),
 	)
 
-	const submission = parse(formData, { schema: PhotoFormSchema })
+	const submission = parseWithZod(formData, { schema: PhotoFormSchema })
 
-	if (submission.intent !== 'submit') {
-		return { status: 'idle', submission } as const
-	}
-	if (!submission.value) {
+	if (submission.status !== 'success') {
 		return data(
 			{
 				status: 'error',
@@ -88,48 +86,75 @@ export async function action({ request }: ActionFunctionArgs) {
 		)
 	}
 
-	const { photoFile } = submission.value
+	const { photoFile } = submission.payload as { photoFile: File }
 
-	// Query user profile
-	const previousProfileWithImage = await drizzleClient.query.profile.findFirst({
+	const existingProfile = await drizzleClient.query.profile.findFirst({
 		where: (profile, { eq }) => eq(profile.userId, userId),
-		with: { profileImage: true },
+		columns: { id: true, image: true },
 	})
+	if (!existingProfile) {
+		throw new Response('Profile not found', { status: 404 })
+	}
 
-	// Store the old image ID before inserting new one
-	const oldImageId = previousProfileWithImage?.profileImage?.id
+	const oldImageKey = existingProfile.image
+	let newImageKey: string | undefined
 
-	// Insert new profile image and get the new ID back
-	const [newImage] = await drizzleClient
-		.insert(profileImage)
-		.values({
-			blob: Buffer.from(await photoFile.arrayBuffer()),
-			contentType: photoFile.type,
-			profileId: previousProfileWithImage?.id,
-		})
-		.returning()
+	try {
+		newImageKey = await uploadProfileImage(existingProfile.id, photoFile)
 
-	// Delete the OLD image (not the new one)
-	if (oldImageId && oldImageId !== newImage.id) {
-		await drizzleClient
-			.delete(profileImage)
-			.where(eq(profileImage.id, oldImageId))
+		const imageHasNotChanged = oldImageKey
+			? eq(profile.image, oldImageKey)
+			: isNull(profile.image)
+		const [updatedProfile] = await drizzleClient
+			.update(profile)
+			.set({ image: newImageKey })
+			.where(and(eq(profile.id, existingProfile.id), imageHasNotChanged))
+			.returning({ id: profile.id })
+
+		if (!updatedProfile) {
+			throw new Response('Profile image changed during upload', { status: 409 })
+		}
+	} catch (error) {
+		if (newImageKey && newImageKey !== oldImageKey) {
+			try {
+				await deleteProfileImage(newImageKey)
+			} catch (cleanupError) {
+				logServerWarning(
+					'Failed to clean up an unreferenced profile image',
+					cleanupError,
+					{ 'profile.id': existingProfile.id },
+				)
+			}
+		}
+		throw error
+	}
+
+	if (oldImageKey && oldImageKey !== newImageKey) {
+		try {
+			await deleteProfileImage(oldImageKey)
+		} catch (error) {
+			logServerWarning('Failed to delete the previous profile image', error, {
+				'profile.id': existingProfile.id,
+			})
+		}
 	}
 
 	return redirect('/settings/profile')
 }
 
-export default function PhotoChooserModal() {
-	const data = useLoaderData<typeof loader>()
+export default function PhotoChooserModal({
+	loaderData: data,
+	actionData,
+}: Route.ComponentProps) {
 	const [newImageSrc, setNewImageSrc] = useState<string | null>(null)
+	const fileInputRef = useRef<HTMLInputElement>(null)
 	const navigate = useNavigate()
-	const actionData = useActionData<typeof action>()
 	const [form, { photoFile }] = useForm({
 		id: 'profile-photo',
-		constraint: getFieldsetConstraint(PhotoFormSchema),
-		lastSubmission: actionData?.submission,
+		constraint: getZodConstraint(PhotoFormSchema),
+		lastResult: actionData?.submission.payload,
 		onValidate({ formData }) {
-			return parse(formData, { schema: PhotoFormSchema })
+			return parseWithZod(formData, { schema: PhotoFormSchema })
 		},
 		shouldRevalidate: 'onBlur',
 	})
@@ -152,7 +177,7 @@ export default function PhotoChooserModal() {
 					encType="multipart/form-data"
 					className="mt-8 flex flex-col items-center justify-center gap-10"
 					onReset={() => setNewImageSrc(null)}
-					{...form.props}
+					{...getFormProps(form)}
 				>
 					<Avatar className="h-64 w-64">
 						<AvatarImage
@@ -160,7 +185,9 @@ export default function PhotoChooserModal() {
 							src={
 								newImageSrc
 									? newImageSrc
-									: '/resources/file/' + data.profile?.profileImage?.id
+									: data.profile?.image
+										? `/resources/profile-image/${data.profile.id}?v=${encodeURIComponent(data.profile.image)}`
+										: undefined
 							}
 						/>
 						<AvatarFallback>
@@ -169,11 +196,12 @@ export default function PhotoChooserModal() {
 					</Avatar>
 					{/* <ErrorList errors={photoFile.errors} id={photoFile.id} /> */}
 					<input
-						{...conform.input(photoFile, { type: 'file' })}
+						{...getInputProps(photoFile, { type: 'file' })}
+						ref={fileInputRef}
 						type="file"
-						accept="image/*"
+						accept="image/jpeg,image/png,image/webp"
 						className="sr-only"
-						tabIndex={newImageSrc ? -1 : 0}
+						tabIndex={-1}
 						onChange={(e) => {
 							const file = e.currentTarget.files?.[0]
 							if (file) {
@@ -192,7 +220,12 @@ export default function PhotoChooserModal() {
 						</div>
 					) : (
 						<div className="flex gap-4">
-							<LabelButton htmlFor={photoFile.id}>{t('change')}</LabelButton>
+							<Button
+								type="button"
+								onClick={() => fileInputRef.current?.click()}
+							>
+								{t('change')}
+							</Button>
 						</div>
 					)}
 					{/* <ErrorList errors={form.errors} /> */}

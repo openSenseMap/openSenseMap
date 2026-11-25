@@ -1,11 +1,31 @@
-import { type ActionFunction, type ActionFunctionArgs } from 'react-router'
+import { type Route } from './+types/api.sign-out'
+import { type User } from '~/db/schema'
 import { getUserFromJwt, revokeToken } from '~/lib/jwt'
-import { type User } from '~/schema'
-import { StandardResponse } from '~/utils/response-utils'
+import {
+	InternalServerErrorSchema,
+	internalServerErrorResponse,
+	messageResponse,
+} from '~/lib/openapi/errors'
+import { StandardResponse } from '~/lib/responses'
+import { type ZodOpenApiPathItemObject } from 'zod-openapi'
 
-export const action: ActionFunction = async ({
-	request,
-}: ActionFunctionArgs) => {
+export const openapi: ZodOpenApiPathItemObject = {
+	post: {
+		tags: ['Authentication'],
+		summary: 'Sign out',
+		description: 'Revokes the supplied JWT access token.',
+		security: [{ bearerAuth: [] }],
+		responses: {
+			200: messageResponse('Successfully signed out.'),
+			500: internalServerErrorResponse(
+				InternalServerErrorSchema,
+				'Internal server error.',
+			),
+		},
+	},
+}
+
+export const action = async ({ request }: Route.ActionArgs) => {
 	try {
 		// We deliberately make casts and stuff like that, so everything
 		// but the happy path will result in an internal server error.
@@ -21,8 +41,7 @@ export const action: ActionFunction = async ({
 			code: 'Ok',
 			message: 'Successfully signed out',
 		})
-	} catch (err) {
-		console.warn(err)
+	} catch {
 		return StandardResponse.internalServerError()
 	}
 }

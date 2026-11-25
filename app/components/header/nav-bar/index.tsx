@@ -1,15 +1,17 @@
-import { useMediaQuery } from '@mantine/hooks'
 import { AnimatePresence, motion } from 'framer-motion'
-import { SearchIcon, XIcon } from 'lucide-react'
+import { DownloadIcon, SearchIcon, XIcon } from 'lucide-react'
 import { useState, useEffect, useRef, createContext } from 'react'
 import { useTranslation } from 'react-i18next'
-import { useMap } from 'react-map-gl'
+import { useMap } from 'react-map-gl/maplibre'
 import NavbarHandler from './nav-bar-handler'
 import FilterVisualization from '~/components/map/filter-visualization'
-import { type Device } from '~/schema'
+import { type DeviceFeatureCollection } from '~/components/search/search-types'
+import { cn } from '~/lib/utils'
+import { topbarSurface } from '~/components/ui/topbar-styles'
+import Download from '../download'
 
 interface NavBarProps {
-	devices: Device[]
+	devices: DeviceFeatureCollection
 }
 
 export const NavbarContext = createContext({
@@ -19,12 +21,14 @@ export const NavbarContext = createContext({
 
 export default function NavBar(props: NavBarProps) {
 	const [open, setOpen] = useState(false)
+	const [downloadOpen, setDownloadOpen] = useState(false)
 	const inputRef = useRef<HTMLInputElement>(null)
 	const [searchString, setSearchString] = useState('')
 
 	const { osem: mapRef } = useMap()
 
 	const { t } = useTranslation('search')
+	const { t: tDownload } = useTranslation('download')
 
 	useEffect(() => {
 		if (mapRef) {
@@ -48,7 +52,6 @@ export default function NavBar(props: NavBarProps) {
 		return () => document.removeEventListener('keydown', down)
 	}, [])
 
-	// focus input when opening
 	useEffect(() => {
 		if (open) {
 			inputRef.current?.focus()
@@ -58,62 +61,138 @@ export default function NavBar(props: NavBarProps) {
 		}
 	}, [open])
 
-	const isDesktop = useMediaQuery('(min-width: 768px)')
-
 	return (
-		<div className="pointer-events-auto relative w-full md:w-1/2">
-			<div className="absolute left-0 top-0 flex w-full flex-col gap-2">
-				<div className="w-full rounded-2xl border border-gray-100 bg-white px-2 py-2 shadow-xl dark:bg-zinc-800 dark:text-zinc-200 dark:opacity-90 dark:ring-white dark:backdrop-blur-sm md:px-4">
-					<div className="flex w-full items-center gap-2 px-2 text-black dark:text-zinc-200 md:gap-4">
-						<SearchIcon className="aspect-square h-6 dark:text-zinc-200" />
-						<input
-							ref={inputRef}
-							placeholder={t('placeholder') || undefined}
-							onFocus={() => setOpen(true)}
-							onChange={(e) => setSearchString(e.target.value)}
-							className="h-fit w-full flex-1 border-none bg-white focus:border-none focus:outline-none focus:ring-0 dark:bg-zinc-800 dark:text-zinc-200"
-							value={searchString}
-						/>
-						{!open && (
-							<span className="hidden flex-none text-xs font-semibold text-gray-400 md:block">
-								<kbd>ctrl</kbd> + <kbd>K</kbd>
-							</span>
-						)}
+		<div className="pointer-events-auto relative w-11 shrink-0 lg:w-full lg:max-w-176">
+			<button
+				type="button"
+				onClick={() => setOpen(true)}
+				aria-label={t('placeholder') || 'Search'}
+				aria-expanded={open}
+				className={cn(
+					topbarSurface({ shape: 'circle' }),
+					'flex items-center justify-center focus-visible:ring-2 focus-visible:ring-slate-950 focus-visible:ring-offset-2 focus-visible:outline-hidden lg:hidden',
+					open && 'invisible',
+				)}
+			>
+				<SearchIcon className="size-6" aria-hidden="true" />
+			</button>
+
+			<motion.div
+				layout
+				className={cn(
+					topbarSurface({ shape: 'panel' }),
+					'fixed top-16 right-3 left-3 w-auto overflow-hidden px-3 lg:relative lg:inset-auto lg:w-full lg:px-4',
+					!open && 'hidden lg:block',
+				)}
+				animate={{
+					borderRadius: open ? 16 : 999,
+				}}
+				transition={{
+					layout: {
+						duration: 0.24,
+						ease: [0.22, 1, 0.36, 1],
+					},
+					borderRadius: {
+						duration: 0.2,
+						ease: [0.22, 1, 0.36, 1],
+					},
+				}}
+			>
+				<div className="flex h-11 w-full items-center gap-2 text-black lg:gap-4 dark:text-zinc-200">
+					<SearchIcon className="h-6 w-6 shrink-0 dark:text-zinc-200" />
+
+					<input
+						ref={inputRef}
+						placeholder={t('placeholder') || undefined}
+						onFocus={() => setOpen(true)}
+						onChange={(e) => setSearchString(e.target.value)}
+						className="h-full min-w-0 flex-1 border-none bg-transparent focus:border-none focus:ring-0 focus:outline-hidden dark:text-zinc-200"
+						value={searchString}
+					/>
+
+					{!open && (
+						<span className="hidden flex-none text-xs font-semibold text-gray-400 lg:block">
+							<kbd>ctrl</kbd> + <kbd>K</kbd>
+						</span>
+					)}
+
+					<button
+						type="button"
+						onClick={() => {
+							setOpen(false)
+							setDownloadOpen(true)
+						}}
+						aria-label={tDownload('download')}
+						title={tDownload('download')}
+						className="flex size-8 shrink-0 items-center justify-center rounded-full hover:bg-black/5 dark:hover:bg-white/10"
+					>
+						<DownloadIcon className="h-5 w-5" aria-hidden="true" />
+					</button>
+
+					{open && (
+						<button
+							type="button"
+							onClick={() => {
+								setSearchString('')
+								setOpen(false)
+								inputRef.current?.blur()
+							}}
+							aria-label="Close search"
+							className="-mr-2 flex size-11 shrink-0 items-center justify-center rounded-full hover:bg-black/5 lg:mr-0 lg:size-8 dark:hover:bg-white/10"
+						>
+							<XIcon className="h-5 w-5" />
+						</button>
+					)}
+				</div>
+
+				<NavbarContext.Provider value={{ open, setOpen }}>
+					<AnimatePresence initial={false}>
 						{open && (
-							<XIcon
-								onClick={() => {
-									setSearchString('')
-									setOpen(false)
-									inputRef.current?.blur()
+							<motion.div
+								key="search-results"
+								className="overflow-hidden"
+								initial={{
+									opacity: 0,
+									height: 0,
+									y: -4,
 								}}
-								className="h-6"
-							/>
-						)}
-					</div>
-					<NavbarContext.Provider value={{ open, setOpen }}>
-						<AnimatePresence>
-							{open && (
-								<motion.div
-									className="overflow-hidden"
-									initial={{ opacity: 0, height: 0 }}
-									animate={{ opacity: 1, height: 'auto' }}
-									exit={{ opacity: 0, height: 0 }}
-								>
+								animate={{
+									opacity: 1,
+									height: 'auto',
+									y: 0,
+								}}
+								exit={{
+									opacity: 0,
+									height: 0,
+									y: -4,
+								}}
+								transition={{
+									duration: 0.22,
+									ease: [0.22, 1, 0.36, 1],
+								}}
+							>
+								<div className="pt-2">
 									<NavbarHandler
 										devices={props.devices}
 										searchString={searchString}
 									/>
-								</motion.div>
-							)}
-						</AnimatePresence>
-					</NavbarContext.Provider>
+								</div>
+							</motion.div>
+						)}
+					</AnimatePresence>
+				</NavbarContext.Provider>
+			</motion.div>
+			{!open && (
+				<div className="hidden w-full items-center justify-center lg:flex">
+					<FilterVisualization />
 				</div>
-				{!open && isDesktop && (
-					<div className="flex w-full items-center justify-center">
-						<FilterVisualization />
-					</div>
-				)}
-			</div>
+			)}
+
+			<Download
+				devices={props.devices}
+				open={downloadOpen}
+				onOpenChange={setDownloadOpen}
+			/>
 		</div>
 	)
 }

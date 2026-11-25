@@ -1,12 +1,13 @@
-import { type LoaderFunctionArgs } from 'react-router'
 import { generateTestUserCredentials } from 'tests/data/generate_test_user'
-import { BASE_URL } from 'vitest.setup'
+import { type Route } from '../../.react-router/types/app/routes/+types/api.users.me.boxes'
+import { BASE_URL } from '../../vitest.setup'
+import { createDevice, deleteDevice } from '~/db/models/device.server'
+import { deleteUserByEmail } from '~/db/models/user.server'
+import { integration, type User } from '~/db/schema'
+import { drizzleClient } from '~/db.server'
 import { createToken } from '~/lib/jwt'
-import { registerUser } from '~/lib/user-service.server'
-import { createDevice, deleteDevice } from '~/models/device.server'
-import { deleteUserByEmail } from '~/models/user.server'
 import { loader } from '~/routes/api.users.me.boxes'
-import { type User } from '~/schema'
+import { registerUser } from '~/services/user-service.server'
 
 const BOXES_TEST_USER = generateTestUserCredentials()
 const TEST_BOX = {
@@ -17,8 +18,7 @@ const TEST_BOX = {
 	latitude: 0,
 	longitude: 0,
 	model: 'luftdaten.info',
-	mqttEnabled: false,
-	ttnEnabled: false,
+	sensorTemplates: ['sds011_pm10'],
 }
 
 describe('openSenseMap API Routes: /users', () => {
@@ -28,12 +28,34 @@ describe('openSenseMap API Routes: /users', () => {
 	describe('/me/boxes', () => {
 		describe('GET', async () => {
 			beforeAll(async () => {
+				// seed integrations if they dont exist
+				await drizzleClient
+					.insert(integration)
+					.values([
+						{
+							name: 'MQTT',
+							slug: 'mqtt',
+							serviceUrl: 'http://mqtt-test-service',
+							serviceKey: 'MQTT_SERVICE_KEY',
+							icon: 'message-square-text',
+							order: 1,
+						},
+						{
+							name: 'The Things Network',
+							slug: 'ttn',
+							serviceUrl: 'http://ttn-test-service',
+							serviceKey: 'TTN_SERVICE_KEY',
+							icon: 'antenna',
+							order: 2,
+						},
+					])
+					.onConflictDoNothing()
 				const registration = await registerUser(
 					BOXES_TEST_USER.name,
 					BOXES_TEST_USER.email,
 					BOXES_TEST_USER.password,
 					'en_US',
-					true
+					true,
 				)
 				expect(registration.ok).toBe(true)
 
@@ -58,7 +80,7 @@ describe('openSenseMap API Routes: /users', () => {
 				// Act
 				const response = (await loader({
 					request,
-				} as LoaderFunctionArgs)) as Response
+				} as Route.LoaderArgs)) as Response
 				const body = await response?.json()
 
 				expect(response.status).toBe(200)
@@ -117,7 +139,7 @@ describe('openSenseMap API Routes: /users', () => {
 					'nodevices@test.com',
 					'password123',
 					'en_US',
-					true
+					true,
 				)
 
 				expect(registration.ok).toBe(true)
@@ -140,7 +162,7 @@ describe('openSenseMap API Routes: /users', () => {
 
 				const response = (await loader({
 					request,
-				} as LoaderFunctionArgs)) as Response
+				} as Route.LoaderArgs)) as Response
 				const body = await response?.json()
 
 				expect(response.status).toBe(200)
@@ -159,7 +181,7 @@ describe('openSenseMap API Routes: /users', () => {
 
 				const response = (await loader({
 					request,
-				} as LoaderFunctionArgs)) as Response
+				} as Route.LoaderArgs)) as Response
 				const body = await response?.json()
 
 				expect(response.status).toBe(403)
@@ -174,7 +196,7 @@ describe('openSenseMap API Routes: /users', () => {
 
 				const response = (await loader({
 					request,
-				} as LoaderFunctionArgs)) as Response
+				} as Route.LoaderArgs)) as Response
 				const body = await response?.json()
 
 				expect(response.status).toBe(403)

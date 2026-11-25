@@ -8,27 +8,34 @@ import {
 	Legend,
 	Tooltip as ChartTooltip,
 	Filler,
+	Decimation,
 	type ChartOptions,
 } from 'chart.js'
 import 'chartjs-adapter-date-fns'
-// import { de, enGB } from "date-fns/locale";
-import { Download, RefreshCcw, X } from 'lucide-react'
+import { ChartLine, Download, RefreshCcw, X } from 'lucide-react'
 import {
 	useMemo,
 	useRef,
 	useState,
 	useEffect,
 	useContext,
+	useCallback,
 	type RefObject,
 } from 'react'
-import { Scatter } from 'react-chartjs-2'
+import { Line } from 'react-chartjs-2'
 import { isBrowser, isTablet } from 'react-device-detect'
 import Draggable, { type DraggableData } from 'react-draggable'
-import { useNavigate, useNavigation, useSearchParams } from 'react-router'
+import {
+	useLocation,
+	useNavigate,
+	useNavigation,
+	useSearchParams,
+} from 'react-router'
 import { AggregationFilter } from '../aggregation-filter'
 import { ClientOnly } from '../client-only'
 import { ColorPicker } from '../color-picker'
 import { DateRangeFilter } from '../daterange-filter'
+import { Alert, AlertDescription, AlertTitle } from '../ui/alert'
 import { HoveredPointContext } from '../map/layers/mobile/mobile-box-layer'
 import Spinner from '../spinner'
 import {
@@ -37,13 +44,15 @@ import {
 	DropdownMenuItem,
 	DropdownMenuTrigger,
 } from '../ui/dropdown-menu'
-import {
-	Tooltip,
-	TooltipContent,
-	TooltipProvider,
-	TooltipTrigger,
-} from '../ui/tooltip'
+import { Tooltip, TooltipContent, TooltipTrigger } from '../ui/tooltip'
 import { datesHave48HourRange } from '~/lib/utils'
+import { useTranslation } from 'react-i18next'
+import {
+	createMeasurementChartData,
+	type MeasurementChartData,
+	type MeasurementChartPoint,
+} from '~/lib/measurement-chart'
+import { getExplorePendingUi } from '~/lib/explore-pending-navigation'
 
 ChartJS.register(
 	LineElement,
@@ -54,23 +63,68 @@ ChartJS.register(
 	ChartTooltip,
 	Legend,
 	Filler,
+	Decimation,
 )
 
-// ClientOnly component to handle the plugin that needs window
-const GraphWithZoom = (props: any) => {
-	useMemo(() => {
-		// Dynamically import the zoom plugin
-		void import('chartjs-plugin-zoom').then(({ default: zoomPlugin }) => {
+let zoomPluginRegistration: Promise<void> | null = null
+
+function registerZoomPlugin(): Promise<void> {
+	if (zoomPluginRegistration) return zoomPluginRegistration
+
+	zoomPluginRegistration = import('chartjs-plugin-zoom')
+		.then(({ default: zoomPlugin }) => {
 			ChartJS.register(zoomPlugin)
 		})
+		.catch((error: unknown) => {
+			zoomPluginRegistration = null
+			console.error('Failed to register chartjs-plugin-zoom:', error)
+			throw error
+		})
+
+	return zoomPluginRegistration
+}
+
+interface GraphWithZoomProps {
+	chartData: MeasurementChartData
+	options: ChartOptions<'line'>
+	chartRef: RefObject<ChartJS<'line', MeasurementChartPoint[], unknown> | null>
+	onMouseLeave: () => void
+}
+
+// ClientOnly component to handle the plugin that needs window
+const GraphWithZoom = ({
+	chartData,
+	options,
+	chartRef,
+	onMouseLeave,
+}: GraphWithZoomProps) => {
+	const [isZoomPluginSettled, setIsZoomPluginSettled] = useState(false)
+
+	useEffect(() => {
+		let isMounted = true
+		const finishLoadingZoomPlugin = () => {
+			if (isMounted) setIsZoomPluginSettled(true)
+		}
+
+		void registerZoomPlugin().then(
+			finishLoadingZoomPlugin,
+			finishLoadingZoomPlugin,
+		)
+
+		return () => {
+			isMounted = false
+		}
 	}, [])
 
+	if (!isZoomPluginSettled) return <Spinner />
+
 	return (
-		<Scatter
-			data={props.chartData}
-			options={props.options}
-			ref={props.chartRef}
-		></Scatter>
+		<Line
+			data={chartData}
+			options={options}
+			ref={chartRef}
+			onMouseLeave={onMouseLeave}
+		></Line>
 	)
 }
 
@@ -79,6 +133,8 @@ interface GraphProps {
 	sensors: any[]
 	startDate?: string
 	endDate?: string
+	limitExceeded: boolean
+	showingLatestOnly: boolean
 }
 
 export default function Graph({
@@ -86,12 +142,22 @@ export default function Graph({
 	sensors,
 	startDate,
 	endDate,
+	limitExceeded,
+	showingLatestOnly,
 }: GraphProps) {
-	const { setHoveredPoint } = useContext(HoveredPointContext)
+	const { hoveredPoint, setHoveredPoint } = useContext(HoveredPointContext)
 	const navigation = useNavigation()
+	const location = useLocation()
+	const { graph: isGraphPending } = getExplorePendingUi({
+		navigationState: navigation.state,
+		currentLocation: location,
+		nextLocation: navigation.location,
+	})
+	const { t, i18n } = useTranslation('graph')
 	const navigate = useNavigate()
 	const [offsetPositionX, setOffsetPositionX] = useState(0)
 	const [offsetPositionY, setOffsetPositionY] = useState(0)
+	const [connectDots, setConnectDots] = useState(false)
 	const [currentZoom, setCurrentZoom] = useState<{
 		xMin: number
 		xMax: number
@@ -105,181 +171,80 @@ export default function Graph({
 	const isAggregated = aggregation !== 'raw'
 
 	const nodeRef = useRef<HTMLDivElement>(null)
-	const chartRef = useRef<ChartJS<'scatter'>>(null)
+	const chartRef = useRef<ChartJS<
+		'line',
+		MeasurementChartPoint[],
+		unknown
+	> | null>(null)
+	const isZoomingRef = useRef(false)
+	const lastHoveredPointRef = useRef<number | null>(hoveredPoint)
+	const previousChartInputRef = useRef({ sensors, isAggregated })
 
 	useEffect(() => {
-		if (chartRef.current) {
-			const canvas = chartRef.current.canvas
+		lastHoveredPointRef.current = hoveredPoint
+	}, [hoveredPoint])
 
-			const handleMouseLeave = () => {
-				setHoveredPoint(null) // Clear the hovered point when the mouse leaves the chart area
-			}
+	const setHoveredPointIfChanged = useCallback(
+		(point: number | null) => {
+			if (lastHoveredPointRef.current === point) return
 
-			canvas.addEventListener('mouseleave', handleMouseLeave)
+			lastHoveredPointRef.current = point
+			setHoveredPoint(point)
+		},
+		[setHoveredPoint],
+	)
+	const handleChartMouseLeave = useCallback(() => {
+		isZoomingRef.current = false
+		setHoveredPointIfChanged(null)
+	}, [setHoveredPointIfChanged])
 
-			// Cleanup
-			return () => {
-				canvas.removeEventListener('mouseleave', handleMouseLeave)
-			}
-		}
-	}, [chartRef, setHoveredPoint])
+	const dateTimeFormatter = useMemo(() => {
+		return new Intl.DateTimeFormat(i18n.language, {
+			dateStyle: 'medium',
+			timeStyle: 'medium',
+		})
+	}, [i18n.language])
 
 	// get theme from tailwind
 	const [theme] = 'light' //useTheme();
 
-	const [chartData, setChartData] = useState(() => {
-		const includeDeviceName =
-			sensors.length === 2 && sensors[0].device_name !== sensors[1].device_name
-
-		return {
-			datasets: sensors
-				.map(
-					(
-						sensor: {
-							title: any
-							device_name: any
-							data: any[]
-							color: string
-						},
-						index: number,
-					) => {
-						const baseDataset = {
-							label: includeDeviceName
-								? `${sensor.title} (${sensor.device_name})`
-								: sensor.title,
-							data: sensor.data.map((measurement) => ({
-								x: measurement.time,
-								y: measurement.value,
-								locationId: measurement.locationId,
-							})),
-							pointRadius: 3,
-							borderColor: sensor.color,
-							backgroundColor: sensor.color,
-							yAxisID: index === 0 ? 'y' : 'y1',
-							fill: false,
-							tension: 0.4,
-						}
-
-						if (isAggregated && sensors.length === 1) {
-							const minDataset = {
-								...baseDataset,
-								label: `${baseDataset.label} (Min)`,
-								data: sensor.data.map((measurement) => ({
-									x: measurement.time,
-									y: measurement.min_value,
-									locationId: null,
-								})),
-								borderColor: sensor.color + '33',
-								backgroundColor: sensor.color + '33',
-								fill: 1,
-							}
-
-							const maxDataset = {
-								...baseDataset,
-								label: `${baseDataset.label} (Max)`,
-								data: sensor.data.map((measurement) => ({
-									x: measurement.time,
-									y: measurement.max_value,
-									locationId: null,
-								})),
-								borderColor: sensor.color + '33',
-								backgroundColor: sensor.color + '33',
-								fill: 1,
-							}
-
-							return [maxDataset, baseDataset, minDataset]
-						}
-
-						return [baseDataset]
-					},
-				)
-				.flat(),
-		}
-	})
+	const [chartData, setChartData] = useState(() =>
+		createMeasurementChartData(sensors, isAggregated),
+	)
 
 	useEffect(() => {
-		const includeDeviceName =
-			sensors.length === 2 && sensors[0].device_name !== sensors[1].device_name
+		if (
+			previousChartInputRef.current.sensors === sensors &&
+			previousChartInputRef.current.isAggregated === isAggregated
+		) {
+			return
+		}
+
+		previousChartInputRef.current = { sensors, isAggregated }
+
+		const newChartData = createMeasurementChartData(sensors, isAggregated)
 
 		setChartData({
-			datasets: sensors
-				.map(
-					(
-						sensor: {
-							title: any
-							device_name: any
-							data: any[]
-							color: string
-						},
-						index: number,
-					) => {
-						const baseDataset = {
-							label: includeDeviceName
-								? `${sensor.title} (${sensor.device_name})`
-								: sensor.title,
-							data: sensor.data.map((measurement) => ({
-								x: measurement.time,
-								y: measurement.value,
-								locationId: measurement.locationId,
-							})),
-							pointRadius: 1,
-							borderColor: sensor.color,
-							backgroundColor: sensor.color,
-							yAxisID: index === 0 ? 'y' : 'y1',
-							fill: false,
-							tension: 0.4,
-						}
-
-						if (isAggregated && sensors.length === 1) {
-							const minDataset = {
-								...baseDataset,
-								label: `${baseDataset.label} (Min)`,
-								data: sensor.data.map((measurement) => ({
-									x: measurement.time,
-									y: measurement.min_value,
-									locationId: null,
-								})),
-								borderColor: sensor.color + '33',
-								backgroundColor: sensor.color + '33',
-								fill: 1,
-							}
-
-							const maxDataset = {
-								...baseDataset,
-								label: `${baseDataset.label} (Max)`,
-								data: sensor.data.map((measurement) => ({
-									x: measurement.time,
-									y: measurement.max_value,
-									locationId: null,
-								})),
-								borderColor: sensor.color + '33',
-								backgroundColor: sensor.color + '33',
-								fill: 1,
-							}
-
-							return [maxDataset, baseDataset, minDataset]
-						}
-
-						return [baseDataset]
-					},
-				)
-				.flat(),
+			...newChartData,
+			datasets: newChartData.datasets.map((dataset) => ({
+				...dataset,
+				showLine: connectDots,
+			})),
 		})
-	}, [sensors, isAggregated])
+	}, [sensors, isAggregated, connectDots])
 
-	const options: ChartOptions<'scatter'> = useMemo(() => {
+	const options: ChartOptions<'line'> = useMemo(() => {
 		return {
 			maintainAspectRatio: false,
 			responsive: true,
+			animation: false,
+			normalized: sensors.length === 1 && !isAggregated,
 			spanGaps: false,
 			interaction: {
 				mode: 'index',
 				intersect: false,
 			},
-			parsing: {
-				xAxisKey: 'x',
-				yAxisKey: 'y',
-			},
+			parsing: false,
 			scales: {
 				x: {
 					type: 'time',
@@ -304,8 +269,6 @@ export default function Graph({
 					//     locale: data.locale === "de" ? de : enGB,
 					//   },
 					// },
-					min: currentZoom?.xMin,
-					max: currentZoom?.xMax,
 					ticks: {
 						major: {
 							enabled: true,
@@ -355,17 +318,32 @@ export default function Graph({
 				},
 			},
 			plugins: {
+				decimation: {
+					enabled: true,
+					algorithm: 'min-max',
+				},
 				tooltip: {
 					enabled: true,
 					mode: 'index',
 					intersect: false,
 					callbacks: {
+						title: (tooltipItems: any[]) => {
+							const firstItem = tooltipItems[0]
+
+							if (!firstItem) return ''
+
+							const { timestamp } = firstItem.raw as MeasurementChartPoint
+
+							return dateTimeFormatter.format(new Date(timestamp))
+						},
+
 						label: (context: any) => {
-							const dataIndex = context.dataIndex
-							const datasetIndex = context.datasetIndex
-							const point = chartData.datasets[datasetIndex].data[dataIndex]
-							const locationId = point.locationId
-							setHoveredPoint(locationId)
+							const point = context.raw as MeasurementChartPoint
+
+							if (!isZoomingRef.current && point.locationId !== null) {
+								setHoveredPointIfChanged(point.locationId)
+							}
+
 							return `${context.dataset.label}: ${context.raw.y}`
 						},
 					},
@@ -379,12 +357,16 @@ export default function Graph({
 							enabled: true,
 						},
 						mode: 'x',
-						onZoom: ({ chart }) => {
+						onZoomStart: () => {
+							isZoomingRef.current = true
+							return true
+						},
+						onZoomComplete: ({ chart }) => {
+							isZoomingRef.current = false
 							const xScale = chart.scales['x']
 							const xMin = xScale.min
 							const xMax = xScale.max
 
-							// Track the zoom level
 							setCurrentZoom({ xMin, xMax })
 						},
 					},
@@ -424,24 +406,41 @@ export default function Graph({
 	}, [
 		startDate,
 		endDate,
-		currentZoom?.xMin,
-		currentZoom?.xMax,
 		theme,
 		sensors,
+		isAggregated,
 		chartData.datasets,
-		setHoveredPoint,
+		setHoveredPointIfChanged,
 		colorPickerState.open,
+		dateTimeFormatter,
 	])
 
 	function handleColorChange(newColor: string) {
-		const updatedDatasets = [...chartData.datasets]
-		updatedDatasets[colorPickerState.index].borderColor = newColor
-		updatedDatasets[colorPickerState.index].backgroundColor = newColor
-
-		// Update the chartData state with the new dataset colors
 		setChartData((prevData) => ({
 			...prevData,
-			datasets: updatedDatasets,
+			datasets: prevData.datasets.map((dataset, index) =>
+				index === colorPickerState.index
+					? {
+							...dataset,
+							borderColor: newColor,
+							backgroundColor: newColor,
+						}
+					: dataset,
+			),
+		}))
+	}
+
+	function handleConnectDotsClick() {
+		const nextConnectDots = !connectDots
+
+		setConnectDots(nextConnectDots)
+
+		setChartData((prevData) => ({
+			...prevData,
+			datasets: prevData.datasets.map((dataset) => ({
+				...dataset,
+				showLine: nextConnectDots,
+			})),
 		}))
 	}
 
@@ -471,7 +470,7 @@ export default function Graph({
 		let csvContent = 'timestamp,deviceId,sensorId,value,unit,phenomena\n'
 
 		// Loop through each timestamp and sensor data
-		labels.forEach((timestamp: any, index: string | number) => {
+		labels.forEach((timestamp: number, index: number) => {
 			sensors.forEach((sensor: any) => {
 				const dataset = chartData.datasets.find(
 					(ds: { label: string | any[] }) => ds.label.includes(sensor.title),
@@ -479,7 +478,7 @@ export default function Graph({
 				if (dataset) {
 					const value = (dataset.data as any)[index]?.y ?? ''
 
-					csvContent += `${timestamp},`
+					csvContent += `${new Date(timestamp).toISOString()},`
 					csvContent += `${sensor.deviceId},`
 					csvContent += `${sensor.id},`
 					csvContent += `${value},`
@@ -513,6 +512,7 @@ export default function Graph({
 	function handleResetZoomClick() {
 		if (chartRef.current) {
 			chartRef.current.resetZoom() // Use the resetZoom function from the zoom plugin
+			isZoomingRef.current = false
 			setCurrentZoom(null) // Reset the zoom state
 		}
 	}
@@ -534,54 +534,80 @@ export default function Graph({
 			>
 				<div
 					ref={nodeRef}
-					className="shadow-zinc-800/5 ring-zinc-900/5 absolute bottom-6 left-4 right-4 top-14 z-40 flex flex-col gap-2 rounded-xl bg-white px-4 pt-2 text-sm font-medium text-zinc-800 shadow-lg ring-1 dark:bg-zinc-800 dark:text-zinc-200 dark:opacity-95 dark:ring-white dark:backdrop-blur-sm md:bottom-[30px] md:left-auto md:right-4 md:top-auto md:h-[35%] md:max-h-[35%] md:w-[60vw]"
+					className="absolute top-14 right-4 bottom-6 left-4 z-40 flex flex-col gap-2 rounded-xl bg-white px-4 pt-2 text-sm font-medium text-zinc-800 shadow-lg ring-1 shadow-zinc-800/5 ring-zinc-900/5 md:top-auto md:right-4 md:bottom-7.5 md:left-auto md:h-[35%] md:max-h-[35%] md:w-[60vw] dark:bg-zinc-800 dark:text-zinc-200 dark:opacity-95 dark:ring-white dark:backdrop-blur-xs"
 				>
-					{navigation.state === 'loading' && (
-						<div className="bg-gray-100/30 absolute inset-0 z-50 flex items-center justify-center backdrop-blur-[1.5px]">
+					{isGraphPending && (
+						<div
+							className="absolute inset-0 z-50 flex items-center justify-center bg-gray-100/30 backdrop-blur-[1.5px]"
+							role="status"
+							aria-live="polite"
+						>
 							<Spinner />
+							<span className="sr-only">{t('loading_graph')}</span>
 						</div>
 					)}
 					<div
-						className="flex cursor-move flex-wrap items-center justify-between gap-2 px-2 pt-2"
+						className="flex cursor-move items-start justify-between gap-2 px-2 pt-2"
 						id="graphTop"
 					>
-						<div className="flex flex-grow flex-wrap items-center gap-2">
+						<div className="flex grow flex-wrap items-center gap-2">
 							<DateRangeFilter />
 							<AggregationFilter />
 						</div>
-						<div className="ml-auto flex items-center justify-end gap-4">
+						<div className="flex h-full items-start justify-end gap-4 py-2">
+							<Tooltip>
+								<TooltipTrigger asChild>
+									<button
+										type="button"
+										onClick={handleConnectDotsClick}
+										aria-pressed={connectDots}
+										className={`cursor-pointer rounded p-1 ${
+											connectDots ? 'bg-zinc-200 dark:bg-zinc-700' : ''
+										}`}
+									>
+										<ChartLine />
+									</button>
+								</TooltipTrigger>
+
+								<TooltipContent>
+									<p>
+										{connectDots ? t('disconnect_points') : t('connect_points')}
+									</p>
+								</TooltipContent>
+							</Tooltip>
 							{currentZoom !== null &&
 								currentZoom.xMax !== 0 &&
 								currentZoom.xMin !== 0 && (
-									<TooltipProvider>
-										<Tooltip>
-											<TooltipTrigger>
-												<RefreshCcw
-													onClick={handleResetZoomClick}
-													className="cursor-pointer"
-												/>
-											</TooltipTrigger>
-											<TooltipContent>
-												<p>Reset zoom</p>
-											</TooltipContent>
-										</Tooltip>
-									</TooltipProvider>
+									<Tooltip>
+										<TooltipTrigger>
+											<RefreshCcw
+												onClick={handleResetZoomClick}
+												className="cursor-pointer"
+											/>
+										</TooltipTrigger>
+										<TooltipContent>
+											<p>{t('reset_zoom')}</p>
+										</TooltipContent>
+									</Tooltip>
 								)}
-							<DropdownMenu>
-								<DropdownMenuTrigger>
-									<Download />
-								</DropdownMenuTrigger>
-								<DropdownMenuContent>
-									<DropdownMenuItem onClick={handlePngDownloadClick}>
-										PNG
-									</DropdownMenuItem>
-									{sensors.length < 2 && (
-										<DropdownMenuItem onClick={handleCsvDownloadClick}>
-											CSV
+
+							{(!limitExceeded || showingLatestOnly) && (
+								<DropdownMenu>
+									<DropdownMenuTrigger>
+										<Download />
+									</DropdownMenuTrigger>
+									<DropdownMenuContent>
+										<DropdownMenuItem onClick={handlePngDownloadClick}>
+											PNG
 										</DropdownMenuItem>
-									)}
-								</DropdownMenuContent>
-							</DropdownMenu>
+										{sensors.length < 2 && (
+											<DropdownMenuItem onClick={handleCsvDownloadClick}>
+												CSV
+											</DropdownMenuItem>
+										)}
+									</DropdownMenuContent>
+								</DropdownMenu>
+							)}
 							<X
 								className="cursor-pointer"
 								onClick={() => {
@@ -597,10 +623,25 @@ export default function Graph({
 							/>
 						</div>
 					</div>
+					{showingLatestOnly && (
+						<p
+							role="status"
+							className="px-2 text-sm text-amber-800 dark:text-amber-300"
+						>
+							{t('showing_latest_only')}
+						</p>
+					)}
 					<div className="flex min-h-0 w-full flex-1 items-center justify-center">
-						{(sensors[0].data.length === 0 && sensors[1] === undefined) ||
-						(sensors[0].data.length === 0 && sensors[1].data.length === 0) ? (
-							<div>There is no data for the selected time period.</div>
+						{limitExceeded && !showingLatestOnly ? (
+							<Alert variant="warning" className="max-w-xl">
+								<AlertTitle>{t('limit_exceeded_title')}</AlertTitle>
+								<AlertDescription>
+									{t('limit_exceeded_description')}
+								</AlertDescription>
+							</Alert>
+						) : (sensors[0].data.length === 0 && sensors[1] === undefined) ||
+						  (sensors[0].data.length === 0 && sensors[1].data.length === 0) ? (
+							<div>{t('no_data_in_range')}</div>
 						) : (
 							<ClientOnly fallback={<Spinner />}>
 								{() => (
@@ -608,6 +649,7 @@ export default function Graph({
 										chartData={chartData}
 										options={options}
 										chartRef={chartRef} // Pass chartRef as a prop
+										onMouseLeave={handleChartMouseLeave}
 									/>
 								)}
 							</ClientOnly>

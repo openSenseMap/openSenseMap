@@ -1,164 +1,157 @@
-import { type ActionFunction, type ActionFunctionArgs } from 'react-router'
+import { type Route } from './+types/api.users.refresh-auth'
 import { getUserFromJwt, hashJwt, refreshJwt } from '~/lib/jwt'
-import { parseRefreshTokenData } from '~/lib/request-parsing'
-import { type User } from '~/schema'
-import { StandardResponse } from '~/utils/response-utils'
+import { StandardResponse } from '~/lib/responses'
+import { z } from 'zod/v4'
+import { type ZodOpenApiPathItemObject } from 'zod-openapi'
+import {
+	forbiddenResponse,
+	internalServerErrorResponse,
+	InternalServerErrorSchema,
+	standardErrorResponseSchema,
+} from '~/lib/openapi/errors'
+import { UserSchema } from '~/lib/openapi/schemas/user'
+import { transformUserToApiFormat } from '~/lib/user-transform'
+import { parseBearerToken, parseRefreshAuthBody } from '~/lib/request-parsing'
+import { AuthTokensSchema } from '~/lib/openapi/schemas/auth'
 
-/**
- * @openapi
- * /api/users/refresh-auth:
- *   post:
- *     tags:
- *       - Authentication
- *     summary: Refresh authentication token
- *     description: Refreshes a JWT access token using a valid refresh token
- *     operationId: refreshAuth
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required:
- *               - token
- *             properties:
- *               token:
- *                 type: string
- *                 description: Valid refresh token
- *                 example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
- *         application/x-www-form-urlencoded:
- *           schema:
- *             type: object
- *             required:
- *               - token
- *             properties:
- *               token:
- *                 type: string
- *                 description: Valid refresh token
- *                 example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
- *     responses:
- *       200:
- *         description: Successfully refreshed authentication
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 code:
- *                   type: string
- *                   example: Authorized
- *                 message:
- *                   type: string
- *                   example: Successfully refreshed auth
- *                 data:
- *                   type: object
- *                   properties:
- *                     user:
- *                       $ref: '#/components/schemas/User'
- *                 token:
- *                   type: string
- *                   description: New JWT access token
- *                   example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
- *                 refreshToken:
- *                   type: string
- *                   description: New JWT refresh token
- *                   example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
- *       403:
- *         description: Authentication failed - invalid or expired refresh token
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 code:
- *                   type: string
- *                   example: Forbidden
- *                 message:
- *                   type: string
- *                   enum:
- *                     - You must specify a token to refresh
- *                     - Refresh token invalid or too old. Please sign in with your username and password.
- *       500:
- *         description: Internal server error
- *         content:
- *           text/plain:
- *             schema:
- *               type: string
- *               example: Internal Server Error
- * components:
- *   schemas:
- *     User:
- *       type: object
- *       description: User information object
- *       properties:
- *         id:
- *           type: string
- *           description: Unique user identifier
- *         email:
- *           type: string
- *           format: email
- *           description: User's email address
- *         name:
- *           type: string
- *           description: User's display name
- *         createdAt:
- *           type: string
- *           format: date-time
- *           description: Account creation timestamp
- *         updatedAt:
- *           type: string
- *           format: date-time
- *           description: Last account update timestamp
- */
+const errorMessages = {
+	tokenRequired: 'You must specify a token to refresh',
+	refreshTokenInvalid:
+		'Refresh token invalid or too old. Please sign in with your username and password.',
+}
 
-export const action: ActionFunction = async ({
-	request,
-}: ActionFunctionArgs) => {
-	try {
-		// Parse request data - handles both JSON and form data automatically
-		const data = await parseRefreshTokenData(request)
-
-		if (!data.token || data.token.trim().length === 0)
-			return StandardResponse.forbidden('You must specify a token to refresh')
-
-		// We deliberately make casts and stuff like that, so everything
-		// but the happy path will result in an internal server error.
-		// This is done s.t. we are not leaking information if someone
-		// tries sending random token to see if users exist or similar
-		const user = (await getUserFromJwt(request)) as User
-		const rawAuthorizationHeader = request.headers
-			.get('authorization')!
-			.toString()
-		const [, jwtString = ''] = rawAuthorizationHeader.split(' ')
-
-		if (data.token !== hashJwt(jwtString))
-			return StandardResponse.forbidden(
-				'Refresh token invalid or too old. Please sign in with your username and password.',
-			)
-
-		const { token, refreshToken } = (await refreshJwt(user, data.token)) || {}
-
-		if (token && refreshToken)
-			return StandardResponse.ok({
-				code: 'Authorized',
-				message: 'Successfully refreshed auth',
-				data: { user },
-				token,
-				refreshToken,
+export const RefreshAuthRequestSchema = z
+	.object({
+		token: z
+			.string()
+			.trim()
+			.min(1, {
+				error: errorMessages.tokenRequired,
 			})
-		else
-			return StandardResponse.forbidden(
-				'Refresh token invalid or too old. Please sign in with your username and password.',
-			)
-	} catch (error) {
-		// Handle parsing errors
-		if (error instanceof Error && error.message.includes('Failed to parse'))
-			return StandardResponse.forbidden(
-				`Invalid request format: ${error.message}`,
-			)
+			.meta({
+				description:
+					'Refresh token bound to the current access token. This value is compared to the hash of the supplied bearer token.',
+				example: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...',
+			}),
+	})
+	.meta({
+		id: 'RefreshAuthRequest',
+		description:
+			'Refresh authentication request body. Can be submitted as JSON or form data.',
+	})
 
-		// Handle other errors
-		console.warn(error)
+const RefreshAuthResponseSchema = AuthTokensSchema.extend({
+	code: z.literal('Authorized').default('Authorized'),
+	message: z
+		.literal('Successfully refreshed auth')
+		.default('Successfully refreshed auth'),
+	data: z.object({
+		user: UserSchema,
+	}),
+}).meta({
+	id: 'RefreshAuthResponse',
+	description: 'Successfully refreshed authentication response.',
+})
+
+const RefreshAuthForbiddenErrorSchema = standardErrorResponseSchema(
+	'Forbidden',
+	z.union([
+		z.literal(errorMessages.tokenRequired),
+		z.literal(errorMessages.refreshTokenInvalid),
+		z.string().startsWith('Invalid request format:').meta({
+			example:
+				'Invalid request format: Failed to parse request body as JSON or form data',
+		}),
+	]),
+).meta({
+	id: 'RefreshAuthForbiddenError',
+	description:
+		'Authentication failed because the refresh token is missing, invalid, expired, or the request body could not be parsed.',
+})
+
+export const openapi: ZodOpenApiPathItemObject = {
+	post: {
+		tags: ['Authentication'],
+		summary: 'Refresh authentication token',
+		description:
+			'Refreshes the JWT access token using a valid refresh token. The current access token must be supplied via the Authorization bearer header, and the refresh token must be supplied in the request body.',
+		security: [{ bearerAuth: [] }],
+
+		requestBody: {
+			required: true,
+			content: {
+				'application/json': {
+					schema: RefreshAuthRequestSchema,
+				},
+				'application/x-www-form-urlencoded': {
+					schema: RefreshAuthRequestSchema,
+				},
+			},
+		},
+
+		responses: {
+			200: {
+				description: 'Successfully refreshed authentication.',
+				content: {
+					'application/json': {
+						schema: RefreshAuthResponseSchema,
+					},
+				},
+			},
+
+			403: forbiddenResponse(
+				RefreshAuthForbiddenErrorSchema,
+				'Authentication failed. The refresh token is missing, invalid, expired, or the request body could not be parsed.',
+			),
+
+			500: internalServerErrorResponse(
+				InternalServerErrorSchema,
+				'Internal server error.',
+			),
+		},
+	},
+}
+
+export const action = async ({ request }: Route.ActionArgs) => {
+	try {
+		const body = await parseRefreshAuthBody(request)
+		if (body instanceof Response) return body
+
+		const jwtString = parseBearerToken(request)
+		if (jwtString instanceof Response) return jwtString
+
+		const jwtResponse = await getUserFromJwt(request)
+
+		if (typeof jwtResponse === 'string') {
+			return StandardResponse.forbidden(errorMessages.refreshTokenInvalid)
+		}
+
+		if (body.token !== hashJwt(jwtString)) {
+			return StandardResponse.forbidden(errorMessages.refreshTokenInvalid)
+		}
+
+		const refreshed = await refreshJwt(jwtResponse, body.token)
+
+		if (!refreshed?.token || !refreshed.refreshToken) {
+			return StandardResponse.forbidden(errorMessages.refreshTokenInvalid)
+		}
+
+		const responseParsed = await RefreshAuthResponseSchema.safeParseAsync({
+			code: 'Authorized',
+			message: 'Successfully refreshed auth',
+			data: {
+				user: transformUserToApiFormat(jwtResponse),
+			},
+			token: refreshed.token,
+			refreshToken: refreshed.refreshToken,
+		})
+
+		if (!responseParsed.success) {
+			return StandardResponse.internalServerError()
+		}
+
+		return StandardResponse.ok(responseParsed.data)
+	} catch {
 		return StandardResponse.internalServerError()
 	}
 }

@@ -1,11 +1,16 @@
-import { describe, it, expect, beforeAll, afterAll } from 'vitest'
-import { BASE_URL } from 'vitest.setup'
+import { describe, it, expect, beforeAll, afterAll } from 'vite-plus/test'
+import { type Route } from '../../.react-router/types/app/routes/+types/api.boxes.$deviceId'
+import { BASE_URL } from '../../vitest.setup'
+import {
+	createDevice,
+	deleteDevice,
+	getDevice,
+} from '~/db/models/device.server'
+import { deleteUserByEmail } from '~/db/models/user.server'
+import { type User, type Device } from '~/db/schema'
 import { createToken } from '~/lib/jwt'
-import { registerUser } from '~/lib/user-service.server'
-import { createDevice, deleteDevice, getDevice } from '~/models/device.server'
-import { deleteUserByEmail } from '~/models/user.server'
 import { action as deviceUpdateAction } from '~/routes/api.boxes.$deviceId'
-import { type User, type Device } from '~/schema'
+import { registerUser } from '~/services/user-service.server'
 
 const TEST_USER = {
 	name: 'feinstaubAddonTestUser',
@@ -34,7 +39,7 @@ describe('Device API: Feinstaub Addon behavior', () => {
 			TEST_USER.email,
 			TEST_USER.password,
 			'en_US',
-			true
+			true,
 		)
 		expect(registration.ok).toBe(true)
 
@@ -123,11 +128,10 @@ describe('Device API: Feinstaub Addon behavior', () => {
 			body: JSON.stringify(updatePayload),
 		}) as unknown as Request
 
-		const response: any = await deviceUpdateAction({
+		const response = await deviceUpdateAction({
 			request,
 			params: { deviceId: device.id },
-			context: {} as any,
-		})
+		} as Route.ActionArgs)
 
 		expect(response.status).toBe(200)
 		const data = await response.json()
@@ -154,11 +158,10 @@ describe('Device API: Feinstaub Addon behavior', () => {
 		}) as unknown as Request
 
 		// Second PUT should be idempotent — same sensors
-		const secondResponse: any = await deviceUpdateAction({
+		const secondResponse = await deviceUpdateAction({
 			request: secondRequest,
 			params: { deviceId: device.id },
-			context: {} as any,
-		})
+		} as Route.ActionArgs)
 
 		expect(secondResponse.status).toBe(200)
 		const secondData = await secondResponse.json()
@@ -187,11 +190,10 @@ describe('Device API: Feinstaub Addon behavior', () => {
 			body: JSON.stringify(updatePayload),
 		}) as unknown as Request
 
-		const response: any = await deviceUpdateAction({
+		const response = await deviceUpdateAction({
 			request,
 			params: { deviceId: device.id },
-			context: {} as any,
-		})
+		} as Route.ActionArgs)
 
 		expect(response.status).toBe(200)
 		const data = await response.json()

@@ -1,11 +1,12 @@
-import { type Params, type LoaderFunctionArgs } from 'react-router'
+import { type Params } from 'react-router'
 import { generateTestUserCredentials } from 'tests/data/generate_test_user'
-import { BASE_URL } from 'vitest.setup'
-import { registerUser } from '~/lib/user-service.server'
-import { createDevice, deleteDevice } from '~/models/device.server'
-import { deleteUserByEmail } from '~/models/user.server'
+import { type Route } from '../../.react-router/types/app/routes/+types/api.boxes.$deviceId.script'
+import { BASE_URL } from '../../vitest.setup'
+import { createDevice, deleteDevice } from '~/db/models/device.server'
+import { deleteUserByEmail } from '~/db/models/user.server'
+import { type User } from '~/db/schema'
 import { loader } from '~/routes/api.boxes.$deviceId.script'
-import { type User } from '~/schema'
+import { registerUser } from '~/services/user-service.server'
 
 const DEVICE_SENSORS_USER = generateTestUserCredentials()
 
@@ -87,7 +88,7 @@ describe('openSenseMap API Routes: /boxes/:deviceId/script', () => {
 		const dataFunctionValue = await loader({
 			request,
 			params: { deviceId: `${deviceId}` } as Params<string>,
-		} as LoaderFunctionArgs)
+		} as Route.LoaderArgs)
 		const response = dataFunctionValue as Response
 
 		expect(response.status).toBe(200)
@@ -103,7 +104,7 @@ describe('openSenseMap API Routes: /boxes/:deviceId/script', () => {
 		const dataFunctionValue = await loader({
 			request,
 			params: {} as Params<string>,
-		} as LoaderFunctionArgs)
+		} as Route.LoaderArgs)
 
 		const response = dataFunctionValue as Response
 		expect(response.status).toBe(400)

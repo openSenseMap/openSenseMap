@@ -6,7 +6,6 @@ node_modules
 
 /build
 /public/build
-/public/openapi.json
 .env
 .cache
 
@@ -25,5 +24,4 @@ measurements.csv
 /coverage
 
 /minio-data
-/rustfs-data
-/public/openapi.json
+.vitest/

@@ -9,11 +9,17 @@
 	"next_page": "Nächste Seite",
 	"last_page": "Letzte Seite",
 
-	"device_id": "Device ID",
+	"device_id": "Geräte ID",
 	"actions": "Aktionen",
 	"name": "Name",
 	"createdAt": "Erstellt am",
-	"exposure": "Exposition",
+	"exposure": "Standort",
+	"exposure_values": {
+		"indoor": "Drinnen",
+		"outdoor": "Draußen",
+		"mobile": "Mobil",
+		"unknown": "Unbekannt"
+	},
 	"model": "Modell",
 	"overview": "Überblick",
 	"show_on_map": "Auf der Karte anzeigen",
@@ -21,5 +27,6 @@
 	"data_upload": "Daten hochladen",
 	"support": "Unterstützung",
 	"copy_id": "ID kopieren",
+	"copied": "ID erfolgreich kopiert",
 	"delete": "Löschen"
 }

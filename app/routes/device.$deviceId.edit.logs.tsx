@@ -1,17 +1,10 @@
 import { Save, Trash } from 'lucide-react'
 import { useEffect, useState } from 'react'
-import {
-	type ActionFunctionArgs,
-	type LoaderFunctionArgs,
-	data,
-	redirect,
-	Form,
-	useActionData,
-	useLoaderData,
-	useSubmit,
-} from 'react-router'
+import { useTranslation } from 'react-i18next'
+import { data, redirect, Form, useSubmit } from 'react-router'
 
 import invariant from 'tiny-invariant'
+import { type Route } from './+types/device.$deviceId.edit.logs'
 import { Switch } from '@/components/ui/switch'
 import {
 	Table,
@@ -29,11 +22,12 @@ import {
 	deleteLogEntry,
 	getLogEntriesByDeviceId,
 	updateLogEntryVisibility,
-} from '~/models/log-entry.server'
-import { type LogEntry } from '~/schema/log-entry'
-import { getUserId } from '~/utils/session.server'
+} from '~/db/models/log-entry.server'
+import { type LogEntry } from '~/db/schema/log-entry'
+import { getUserId } from '~/services/session-service.server'
+import { useHydrated } from '~/hooks/use-hydrated'
 
-export async function loader({ request, params }: LoaderFunctionArgs) {
+export async function loader({ request, params }: Route.LoaderArgs) {
 	const userId = await getUserId(request)
 	if (!userId) return redirect('/')
 
@@ -46,7 +40,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
 	return { logEntries: logEntries }
 }
 
-export async function action({ request, params }: ActionFunctionArgs) {
+export async function action({ request, params }: Route.ActionArgs) {
 	try {
 		const formData = await request.formData()
 		const { intent, content, logEntryId, isPublic } =
@@ -61,7 +55,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
 				await createLogEntry({ deviceId: deviceID, content, public: false })
 				return data({
 					success: true,
-					message: 'Log added successfully!',
+					message: 'log_added',
 				})
 			}
 			case 'deleteLog': {
@@ -69,7 +63,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
 				await deleteLogEntry(logEntryId)
 				return data({
 					success: true,
-					message: 'Log deleted successfully!',
+					message: 'log_deleted',
 				})
 			}
 			case 'togglePublic': {
@@ -78,26 +72,26 @@ export async function action({ request, params }: ActionFunctionArgs) {
 				await updateLogEntryVisibility(logEntryId, isPublic === 'true')
 				return data({
 					success: true,
-					message: 'Log visibility updated!',
+					message: 'visibility_updated',
 				})
 			}
 			default:
-				return data({ success: false, message: 'Unknown action.' })
+				return data({ success: false, message: 'unknown_action' })
 		}
 	} catch (error) {
 		console.error('Error processing action:', error)
-		return data(
-			{ success: false, message: 'Something went wrong.' },
-			{ status: 500 },
-		)
+		return data({ success: false, message: 'error' }, { status: 500 })
 	}
 }
 
-export default function Logs() {
-	const { logEntries } = useLoaderData<typeof loader>()
-	const actionData = useActionData<typeof action>()
+export default function Logs({
+	loaderData: { logEntries },
+	actionData,
+}: Route.ComponentProps) {
 	const { toast } = useToast()
+	const { t, i18n } = useTranslation('edit-device-logs')
 	const [newLogContent, setNewLogContent] = useState('')
+	const hydrated = useHydrated()
 
 	const submit = useSubmit()
 
@@ -106,29 +100,29 @@ export default function Logs() {
 		if (actionData) {
 			if (actionData.success) {
 				toast({
-					title: actionData.message,
+					title: t(actionData.message),
 					variant: 'success',
 				})
 			} else {
 				toast({
-					title: actionData.message,
+					title: t(actionData.message),
 					variant: 'destructive',
 				})
 			}
 		}
-	}, [actionData, toast])
+	}, [actionData, t, toast])
 
 	return (
 		<div className="grid grid-rows-1">
 			<div className="flex min-h-full items-center justify-center">
-				<div className="mx-auto w-full font-helvetica text-[14px]">
+				<div className="font-helvetica mx-auto w-full text-[14px]">
 					<Form method="post" noValidate className="mb-8">
 						{/* Heading */}
 						<div>
 							{/* Title */}
 							<div className="mt-2 flex justify-between">
 								<div>
-									<h1 className="text-4xl">Device Logs</h1>
+									<h1 className="text-4xl">{t('title')}</h1>
 								</div>
 								<div></div>
 							</div>
@@ -139,7 +133,7 @@ export default function Logs() {
 						<div className="flex space-x-2">
 							<Input
 								name="content"
-								placeholder="Enter log content"
+								placeholder={t('content_placeholder')}
 								type="text"
 								value={newLogContent}
 								onChange={(e) => setNewLogContent(e.target.value)}
@@ -160,10 +154,10 @@ export default function Logs() {
 						<Table>
 							<TableHeader>
 								<TableRow>
-									<TableHead>Content</TableHead>
-									<TableHead>Created At</TableHead>
-									<TableHead>Public</TableHead>
-									<TableHead>Actions</TableHead>
+									<TableHead>{t('content')}</TableHead>
+									<TableHead>{t('created_at')}</TableHead>
+									<TableHead>{t('public')}</TableHead>
+									<TableHead>{t('actions')}</TableHead>
 								</TableRow>
 							</TableHeader>
 							<TableBody>
@@ -171,7 +165,10 @@ export default function Logs() {
 									<TableRow key={logEntry.id}>
 										<TableCell>{logEntry.content}</TableCell>
 										<TableCell>
-											{new Date(logEntry.createdAt).toLocaleString()}
+											{hydrated &&
+												new Date(logEntry.createdAt).toLocaleString(
+													i18n.language,
+												)}
 										</TableCell>
 										<TableCell>
 											<Form method="post">

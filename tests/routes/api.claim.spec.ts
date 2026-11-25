@@ -1,19 +1,26 @@
-import { type ActionFunctionArgs } from 'react-router'
 import { generateTestUserCredentials } from 'tests/data/generate_test_user'
-import { BASE_URL } from 'vitest.setup'
+import { type Route } from '../../.react-router/types/app/routes/+types/api.boxes.claim'
+import { type Route as TransferRoute } from '../../.react-router/types/app/routes/+types/api.boxes.transfer'
+import { BASE_URL } from '../../vitest.setup'
+import { createDevice, getDevice } from '~/db/models/device.server'
+import { deleteUserByEmail } from '~/db/models/user.server'
+import { type Device, type User } from '~/db/schema'
 import { createToken } from '~/lib/jwt'
-import { registerUser } from '~/lib/user-service.server'
-import { createDevice, getDevice } from '~/models/device.server'
-import { deleteUserByEmail } from '~/models/user.server'
-import { action as claimAction } from '~/routes/api.claim'
-import { action as transferAction } from '~/routes/api.transfer'
-import { type Device, type User } from '~/schema'
+import { action as claimAction } from '~/routes/api.boxes.claim'
+import { action as transferAction } from '~/routes/api.boxes.transfer'
+import { registerUser } from '~/services/user-service.server'
 
 const CLAIM_TEST_USER = generateTestUserCredentials()
 
 const createTestUser = async (suffix: string): Promise<User> => {
 	const u = generateTestUserCredentials()
-	const registration = await registerUser(u.name, u.email, u.password, 'en_US', true)
+	const registration = await registerUser(
+		u.name,
+		u.email,
+		u.password,
+		'en_US',
+		true,
+	)
 	expect(registration.ok).toBe(true)
 
 	if (!registration.ok) {
@@ -47,7 +54,7 @@ describe('openSenseMap API Routes: /boxes/claim', () => {
 			CLAIM_TEST_USER.email,
 			CLAIM_TEST_USER.password,
 			'en_US',
-			true
+			true,
 		)
 		expect(testUser.ok).toBe(true)
 
@@ -57,7 +64,7 @@ describe('openSenseMap API Routes: /boxes/claim', () => {
 			)
 		}
 
-		user = testUser.user 
+		user = testUser.user
 		const { token: t } = await createToken(user)
 		jwt = t
 
@@ -84,7 +91,7 @@ describe('openSenseMap API Routes: /boxes/claim', () => {
 
 			const transferResponse = (await transferAction({
 				request: createTransferRequest,
-			} as ActionFunctionArgs)) as Response
+			} as TransferRoute.ActionArgs)) as Response
 
 			const transferBody = await transferResponse.json()
 			const claimToken = transferBody.data.token
@@ -103,7 +110,7 @@ describe('openSenseMap API Routes: /boxes/claim', () => {
 
 			const claimResponse = (await claimAction({
 				request: claimRequest,
-			} as ActionFunctionArgs)) as Response
+			} as Route.ActionArgs)) as Response
 
 			expect(claimResponse.status).toBe(200)
 			const claimBody = await claimResponse.json()
@@ -126,7 +133,7 @@ describe('openSenseMap API Routes: /boxes/claim', () => {
 
 			const reusedResponse = (await claimAction({
 				request: reusedClaimRequest,
-			} as ActionFunctionArgs)) as Response
+			} as Route.ActionArgs)) as Response
 
 			expect(reusedResponse.status).toBe(410)
 
@@ -151,7 +158,7 @@ describe('openSenseMap API Routes: /boxes/claim', () => {
 
 			const transferResponse = (await transferAction({
 				request: createTransferRequest,
-			} as ActionFunctionArgs)) as Response
+			} as TransferRoute.ActionArgs)) as Response
 
 			expect(transferResponse.status).toBe(201)
 			const transferBody = await transferResponse.json()
@@ -169,7 +176,7 @@ describe('openSenseMap API Routes: /boxes/claim', () => {
 
 			const claimResponse = (await claimAction({
 				request: claimRequest,
-			} as ActionFunctionArgs)) as Response
+			} as Route.ActionArgs)) as Response
 
 			expect(claimResponse.status).toBe(415)
 			const body = await claimResponse.json()
@@ -194,7 +201,7 @@ describe('openSenseMap API Routes: /boxes/claim', () => {
 
 			const transferResponse = (await transferAction({
 				request: createTransferRequest,
-			} as ActionFunctionArgs)) as Response
+			} as TransferRoute.ActionArgs)) as Response
 
 			expect(transferResponse.status).toBe(201)
 			const transferBody = await transferResponse.json()
@@ -211,7 +218,7 @@ describe('openSenseMap API Routes: /boxes/claim', () => {
 
 			const claimResponse = (await claimAction({
 				request: claimRequest,
-			} as ActionFunctionArgs)) as Response
+			} as Route.ActionArgs)) as Response
 
 			expect(claimResponse.status).toBe(403)
 			const body = await claimResponse.json()
@@ -225,7 +232,7 @@ describe('openSenseMap API Routes: /boxes/claim', () => {
 				`claimer${Date.now()}@test.com`,
 				'password123',
 				'en_US',
-				true
+				true,
 			)
 			expect(registration.ok).toBe(true)
 
@@ -247,7 +254,7 @@ describe('openSenseMap API Routes: /boxes/claim', () => {
 
 			const claimResponse = (await claimAction({
 				request: claimRequest,
-			} as ActionFunctionArgs)) as Response
+			} as Route.ActionArgs)) as Response
 
 			expect(claimResponse.status).toBe(410)
 			const body = await claimResponse.json()

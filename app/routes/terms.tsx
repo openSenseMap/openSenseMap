@@ -1,14 +1,7 @@
 import * as React from 'react'
 import { useTranslation } from 'react-i18next'
-import {
-	Form,
-	data,
-	redirect,
-	useActionData,
-	useLoaderData,
-	type ActionFunctionArgs,
-	type LoaderFunctionArgs,
-} from 'react-router'
+import { Form, data, redirect } from 'react-router'
+import { type Route } from './+types/terms'
 import { MarkdownContent } from '~/components/markdown-content'
 import { Button } from '~/components/ui/button'
 import {
@@ -17,14 +10,14 @@ import {
 	getCurrentEffectiveTos,
 	getTosLocale,
 	getTosRequirementForUser,
-} from '~/models/tos.server'
-import { getUser } from '~/utils/session.server'
+} from '~/db/models/tos.server'
+import { getUser } from '~/services/session-service.server'
 import {
 	getTosFlowSession,
 	tosFlowSessionStorage,
-} from '~/utils/tos-session.server'
+} from '~/services/tos-service.server'
 
-export async function loader({ request }: LoaderFunctionArgs) {
+export async function loader({ request }: Route.LoaderArgs) {
 	const url = new URL(request.url)
 	const tos = await getCurrentEffectiveTos()
 
@@ -107,7 +100,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
 	)
 }
 
-export async function action({ request }: ActionFunctionArgs) {
+export async function action({ request }: Route.ActionArgs) {
 	const formData = await request.formData()
 
 	if (formData.get('intent') !== 'accept_tos_from_email') {
@@ -143,9 +136,10 @@ export async function action({ request }: ActionFunctionArgs) {
 	})
 }
 
-export default function TermsPage() {
-	const { tos, canAcceptViaEmail, info } = useLoaderData<typeof loader>()
-	const actionData = useActionData<typeof action>()
+export default function TermsPage({
+	loaderData: { tos, canAcceptViaEmail, info },
+	actionData,
+}: Route.ComponentProps) {
 	const [checked, setChecked] = React.useState(false)
 
 	const { t, i18n } = useTranslation('terms')
@@ -162,7 +156,7 @@ export default function TermsPage() {
 		<div className="mx-auto max-w-3xl space-y-6 p-6">
 			<h1 className="text-2xl font-bold">{tos.title}</h1>
 
-			<div className="text-sm text-muted-foreground">
+			<div className="text-muted-foreground text-sm">
 				{t('effectiveFrom', { date: effectiveFromDate })}
 			</div>
 

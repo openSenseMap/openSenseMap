@@ -1,17 +1,13 @@
-![openSenseMap](https://github.com/openSenseMap/frontend/blob/dev/public/openSenseMap.png)
+![openSenseMap](https://github.com/openSenseMap/frontend/blob/dev/public/img/openSenseMap.png)
 
-This repository contains the code of the new _openSenseMap_ frontend running at
-[https://beta.opensensemap.org](https://beta.opensensemap.org).
+This repository contains the code of the redeveloped _openSenseMap_ currently
+running as a public beta at
+[https://staging.opensensemap.org](https://staging.opensensemap.org).
 
-Originally, the _openSenseMap_ was built as part of the bachelor thesis of
-[@mpfeil](https://github.com/mpfeil) at the ifgi (Institute for Geoinformatics,
-University of Münster). Between 2016 and 2022 development was partly funded by
-the German Ministry of Education and Research (BMBF) in the projets senseBox and
-senseBox Pro. This version has been developed by
-[@mpfeil](https://github.com/mpfeil) and
-[@freds-dev](https://github.com/freds-dev).
+<img width="1510" height="858" alt="Screenshot OSeM" src="https://github.com/user-attachments/assets/70da4cff-1751-4a13-89e8-607a5198df37">
 
-<img width="1438" alt="Screenshot OSeM" src="https://github.com/user-attachments/assets/a7bf16fb-44a2-4a21-9c0f-d4bf431ab9b5">
+![](https://status.opensensemap.org/api/badge/2/uptime?style=for-the-badge)
+![](https://status.opensensemap.org/api/badge/13/uptime?labelPrefix=Staging+&style=for-the-badge)
 
 ## Project setup
 
@@ -20,71 +16,146 @@ instructions:
 
 ### System Requirements
 
-- [Node.js](https://nodejs.org/) >= 24.0.0 (see [.nvmrc](./.nvmrc))
+- [Node.js](https://nodejs.org/) >= 24.0.0 (see
+  [.node-version](./.node-version))
 - [npm](https://npmjs.com/) >= 11.0.0
+- [nvm](https://github.com/nvm-sh/nvm) >= 4.0.0
 - [git](https://git-scm.com/) >= 2.38.0
 - [Docker](https://www.docker.com) >= 27.0.0
 
 ### Variables
 
-You can configure the API endpoint and/or map tiles using the following
-environmental variables:
+You can configure the API endpoint using the following environmental variables:
 
-| ENV                 | Default value                        |
-| ------------------- | ------------------------------------ |
-| OSEM_API_URL        | https://api.testing.opensensemap.org |
-| DATABASE_URL        | <YOUR_POSTGRES_URL>                  |
-| MAPBOX_ACCESS_TOKEN | <YOUR_MAPBOX_ACCESS_TOKEN>           |
+| ENV          | Default value                                            |
+| ------------ | -------------------------------------------------------- |
+| OSEM_API_URL | https://api.testing.opensensemap.org                     |
+| DATABASE_URL | `postgresql://postgres:postgres@localhost:5432/postgres` |
+| GPXZ_API_URL | `https://api-eu.gpxz.io/v1/elevation/points`             |
+| GPXZ_API_KEY | `YOUR_GPXZ_API_KEY`                                      |
 
 You can create a copy of `.env.example`, rename it to `.env` and set the values.
+To run a local development version, adjust `OSEM_API_URL` to the one given
+above. Elevation lookup additionally requires a GPXZ API key.
 
 ### Setup Steps
 
-1. Clone the repo: `git clone https://github.com/openSenseMap/frontend`
+1. Clone the repo: `git clone https://github.com/openSenseMap/openSenseMap`
 2. Copy `.env.example` into `.env`
-3. Run `npm install` to install dependencies
-4. Optionally run `docker compose up` to start a docker container running your
-   local postgres DB
+3. Activate the Node.js version listed in [.node-version](./.node-version) with
+   your preferred version manager
+4. Run `npm install` to install dependencies
+5. Optionally run `docker compose up` to start a docker container running your
+   local postgres DB (`docker compose up -d` for running container in
+   background)
    - If it is the first time doing this, you may need to bootstrap the database
      by running `npm run db:setup`
    - If you want some example data run `npm run db:seed`. **WARNING**: Do not
      run this on a production database. It will delete all existing data.
-5. Run `npm run dev` to start the local server
+6. Run `npm run dev` to start the local server
+
+### Linting and formatting
+
+This project uses [Vite+](https://viteplus.dev/) to run
+[Oxlint](https://oxc.rs/docs/guide/usage/linter.html) and
+[Oxfmt](https://oxc.rs/docs/guide/usage/formatter.html). Their configuration
+lives in `vite.config.ts` and extends
+[@epic-web/config/](https://github.com/epicweb-dev/config).
+
+Run formatting:
+
+```bash
+npm run format
+```
+
+For more options inspect the `package.json` file. Editor integration is provided
+by the recommended Oxc extension listed in `.vscode/extensions.json`.
+
+Exemplary VSCode config:
+
+```JSON
+{
+  "editor.formatOnSave": true,
+  "editor.formatOnSaveMode": "file",
+  "editor.codeActionsOnSave": {
+    "source.fixAll.oxc": "always"
+  },
+  "oxc.enable": true,
+  "oxc.fmt.configPath": "./vite.config.ts",
+  "oxc.fmt.disableNestedConfig": true,
+  "oxc.configPath": "./vite.config.ts",
+  "oxc.disableNestedConfig": true,
+  "[typescript]": {
+    "editor.defaultFormatter": "oxc.oxc-vscode"
+  },
+  "[typescriptreact]": {
+    "editor.defaultFormatter": "oxc.oxc-vscode",
+    "editor.tabSize": 2
+  },
+}
+```
 
 ### Contributing
 
-We welcome all kind of constructive contributions to this project. If you are
-planning to implement a new feature or change something, please create an issue
-first.
+We welcome all kind of constructive contributions to this project. If you have
+ideas, suggestions or plan to implement a new feature, please open a new
+[GitHub discussion](https://github.com/openSenseMap/frontend/discussions) to
+connect to us and other contributers.
+
+If you implement a new feature or change something, please create an issue.
 
 Afterwards follow these steps:
 
 1. Fork this repository
-2. Create your feature branch (`git checkout -b my-new-feature`)
+2. Create your feature branch (`git checkout -b feat/my-new-feature`)
 3. Make and commit your changes
-4. Push to the branch (`git push origin my-new-feature`)
+4. Push to the branch (`git push origin feat/my-new-feature`)
 5. Create a new pull request against this repository's `dev` branch, linking
    your issue.
+
+#### Phenomenon metadata
+
+Sensor records and device schemas may include `sensorWikiType` (sensor type
+metadata), `sensorWikiPhenomenon` (canonical phenomenon ID), and
+`sensorWikiUnit` (canonical unit ID). Despite their historical names, new-device
+matching can fill the latter two from the bundled
+[phenomenon catalog](./app/lib/sensor-wiki/aliases.json) (see its
+[contribution guide](./app/lib/sensor-wiki/PHENOMENON_CATALOG.md)), and Explore
+uses the same catalog for filtering.
 
 #### How the repository is organized
 
 ```shell
-├── app                 # main directory where most of the application code lives
-│   ├── components      # reusable/ general purpose components
+├frontend
+├── .github
+├── app/
+│   ├── components/                 reusable UI components like buttons, alerts, etc.
+│   |	├── routes/					follows the structure of app/routes for route-specific components (use sparingly!)
+│   ├── emails/                     email templates
+│   ├── routes/                     pages and layouts making up the application using the components
+│   |   ├── ...
+│   ├── lib/                        shared utility / 3rd party code that "does stuff"™️
+│   ├── services/                   domain-specific stuff, business logic like a measurement service
+│   ├── models/                     mostly plain types, interfaces, classes, schemas (not database)
+│   ├── db/                         app-related database specifics
+│   |   ├── drizzle/
+│   |   |   ├── meta/
+│   |   |   ├── 0000_xyz.sql
+│   └── index.js.map
+├── public							public assets (favicons, etc.)
+├── scripts
+│   ├── db/                         database utility scripts (e.g. seed)
+│   |   ├── migrate.ts
+│   |   ├── seed.ts
+│   |   ├── ...
+├── tests/                          follows the structure of app/ for tests of corresponding file(s)
+│   ├── components
+│   ├── routes
+│   |   ├── api
+│   |   ├── ...
 │   ├── lib
-│   ├── models
-│   ├── routes          # app/ api routes
-│   ├── schema
-│   └── utils
-├── db                  # code for seeding/ migration of database
-├── drizzle             # database migrations
-├── other
-├── public              # static assets
-├── server
-├── tests               # automated tests, same structure as the app/ folder with tests placed according to the files they test
-│   ├── routes          # tests for (resource/ api) routes
-├── types
-├── ...
+│   ├── ...
+└── ...
 ```
 
 #### openSenseMap API
@@ -111,91 +182,148 @@ flexibility to adjust the outputs to the needs of the respective use case.
 
 ##### Documenting an API Route
 
-The [swaggerJsdoc Library](https://www.npmjs.com/package/swagger-jsdoc) reads
-the JSDoc-annotated source code in the api-routes and generates an
-openAPI(Swagger) specification and is rendered using
-[Swaggger UI](https://swagger.io/tools/swagger-ui/). The
-[JSDoc annotations](https://github.com/Surnet/swagger-jsdoc) is usually added
-before the loader or action function in the API Routes. The documentation will
-then be automatically generated from the JSDoc annotations in all the api
-routes. When testing the api during development do not forget to change the
-server to [Development Server](http://localhost:3000). To authorize a user you
-must provide the token obtained after sign-in. You can just copy and paste the
-token in the value field and then hit the authorize button.
+API route documentation is generated from route-local `zod-openapi` definitions.
+Each API route can export an `openapi` object that describes the route's OpenAPI
+path item. Request bodies, response bodies, path parameters, query parameters,
+and headers should be described with Zod schemas wherever possible.
 
-##### JSDoc Example
+The main benefit of this approach is that schemas can be shared between
+validation and documentation. This keeps the OpenAPI documentation closer to the
+actual implementation and reduces the risk of outdated docs.
 
-Here's an example of how to document an API route using JSDoc annotations:
+The generated OpenAPI specification is rendered using
+[Swagger UI](https://swagger.io/tools/swagger-ui/). When testing the API during
+development, do not forget to change the server to the
+[Development Server](http://localhost:3000). To authorize a user, provide the
+token obtained after sign-in. You can copy and paste the token into the value
+field and then hit the authorize button.
 
-```javascript
-/**
- * @openapi
- * /api/users/{id}:
- *   get:
- *     summary: Get user by ID
- *     description: Retrieve a single user by their unique identifier
- *     tags:
- *       - Users
- *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         description: Unique identifier of the user
- *         schema:
- *           type: string
- *           example: "12345"
- *     responses:
- *       200:
- *         description: User retrieved successfully
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 id:
- *                   type: string
- *                   example: "12345"
- *                 name:
- *                   type: string
- *                   example: "John Doe"
- *                 email:
- *                   type: string
- *                   example: "john.doe@example.com"
- *                 createdAt:
- *                   type: string
- *                   format: date-time
- *                   example: "2023-01-15T10:30:00Z"
- *       404:
- *         description: User not found
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 error:
- *                   type: string
- *                   example: "User not found"
- *       500:
- *         description: Internal server error
- */
-export async function loader({ params }) {
+##### zod-openapi Example
+
+Here's an example of how to document an API route using `zod-openapi`:
+
+```typescript
+import { z } from 'zod'
+import { type ZodOpenApiPathItemObject } from 'zod-openapi'
+import { type Route } from './+types/api.users.$id'
+
+const UserPathParamsSchema = z.object({
+	id: z.string().min(1).meta({
+		description: 'Unique identifier of the user',
+		example: '12345',
+	}),
+})
+
+const UserSchema = z
+	.object({
+		id: z.string().meta({
+			description: 'Unique identifier of the user',
+			example: '12345',
+		}),
+		name: z.string().meta({
+			description: "User's display name",
+			example: 'John Doe',
+		}),
+		email: z.string().email().meta({
+			description: "User's email address",
+			example: 'john.doe@example.com',
+		}),
+		createdAt: z.string().datetime().meta({
+			description: 'Account creation timestamp',
+			example: '2023-01-15T10:30:00.000Z',
+		}),
+	})
+	.meta({
+		id: 'User',
+		description: 'User information object',
+	})
+
+const NotFoundErrorSchema = z
+	.object({
+		code: z.literal('Not Found'),
+		message: z.literal('User not found'),
+		error: z.literal('User not found'),
+	})
+	.meta({ id: 'NotFoundError' })
+
+const InternalServerErrorSchema = z
+	.object({
+		code: z.literal('Internal Server Error'),
+		message: z.literal('Internal server error'),
+		error: z.literal('Internal server error'),
+	})
+	.meta({ id: 'InternalServerError' })
+
+export const openapi: ZodOpenApiPathItemObject = {
+	get: {
+		tags: ['Users'],
+		summary: 'Get user by ID',
+		description: 'Retrieve a single user by their unique identifier',
+
+		requestParams: {
+			path: UserPathParamsSchema,
+		},
+
+		responses: {
+			200: {
+				description: 'User retrieved successfully',
+				content: {
+					'application/json': {
+						schema: UserSchema,
+					},
+				},
+			},
+			404: {
+				description: 'User not found',
+				content: {
+					'application/json': {
+						schema: NotFoundErrorSchema,
+					},
+				},
+			},
+			500: {
+				description: 'Internal server error',
+				content: {
+					'application/json': {
+						schema: InternalServerErrorSchema,
+					},
+				},
+			},
+		},
+	},
+}
+
+export async function loader({ params }: Route.LoaderArgs) {
 	const { id } = params
 
 	try {
 		const user = await getUserById(id)
+
 		if (!user) {
-			throw new Response('User not found', { status: 404 })
+			return StandardResponse.notFound('User not found')
 		}
-		return Response.json({ user })
+
+		const parsed = await UserSchema.safeParseAsync(user)
+
+		if (!parsed.success) {
+			return StandardResponse.internalServerError()
+		}
+
+		return StandardResponse.ok(parsed.data)
 	} catch (error) {
-		throw new Response('Internal server error', { status: 500 })
+		return StandardResponse.internalServerError('Internal server error')
 	}
 }
 ```
 
-This JSDoc annotation will automatically generate comprehensive API
-documentation including endpoint details, parameters, response schemas, and
-example values.
+The exported `openapi` object is picked up automatically when generating the
+OpenAPI specification. Prefer defining reusable Zod schemas for request bodies,
+response bodies, path parameters, query parameters, and shared error responses.
+
+Use `.meta(...)` to add OpenAPI-specific metadata such as descriptions,
+examples, component ids, and formatting hints. For route parameters, prefer
+`requestParams` over manually writing OpenAPI `parameters`, because it allows
+the parameters to be described directly with Zod schemas.
 
 #### Testing
 
@@ -211,4 +339,4 @@ your local database). Then simply run `npm test`.
 
 ## License
 
-[MIT](LICENSE) - Matthias Pfeil 2015 - now
+[MIT](LICENSE) - openSenseLab 2026

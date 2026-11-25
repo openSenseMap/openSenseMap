@@ -1,5 +1,5 @@
 import * as React from 'react'
-import { useHydrated } from '~/utils/use-hydrated'
+import { useHydrated } from '~/hooks/use-hydrated'
 
 type Props = {
 	/**

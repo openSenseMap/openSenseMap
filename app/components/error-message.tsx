@@ -157,7 +157,7 @@ export default function ErrorMessage() {
 	return (
 		<div className="flex min-h-[400px] w-full items-center justify-center p-4">
 			<Card
-				className={`w-full max-w-md bg-gradient-to-br ${getGradient()} shadow-2xl border-2 border-white/60 dark:border-zinc-700/80 backdrop-blur-sm ring-1 ring-black/10`}
+				className={`w-full max-w-md bg-linear-to-br ${getGradient()} border-2 border-white/60 shadow-2xl ring-1 ring-black/10 backdrop-blur-xs dark:border-zinc-700/80`}
 			>
 				<CardHeader className="text-center">
 					<div className="mx-auto mb-4 flex h-20 w-20 items-center justify-center rounded-full bg-white shadow-md dark:bg-zinc-800">
@@ -173,8 +173,8 @@ export default function ErrorMessage() {
 				</CardHeader>
 
 				<CardContent>
-					<div className="bg-white/50 dark:bg-zinc-800/50 rounded-lg p-4">
-						<p className="text-center text-sm text-muted-foreground">
+					<div className="rounded-lg bg-white/50 p-4 dark:bg-zinc-800/50">
+						<p className="text-muted-foreground text-center text-sm">
 							{t('error_help_text')}
 						</p>
 					</div>

@@ -1,0 +1,36 @@
+{
+	"name": "openSenseMap",
+	"short_name": "openSenseMap",
+	"description": "The environmental data platform",
+	"start_url": "/explore",
+	"scope": "/",
+	"display": "standalone",
+	"theme_color": "#3d843f",
+	"background_color": "#ffffff",
+	"icons": [
+		{
+			"src": "/img/favicon-192x192.png",
+			"sizes": "192x192",
+			"type": "image/png",
+			"purpose": "any"
+		},
+		{
+			"src": "/img/favicon-512x512.png",
+			"sizes": "512x512",
+			"type": "image/png",
+			"purpose": "any"
+		},
+		{
+			"src": "/img/maskable-favicon-192x192.png",
+			"sizes": "192x192",
+			"type": "image/png",
+			"purpose": "maskable"
+		},
+		{
+			"src": "/img/maskable-favicon-512x512.png",
+			"sizes": "512x512",
+			"type": "image/png",
+			"purpose": "maskable"
+		}
+	]
+}

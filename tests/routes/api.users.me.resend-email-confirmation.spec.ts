@@ -1,11 +1,11 @@
-import { type ActionFunctionArgs } from 'react-router'
 import { generateTestUserCredentials } from 'tests/data/generate_test_user'
-import { BASE_URL } from 'vitest.setup'
+import { type Route } from '../../.react-router/types/app/routes/+types/api.users.me.resend-email-confirmation'
+import { BASE_URL } from '../../vitest.setup'
+import { deleteUserByEmail } from '~/db/models/user.server'
+import { type User } from '~/db/schema'
 import { createToken } from '~/lib/jwt'
-import { registerUser } from '~/lib/user-service.server'
-import { deleteUserByEmail } from '~/models/user.server'
 import { action } from '~/routes/api.users.me.resend-email-confirmation'
-import { type User } from '~/schema'
+import { registerUser } from '~/services/user-service.server'
 
 const RESEND_EMAIL_USER = generateTestUserCredentials()
 
@@ -20,10 +20,10 @@ describe('openSenseMap API Routes: /users', () => {
 					RESEND_EMAIL_USER.email,
 					RESEND_EMAIL_USER.password,
 					'en_US',
-					true
+					true,
 				)
 				expect(registration.ok).toBe(true)
-		
+
 				if (!registration.ok) {
 					throw new Error(
 						`Test setup failed: ${registration.field} -> ${registration.code}`,
@@ -50,7 +50,7 @@ describe('openSenseMap API Routes: /users', () => {
 
 				const resendResponse = (await action({
 					request: resendRequest,
-				} as ActionFunctionArgs)) as Response
+				} as Route.ActionArgs)) as Response
 
 				expect(resendResponse.status).toBe(200)
 				expect(resendResponse.headers.get('content-type')).toBe(

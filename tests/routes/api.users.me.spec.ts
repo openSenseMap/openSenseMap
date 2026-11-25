@@ -1,11 +1,11 @@
-import { type ActionFunctionArgs, type LoaderFunctionArgs } from 'react-router'
 import { generateTestUserCredentials } from 'tests/data/generate_test_user'
-import { BASE_URL } from 'vitest.setup'
+import { type Route } from '../../.react-router/types/app/routes/+types/api.users.me'
+import { BASE_URL } from '../../vitest.setup'
+import { deleteUserByEmail } from '~/db/models/user.server'
+import { type User } from '~/db/schema'
 import { createToken } from '~/lib/jwt'
-import { registerUser } from '~/lib/user-service.server'
-import { deleteUserByEmail } from '~/models/user.server'
 import { loader as meLoader, action as meAction } from '~/routes/api.users.me'
-import { type User } from '~/schema'
+import { registerUser } from '~/services/user-service.server'
 
 const ME_TEST_USER = generateTestUserCredentials()
 
@@ -21,7 +21,7 @@ describe('openSenseMap API Routes: /users', () => {
 			ME_TEST_USER.email,
 			ME_TEST_USER.password,
 			'en_US',
-			true
+			true,
 		)
 		expect(registration.ok).toBe(true)
 
@@ -47,7 +47,7 @@ describe('openSenseMap API Routes: /users', () => {
 				// Act
 				const dataFunctionValue = await meLoader({
 					request: request,
-				} as LoaderFunctionArgs)
+				} as Route.LoaderArgs)
 				const response = dataFunctionValue as Response
 				const body = await response?.json()
 
@@ -79,7 +79,7 @@ describe('openSenseMap API Routes: /users', () => {
 
 				const response = (await meAction({
 					request,
-				} as ActionFunctionArgs)) as Response
+				} as Route.ActionArgs)) as Response
 				const body = await response.json()
 
 				expect(response.status).toBe(400)
@@ -101,7 +101,7 @@ describe('openSenseMap API Routes: /users', () => {
 
 				const response = (await meAction({
 					request,
-				} as ActionFunctionArgs)) as Response
+				} as Route.ActionArgs)) as Response
 				const body = await response.json()
 
 				expect(response.status).toBe(400)
@@ -126,7 +126,7 @@ describe('openSenseMap API Routes: /users', () => {
 
 				const response = (await meAction({
 					request,
-				} as ActionFunctionArgs)) as Response
+				} as Route.ActionArgs)) as Response
 				const body = await response.json()
 
 				expect(response.status).toBe(400)
@@ -151,7 +151,7 @@ describe('openSenseMap API Routes: /users', () => {
 				})
 				const putResponse = (await meAction({
 					request: putRequest,
-				} as ActionFunctionArgs)) as Response
+				} as Route.ActionArgs)) as Response
 				const putBody = await putResponse.json()
 
 				expect(putResponse.status).toBe(200)
@@ -167,7 +167,7 @@ describe('openSenseMap API Routes: /users', () => {
 				})
 				const getResponse = (await meLoader({
 					request: getRequest,
-				} as ActionFunctionArgs)) as Response
+				} as Route.LoaderArgs)) as Response
 				const getBody = await getResponse.json()
 
 				expect(getResponse.status).toBe(200)
@@ -186,7 +186,7 @@ describe('openSenseMap API Routes: /users', () => {
 				})
 				const putResponse = (await meAction({
 					request: putRequest,
-				} as ActionFunctionArgs)) as Response
+				} as Route.ActionArgs)) as Response
 				const putBody = await putResponse.json()
 
 				expect(putResponse.status).toBe(200)
@@ -202,7 +202,7 @@ describe('openSenseMap API Routes: /users', () => {
 				})
 				const getResponse = (await meLoader({
 					request: getRequest,
-				} as ActionFunctionArgs)) as Response
+				} as Route.LoaderArgs)) as Response
 				const getBody = await getResponse.json()
 
 				expect(getResponse.status).toBe(200)
@@ -221,7 +221,7 @@ describe('openSenseMap API Routes: /users', () => {
 
 				const response = (await meAction({
 					request,
-				} as ActionFunctionArgs)) as Response
+				} as Route.ActionArgs)) as Response
 				const body = await response.json()
 
 				expect(response.status).toBe(200)
@@ -246,7 +246,7 @@ describe('openSenseMap API Routes: /users', () => {
 
 				const response = (await meAction({
 					request,
-				} as ActionFunctionArgs)) as Response
+				} as Route.ActionArgs)) as Response
 				const body = await response.json()
 
 				expect(response.status).toBe(200)
@@ -271,7 +271,7 @@ describe('openSenseMap API Routes: /users', () => {
 
 				const response = (await meAction({
 					request,
-				} as ActionFunctionArgs)) as Response
+				} as Route.ActionArgs)) as Response
 				const body = await response.json()
 
 				expect(response.status).toBe(400)
@@ -296,7 +296,7 @@ describe('openSenseMap API Routes: /users', () => {
 
 				const response = (await meAction({
 					request,
-				} as ActionFunctionArgs)) as Response
+				} as Route.ActionArgs)) as Response
 
 				expect(response.status).toBe(400)
 			})
@@ -316,7 +316,7 @@ describe('openSenseMap API Routes: /users', () => {
 
 				const response = (await meAction({
 					request,
-				} as ActionFunctionArgs)) as Response
+				} as Route.ActionArgs)) as Response
 
 				expect(response.status).toBe(400)
 			})
@@ -332,7 +332,7 @@ describe('openSenseMap API Routes: /users', () => {
 				// Act
 				const deleteResponse = (await meAction({
 					request: deleteRequest,
-				} as ActionFunctionArgs)) as Response
+				} as Route.ActionArgs)) as Response
 
 				// Assert
 				expect(deleteResponse.status).toBe(403)
@@ -347,7 +347,7 @@ describe('openSenseMap API Routes: /users', () => {
 				})
 				const deleteResponse = (await meAction({
 					request: deleteRequest,
-				} as ActionFunctionArgs)) as Response
+				} as Route.ActionArgs)) as Response
 
 				// Assert: Should return 400 Bad Request
 				expect(deleteResponse.status).toBe(400)
@@ -370,7 +370,7 @@ describe('openSenseMap API Routes: /users', () => {
 
 				const deleteResponse = (await meAction({
 					request: deleteRequest,
-				} as ActionFunctionArgs)) as Response
+				} as Route.ActionArgs)) as Response
 
 				expect(deleteResponse.status).toBe(400)
 			})
@@ -392,7 +392,7 @@ describe('openSenseMap API Routes: /users', () => {
 
 				const deleteResponse = (await meAction({
 					request: deleteRequest,
-				} as ActionFunctionArgs)) as Response
+				} as Route.ActionArgs)) as Response
 				const deleteBody = await deleteResponse.json()
 
 				// Assertions
@@ -420,7 +420,7 @@ describe('openSenseMap API Routes: /users', () => {
 
 				const deleteResponse = (await meAction({
 					request: deleteRequest,
-				} as ActionFunctionArgs)) as Response
+				} as Route.ActionArgs)) as Response
 				expect(deleteResponse.status).toBe(200)
 			})
 		})

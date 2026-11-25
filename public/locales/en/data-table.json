@@ -14,6 +14,12 @@
 	"name": "Name",
 	"createdAt": "Created at",
 	"exposure": "Exposure",
+	"exposure_values": {
+		"indoor": "Indoor",
+		"outdoor": "Outdoor",
+		"mobile": "Mobile",
+		"unknown": "Unknown"
+	},
 	"model": "Model",
 	"overview": "Overview",
 	"show_on_map": "Show on map",
@@ -21,5 +27,6 @@
 	"data_upload": "Data upload",
 	"support": "Support",
 	"copy_id": "Copy ID",
+	"copied": "ID copied successfully",
 	"delete": "Delete"
 }

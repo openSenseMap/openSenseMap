@@ -1,5 +1,5 @@
 import { mean, median } from 'simple-statistics'
-import { type Measurement } from '~/schema'
+import { type Measurement } from '~/db/schema'
 
 export type TransformedMeasurement = Measurement & { isOutlier: boolean }
 

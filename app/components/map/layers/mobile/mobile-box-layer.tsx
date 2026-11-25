@@ -6,11 +6,14 @@ import {
 	point,
 } from '@turf/helpers'
 import { type MultiLineString, type Point } from 'geojson'
-import mapboxgl from 'mapbox-gl'
-import { createContext, useContext, useEffect, useRef, useState } from 'react'
-import { Layer, Source, useMap } from 'react-map-gl'
+import {
+	type CircleLayerSpecification,
+	type LineLayerSpecification,
+} from 'maplibre-gl'
+import { createContext, useContext, useEffect, useMemo } from 'react'
+import { Layer, Popup, Source, useMap } from 'react-map-gl/maplibre'
 import { HIGH_COLOR, LOW_COLOR, createPalette } from './color-palette'
-import { type Sensor } from '~/schema'
+import { type Sensor } from '~/db/schema'
 
 interface CustomGeoJsonProperties {
 	locationId: number
@@ -19,9 +22,12 @@ interface CustomGeoJsonProperties {
 	color: string
 }
 
-export const HoveredPointContext = createContext({
+export const HoveredPointContext = createContext<{
+	hoveredPoint: number | null
+	setHoveredPoint: (point: number | null) => void
+}>({
 	hoveredPoint: null,
-	setHoveredPoint: (_point: number | null) => {},
+	setHoveredPoint: () => {},
 })
 
 export default function MobileBoxLayer({
@@ -30,27 +36,22 @@ export default function MobileBoxLayer({
 	maxColor = HIGH_COLOR,
 }: {
 	sensor: Sensor
-	minColor?:
-		| mapboxgl.CirclePaint['circle-color']
-		| mapboxgl.LinePaint['line-color']
-	maxColor?:
-		| mapboxgl.CirclePaint['circle-color']
-		| mapboxgl.LinePaint['line-color']
-}) {
-	const [sourceData, setSourceData] = useState<GeoJSON.FeatureCollection>()
-	const { hoveredPoint, setHoveredPoint } = useContext(HoveredPointContext)
-	const popupRef = useRef<mapboxgl.Popup | null>(null)
+	minColor?: NonNullable<CircleLayerSpecification['paint']>['circle-color']
 
+	maxColor?: NonNullable<CircleLayerSpecification['paint']>['circle-color']
+}) {
+	const { hoveredPoint, setHoveredPoint } = useContext(HoveredPointContext)
 	const { osem: mapRef } = useMap()
 
-	useEffect(() => {
-		const sensorData = sensor.data! as unknown as {
-			value: String
+	const sourceData = useMemo<GeoJSON.FeatureCollection | null>(() => {
+		const sensorData = (sensor.data ?? []) as unknown as {
+			value: string
 			location: { x: number; y: number; id: number }
 			createdAt: Date
 		}[]
 
-		// create color palette from min and max values
+		if (sensorData.length === 0) return null
+
 		const minValue = Math.min(...sensorData.map((d) => Number(d.value)))
 		const maxValue = Math.max(...sensorData.map((d) => Number(d.value)))
 		const palette = createPalette(
@@ -60,31 +61,33 @@ export default function MobileBoxLayer({
 			maxColor as string,
 		)
 
-		// generate points from the sensor data
-		// apply color from palette
-		const points = sensorData.map((measurement) => {
-			const tempPoint = point(
-				[measurement.location.x, measurement.location.y],
-				{
-					value: Number(measurement.value),
-					createdAt: new Date(measurement.createdAt),
-					color: palette(Number(measurement.value)).hex(),
-					locationId: measurement.location.id,
-				},
-			)
-			return tempPoint
-		})
+		const points = sensorData.map((measurement) =>
+			point([measurement.location.x, measurement.location.y], {
+				value: Number(measurement.value),
+				createdAt: new Date(measurement.createdAt),
+				color: palette(Number(measurement.value)).hex(),
+				locationId: measurement.location.id,
+			}),
+		)
 
-		if (points.length === 0) return
-
-		// generate a line from the points
-		const line = lineString(points.map((point) => point.geometry.coordinates))
+		const line = lineString(points.map((p) => p.geometry.coordinates))
 		const lines = multiLineString([line.geometry.coordinates])
 
-		setSourceData(
-			featureCollection<Point | MultiLineString>([...points, lines]),
-		)
+		return featureCollection<Point | MultiLineString>([...points, lines])
 	}, [maxColor, minColor, sensor.data])
+
+	const hoveredFeature = useMemo(() => {
+		if (!sourceData || hoveredPoint === null) return null
+
+		return (
+			sourceData.features.find(
+				(feat) =>
+					feat.geometry.type === 'Point' &&
+					(feat.properties as CustomGeoJsonProperties | undefined)
+						?.locationId === hoveredPoint,
+			) ?? null
+		)
+	}, [hoveredPoint, sourceData])
 
 	useEffect(() => {
 		if (!mapRef || !sourceData) return
@@ -95,6 +98,7 @@ export default function MobileBoxLayer({
 			number,
 			number,
 		]
+
 		mapRef.fitBounds(bounds, {
 			padding: {
 				top: 100,
@@ -110,61 +114,37 @@ export default function MobileBoxLayer({
 
 		const map = mapRef.getMap()
 
-		map.on('mousemove', 'box-layer-point', (e) => {
+		const handleMouseMove = (e: any) => {
 			if (!e.features || e.features.length === 0) return
 
 			const feature = e.features[0]
 			const { locationId } = feature.properties as CustomGeoJsonProperties
+			setHoveredPoint(locationId)
+		}
 
-			setHoveredPoint(locationId) // Update hoveredPoint dynamically
-		})
+		const handleMouseLeave = () => {
+			setHoveredPoint(null)
+		}
 
-		map.on('mouseleave', 'box-layer-point', () => {
-			setHoveredPoint(null) // Clear hoveredPoint
-		})
+		map.on('mousemove', 'box-layer-point', handleMouseMove)
+		map.on('mouseleave', 'box-layer-point', handleMouseLeave)
+
+		return () => {
+			map.off('mousemove', 'box-layer-point', handleMouseMove)
+			map.off('mouseleave', 'box-layer-point', handleMouseLeave)
+		}
 	}, [mapRef, setHoveredPoint])
 
-	useEffect(() => {
-		if (!mapRef) return
-
-		const map = mapRef.getMap()
-
-		// Cleanup previous popup
-		if (popupRef.current) {
-			popupRef.current.remove()
-			popupRef.current = null
-		}
-
-		if (hoveredPoint !== null) {
-			const feature = sourceData?.features.find(
-				(feat) => feat.properties?.locationId === hoveredPoint,
-			)
-
-			if (feature && feature.geometry.type === 'Point') {
-				const { coordinates } = feature.geometry
-				const { value } = feature.properties as CustomGeoJsonProperties
-
-				popupRef.current = new mapboxgl.Popup({
-					closeButton: false,
-					closeOnClick: false,
-					className: 'highlight-popup',
-				})
-					.setLngLat(coordinates as [number, number])
-					.setHTML(
-						`<div style="display: flex; flex-direction: column; align-items: center; justify-content: center;">
-               <strong>${sensor.title}</strong>
-               <strong>${value}${sensor.unit}</strong>
-             </div>`,
-					)
-					.addTo(map)
-			}
-		} else if (popupRef.current) {
-			;(popupRef.current as mapboxgl.Popup).remove()
-			popupRef.current = null
-		}
-	}, [hoveredPoint, sourceData, mapRef, sensor.title, sensor.unit])
-
 	if (!sourceData) return null
+
+	const popupCoordinates =
+		hoveredFeature?.geometry.type === 'Point'
+			? (hoveredFeature.geometry.coordinates as [number, number])
+			: null
+
+	const popupProps = hoveredFeature?.properties as
+		| CustomGeoJsonProperties
+		| undefined
 
 	return (
 		<>
@@ -193,16 +173,35 @@ export default function MobileBoxLayer({
 				<Layer
 					id="highlighted-layer"
 					source="box-source"
-					filter={['==', ['get', 'locationId'], hoveredPoint ?? -1]} // Filter only the highlighted feature
+					filter={['==', ['get', 'locationId'], hoveredPoint ?? -1]}
 					type="circle"
 					paint={{
 						'circle-color': ['get', 'color'],
 						'circle-radius': 8,
 						'circle-opacity': 1,
 					}}
-					beforeId="box-layer-point" // Ensure this layer is above the point layer
+					beforeId="box-layer-point"
 				/>
 			</Source>
+
+			{popupCoordinates && popupProps ? (
+				<Popup
+					longitude={popupCoordinates[0]}
+					latitude={popupCoordinates[1]}
+					closeButton={false}
+					closeOnClick={false}
+					className="highlight-popup"
+					anchor="bottom"
+				>
+					<div className="flex flex-col items-center justify-center">
+						<strong>{sensor.title}</strong>
+						<strong>
+							{popupProps.value}
+							{sensor.unit}
+						</strong>
+					</div>
+				</Popup>
+			) : null}
 		</>
 	)
 }

@@ -21,6 +21,8 @@
 	"unit": "Unit",
 	"value": "Value",
 	"timestamp": "Timestamp",
+	"coordinates": "Coordinates",
+	"coordinatesRawOnly": "Coordinates are available for raw measurements only.",
 	"processingData": "Processing data...",
 	"readyToDownload": "Ready to download!",
 	"clickHere": "Click here",
@@ -28,5 +30,6 @@
 	"processing": "Processing...",
 	"generateFile": "Generate File",
 	"downloading": "Downloading...",
-	"data": "Data"
+	"data": "Data",
+	"activeFiltersApplied": "The currently active filters will be applied to this download."
 }

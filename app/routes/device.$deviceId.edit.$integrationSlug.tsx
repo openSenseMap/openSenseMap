@@ -3,27 +3,26 @@ import validator from '@rjsf/validator-ajv8'
 import { eq } from 'drizzle-orm'
 import { Save } from 'lucide-react'
 import React from 'react'
+import { data, redirect, useFetcher } from 'react-router'
+import { type Route } from './+types/device.$deviceId.edit.$integrationSlug'
 import {
-	data,
-	redirect,
-	useFetcher,
-	useLoaderData,
-	type ActionFunctionArgs,
-	type LoaderFunctionArgs,
-} from 'react-router'
-import { ArrayFieldTemplate } from '~/components/rjsf/arrayFieldTemplate'
+	ArrayFieldItemTemplate,
+	ArrayFieldRemoveButton,
+	ArrayFieldTemplate,
+} from '~/components/rjsf/arrayFieldTemplate'
 import { CheckboxWidget } from '~/components/rjsf/checkboxWidget'
 import { FieldTemplate } from '~/components/rjsf/fieldTemplate'
 import { BaseInputTemplate } from '~/components/rjsf/inputTemplate'
 import { toast } from '~/components/ui/use-toast'
+import { integration } from '~/db/schema/integration'
 import { drizzleClient } from '~/db.server'
-import { integration } from '~/schema/integration'
-import { getUserId } from '~/utils/session.server'
+import { logServerError } from '~/lib/sentry.server'
+import { getUserId } from '~/services/session-service.server'
 
 // =====================================================
 // Loader
 // =====================================================
-export async function loader({ request, params }: LoaderFunctionArgs) {
+export async function loader({ request, params }: Route.LoaderArgs) {
 	const userId = await getUserId(request)
 	if (!userId) return redirect('/')
 
@@ -93,7 +92,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
 // =====================================================
 // Action
 // =====================================================
-export async function action({ request, params }: ActionFunctionArgs) {
+export async function action({ request, params }: Route.ActionArgs) {
 	const { deviceId, integrationSlug } = params
 
 	if (!deviceId || !integrationSlug) {
@@ -124,7 +123,6 @@ export async function action({ request, params }: ActionFunctionArgs) {
 	}
 
 	const formData = await request.formData()
-	console.log('formData', formData)
 	const configStr = formData.get('integrationConfig')
 
 	if (!configStr) {
@@ -144,6 +142,10 @@ export async function action({ request, params }: ActionFunctionArgs) {
 		)
 
 		if (!deleteRes.ok && deleteRes.status !== 404) {
+			logServerError('Device integration removal failed', deleteRes, {
+				'app.operation': 'integration.delete',
+				'integration.slug': intg.slug,
+			})
 			return data({ error: 'Failed to delete integration' }, { status: 500 })
 		}
 
@@ -160,6 +162,10 @@ export async function action({ request, params }: ActionFunctionArgs) {
 	})
 
 	if (!response.ok) {
+		logServerError('Device integration update failed', response, {
+			'app.operation': 'integration.update',
+			'integration.slug': intg.slug,
+		})
 		const error = await response.json()
 		return data(
 			{ error: error.error || error.details || 'Failed to save configuration' },
@@ -170,8 +176,8 @@ export async function action({ request, params }: ActionFunctionArgs) {
 	return data({ success: true })
 }
 
-export default function EditIntegration() {
-	const { intg, schema, uiSchema, integration } = useLoaderData<typeof loader>()
+export default function EditIntegration({ loaderData }: Route.ComponentProps) {
+	const { intg, schema, uiSchema, integration } = loaderData
 
 	const [formData, setFormData] = React.useState(() => {
 		if (!integration) {
@@ -200,7 +206,7 @@ export default function EditIntegration() {
 			<h1 className="mb-4 text-4xl">{intg.name}</h1>
 
 			{intg.description && (
-				<p className="mb-6 text-gray-600">{intg.description}</p>
+				<p className="text-muted-foreground mb-6">{intg.description}</p>
 			)}
 
 			<Form
@@ -209,7 +215,13 @@ export default function EditIntegration() {
 				uiSchema={uiSchema}
 				formData={formData}
 				validator={validator}
-				templates={{ FieldTemplate, ArrayFieldTemplate, BaseInputTemplate }}
+				templates={{
+					FieldTemplate,
+					ArrayFieldTemplate,
+					ArrayFieldItemTemplate,
+					BaseInputTemplate,
+					ButtonTemplates: { RemoveButton: ArrayFieldRemoveButton },
+				}}
 				onChange={(e: any) => setFormData(e.formData)}
 				onSubmit={handleSubmit}
 				omitExtraData
@@ -221,7 +233,7 @@ export default function EditIntegration() {
 			</Form>
 
 			{fetcher.data?.error && (
-				<div className="text-red-800 mt-4 rounded border border-red-300 bg-red-50 p-4">
+				<div className="mt-4 rounded border border-red-300 bg-red-50 p-4 text-red-800">
 					{fetcher.data.error}
 				</div>
 			)}

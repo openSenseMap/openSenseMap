@@ -1,127 +1,128 @@
-import { Plus, X } from 'lucide-react'
-import { useContext, useEffect, useState } from 'react'
-import { useNavigation, useSearchParams } from 'react-router'
-import { NavbarContext } from '..'
-import Spinner from '~/components/spinner'
+import { Check, ChevronsUpDown, X } from 'lucide-react'
 import { Badge } from '~/components/ui/badge'
 import { Button } from '~/components/ui/button'
-import { Input } from '~/components/ui/input'
+import {
+	Command,
+	CommandEmpty,
+	CommandGroup,
+	CommandInput,
+	CommandItem,
+	CommandList,
+} from '~/components/ui/command'
+import {
+	Popover,
+	PopoverContent,
+	PopoverTrigger,
+} from '~/components/ui/popover'
 import { Label } from '~/components/ui/label'
+import { cn } from '~/lib/utils'
+import { useTranslation } from 'react-i18next'
 
-export default function FilterTags() {
-	const { setOpen } = useContext(NavbarContext)
-	const [searchParams, setSearchParams] = useSearchParams()
-	const navigation = useNavigation()
+interface FilterTagsProps {
+	tags: string[]
+	availableTags: string[] | undefined
+	onTagsChange: (tags: string[]) => void
+}
 
-	const [tags, setTags] = useState<string[]>(
-		searchParams.getAll('tags').flatMap((t) => t.split(',')),
-	)
-	const [newTag, setNewTag] = useState('')
-	const [isChanged, setIsChanged] = useState(false)
-
-	useEffect(() => {
-		setTags(searchParams.getAll('tags').flatMap((t) => t.split(',')))
-	}, [searchParams])
-
-	useEffect(() => {
-		const currentTags = searchParams.getAll('tags').flatMap((t) => t.split(','))
-		setIsChanged(JSON.stringify(tags) !== JSON.stringify(currentTags))
-	}, [tags, searchParams])
-
-	const handleApplyChanges = () => {
-		searchParams.delete('tags')
-		if (tags.length > 0) {
-			// Join all tags into a single string separated by commas
-			searchParams.set('tags', tags.join(','))
+export default function FilterTags({
+	tags,
+	availableTags,
+	onTagsChange,
+}: FilterTagsProps) {
+	const { t } = useTranslation('filter')
+	const toggleTag = (tag: string) => {
+		if (tags.includes(tag)) {
+			onTagsChange(tags.filter((currentTag) => currentTag !== tag))
+			return
 		}
-		setSearchParams(searchParams)
-		setIsChanged(false)
-		setOpen(false)
+
+		onTagsChange([...tags, tag])
 	}
 
-	const handleResetFilters = () => {
-		setTags([])
-		searchParams.delete('tags')
-		setSearchParams(searchParams)
-		setIsChanged(false)
-	}
-
-	const handleAddTag = () => {
-		if (newTag && !tags.includes(newTag)) {
-			setTags([...tags, newTag])
-			setNewTag('')
-		}
-	}
-
-	const handleRemoveTag = (tagToRemove: string) => {
-		setTags(tags.filter((tag) => tag !== tagToRemove))
+	const removeTag = (tag: string) => {
+		onTagsChange(tags.filter((currentTag) => currentTag !== tag))
 	}
 
 	return (
-		<div className="flex h-full flex-1 flex-col justify-around gap-2 dark:text-zinc-200">
-			{navigation.state === 'loading' && (
-				<div className="bg-white/30 dark:bg-zinc-800/30 absolute inset-0 z-50 flex items-center justify-center backdrop-blur-sm">
-					<Spinner />
-				</div>
-			)}
-			<div className="space-y-2">
-				<Label htmlFor="tag-input" className="text-base">
-					Tags:
-				</Label>
-				<div className="flex space-x-2">
-					<Input
-						id="tag-input"
-						type="text"
-						placeholder="Add a tag"
-						value={newTag}
-						onChange={(e) => setNewTag(e.target.value)}
-						onKeyPress={(e) => {
-							if (e.key === 'Enter') {
-								e.preventDefault()
-								handleAddTag()
-							}
-						}}
-					/>
-					<Button
-						variant={'outline'}
-						onClick={handleAddTag}
-						aria-label="Add tag"
+		<div className="grid gap-1.5 md:grid-cols-[5.5rem_1fr] md:items-start">
+			<Label className="pt-2 text-sm text-gray-600 dark:text-zinc-400">
+				Tags
+			</Label>
+
+			<div className="min-w-0 space-y-2">
+				<Popover>
+					<PopoverTrigger asChild>
+						<Button
+							type="button"
+							variant="outline"
+							role="combobox"
+							className="h-8 w-full justify-between px-2 text-sm font-normal"
+						>
+							<span className="truncate">
+								{tags.length > 0
+									? `${tags.length} ${t('tag')}${tags.length === 1 ? '' : 's'} ${t('selected')}`
+									: `${t('select_tags')}`}
+							</span>
+
+							<ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+						</Button>
+					</PopoverTrigger>
+
+					<PopoverContent
+						align="start"
+						className="w-[--radix-popover-trigger-width] p-0"
 					>
-						<Plus className="h-4 w-4" />
-					</Button>
-				</div>
-				<div className="flex flex-wrap gap-2 pt-2">
-					{tags.map((tag, index) => (
-						<Badge key={index} variant="secondary" className="text-sm">
-							{tag}
-							<button
-								onClick={() => handleRemoveTag(tag)}
-								className="ml-2 text-xs"
-								aria-label={`Remove ${tag} tag`}
-							>
-								<X className="h-3 w-3" />
-							</button>
-						</Badge>
-					))}
-				</div>
-			</div>
-			<div className="flex justify-end gap-4 align-bottom">
-				<Button
-					variant="outline"
-					className="rounded-[5px] border-[1px] border-[#e2e8f0] px-2 py-[1px] text-base"
-					onClick={handleResetFilters}
-				>
-					<span className="flex items-center">
-						<X className="m-0 inline h-3.5 w-3.5 p-0 align-sub" /> Reset
-					</span>
-				</Button>
-				<Button
-					className="rounded-[5px] px-2 py-[1px] text-base"
-					onClick={handleApplyChanges}
-					disabled={!isChanged}
-				>
-					Apply
-				</Button>
+						<Command>
+							<CommandInput placeholder={t('search_tags')} />
+
+							<CommandList>
+								<CommandEmpty>{t('no_tag_found')}</CommandEmpty>
+
+								<CommandGroup>
+									{availableTags?.map((tag) => {
+										const selected = tags.includes(tag)
+
+										return (
+											<CommandItem
+												key={tag}
+												value={tag}
+												onSelect={() => toggleTag(tag)}
+											>
+												<Check
+													className={cn(
+														'mr-2 h-4 w-4',
+														selected ? 'opacity-100' : 'opacity-0',
+													)}
+												/>
+
+												<span className="truncate">{tag}</span>
+											</CommandItem>
+										)
+									})}
+								</CommandGroup>
+							</CommandList>
+						</Command>
+					</PopoverContent>
+				</Popover>
+
+				{tags.length > 0 && (
+					<div className="flex flex-wrap gap-1.5">
+						{tags.map((tag) => (
+							<Badge key={tag} variant="secondary" className="text-xs">
+								<span className="max-w-40 truncate">{tag}</span>
+
+								<button
+									type="button"
+									onClick={() => removeTag(tag)}
+									className="hover:text-destructive ml-1 rounded-full"
+									aria-label={`Remove ${tag} tag`}
+								>
+									<X className="h-3 w-3" />
+								</button>
+							</Badge>
+						))}
+					</div>
+				)}
 			</div>
 		</div>
 	)

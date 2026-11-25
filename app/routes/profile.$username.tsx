@@ -1,23 +1,34 @@
+import { useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
+import { redirect, useFetcher } from 'react-router'
+import { type Route } from './+types/profile.$username'
+import { type loader as measurementEstimateLoader } from './resources.profile-measurement-estimate.$userId'
+import { getColumns, type SenseBox } from '~/components/mydevices/dt/columns'
 import {
-	type ActionFunctionArgs,
-	type LoaderFunctionArgs,
-	redirect,
-	useLoaderData,
-} from 'react-router'
-import { getColumns } from '~/components/mydevices/dt/columns'
-import { DataTable } from '~/components/mydevices/dt/data-table'
+	type CustomTableFeatures,
+	DataTable,
+} from '~/components/mydevices/dt/data-table'
 import { NavBar } from '~/components/nav-bar'
 import { Avatar, AvatarFallback, AvatarImage } from '~/components/ui/avatar'
-import { claimBox } from '~/lib/transfer-service.server'
-import { userNameFromURl } from '~/lib/user-service.server'
+import { Badge } from '~/components/ui/badge'
+import { Button } from '~/components/ui/button'
+import Spinner from '~/components/spinner'
+import { getPublicDeviceSchemasForUser } from '~/db/models/device-schema.server'
 import {
 	getProfileByUserId,
 	getProfileByUsername,
-	getProfileSensorsAndMeasurementsCount,
-} from '~/models/profile.server'
-import { formatCount, getInitials } from '~/utils/misc'
-import { getUserId } from '~/utils/session.server'
+	getProfileSensorCount,
+} from '~/db/models/profile.server'
+import { formatCount } from '~/lib/numbers'
+import { shouldRevalidateExceptRootPreferences } from '~/lib/root-preference-revalidation'
+import { getInitials } from '~/lib/strings'
+import { getUserId } from '~/services/session-service.server'
+import { claimDevice } from '~/services/transfer-service.server'
+import { userNameFromURl } from '~/services/user-service.server'
+import { useHydrated } from '~/hooks/use-hydrated'
+import { type ColumnDef, type RowData } from '@tanstack/react-table'
+
+export { shouldRevalidateExceptRootPreferences as shouldRevalidate }
 
 type ActionData = {
 	success: boolean
@@ -26,34 +37,44 @@ type ActionData = {
 	claimedBoxId?: string
 }
 
-export async function loader({ params, request }: LoaderFunctionArgs) {
-  const requestingUserId = await getUserId(request)
+export async function loader({ params, request }: Route.LoaderArgs) {
+	const requestingUserId = await getUserId(request)
 
-  const username = userNameFromURl(params.username as string)
-  if (!username) {
-    return { profile: null, requestingUserId, sensorsCount: '0', measurementsCount: '0' }
-  }
+	const username = userNameFromURl(params.username as string)
+	if (!username) {
+		return {
+			profile: null,
+			requestingUserId,
+			sensorsCount: 0,
+			deviceSchemas: [],
+		}
+	}
 
-  const profile = await getProfileByUsername(username)
+	const profile = await getProfileByUsername(username)
 
-  if (!profile) return redirect('/explore')
+	if (!profile) return redirect('/explore')
 
-  // Block access only if private AND not the owner
-  if (!profile.public && requestingUserId !== profile.userId) {
-    return redirect('/explore')
-  }
+	// Block access only if private AND not the owner
+	if (!profile.public && requestingUserId !== profile.userId) {
+		return redirect('/explore')
+	}
 
-  const counts = await getProfileSensorsAndMeasurementsCount(profile)
+	const [deviceSchemas, sensorsCount] = await Promise.all([
+		getPublicDeviceSchemasForUser(profile.userId),
+		getProfileSensorCount(
+			profile.user?.devices.map((device) => device.id) ?? [],
+		),
+	])
 
-  return {
-    profile,
-    requestingUserId,
-    sensorsCount: counts.sensorsCount,
-    measurementsCount: counts.measurementsCount,
-  }
+	return {
+		profile,
+		requestingUserId,
+		sensorsCount,
+		deviceSchemas,
+	}
 }
 
-export async function action({ request, params }: ActionFunctionArgs) {
+export async function action({ request, params }: Route.ActionArgs) {
 	const userId = await getUserId(request)
 	if (!userId) return redirect('/')
 
@@ -92,7 +113,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
 	}
 
 	try {
-		const result = await claimBox(userId, token)
+		const result = await claimDevice(userId, token)
 
 		return {
 			success: true,
@@ -110,69 +131,98 @@ export async function action({ request, params }: ActionFunctionArgs) {
 	}
 }
 
-export default function ProfilePage() {
-	const { profile, sensorsCount, measurementsCount, requestingUserId } =
-		useLoaderData<typeof loader>()
+export default function ProfilePage({ loaderData }: Route.ComponentProps) {
+	const { profile, requestingUserId, sensorsCount, deviceSchemas } = loaderData
+	const measurementFetcher = useFetcher<typeof measurementEstimateLoader>()
+	const profileUserId = profile?.userId
+	const measurementData = measurementFetcher.data
+	const estimatedMeasurementCount =
+		measurementData && measurementData.userId === profileUserId
+			? measurementData.estimatedMeasurementCount
+			: profileUserId
+				? undefined
+				: 0
 
-	const { t } = useTranslation('profile')
+	useEffect(() => {
+		if (profileUserId) {
+			void measurementFetcher.load(
+				`/resources/profile-measurement-estimate/${encodeURIComponent(profileUserId)}`,
+			)
+		}
+	}, [profileUserId, measurementFetcher.load])
+
+	const { t, i18n } = useTranslation('profile')
 	const columnsTranslation = useTranslation('data-table')
+	const hydrated = useHydrated()
 
 	const isOwner = !!profile?.userId && requestingUserId === profile.userId
 
 	return (
-		<div className="h-full bg-slate-100">
+		<div className="bg-background text-foreground min-h-screen">
 			<NavBar />
-			<div className="flex w-full flex-col gap-6 p-8 md:flex-row md:gap-8 md:pt-4">
-				<div className="flex w-full flex-col gap-6 rounded-xl bg-white p-6 shadow-lg dark:bg-dark-background md:w-1/3">
-					<div className="flex items-center gap-4 dark:text-dark-text">
-						<Avatar className="h-16 w-16">
-							{profile?.profileImage?.id ? (
+			<div className="flex w-full flex-col gap-6 p-4 sm:p-6 lg:flex-row lg:gap-8 lg:p-8 lg:pt-4">
+				<div className="border-border bg-card text-card-foreground flex w-full min-w-0 flex-col gap-6 rounded-xl border p-4 shadow-sm sm:p-6 lg:w-1/3">
+					<div className="flex items-center gap-4">
+						<Avatar className="h-16 w-16 shrink-0">
+							{profile?.image ? (
 								<AvatarImage
 									className="aspect-auto h-full w-full rounded-full object-cover"
-									src={`/resources/file/${profile.profileImage.id}`}
+									src={`/resources/profile-image/${profile.id}?v=${encodeURIComponent(profile.image)}`}
 								/>
 							) : null}
 							<AvatarFallback>
 								{getInitials(profile?.displayName ?? '')}
 							</AvatarFallback>
 						</Avatar>
-						<div>
-							<h3 className="text-2xl font-semibold dark:text-dark-text">
+						<div className="min-w-0">
+							<h3 className="text-title text-2xl font-semibold wrap-break-word">
 								{profile?.displayName || ''}
 							</h3>
-							<h4 className="text-lg dark:text-dark-text">
+							<h4 className="text-foreground text-lg wrap-break-word">
 								{profile?.user?.name || ''}
 							</h4>
-							<p className="text-sm text-gray-500 dark:text-gray-400">
+							<p className="text-muted-foreground text-sm">
 								{t('user_since')}{' '}
-								{new Date(profile?.user?.createdAt || '').toLocaleDateString(
-									t('locale'),
-								)}
+								{hydrated &&
+									new Date(profile?.user?.createdAt || '').toLocaleDateString(
+										i18n.language,
+									)}
 							</p>
 						</div>
 					</div>
 
 					<div className="grid grid-cols-2 gap-4 md:pt-6">
-						<div className="flex flex-col items-center rounded-lg bg-gray-100 p-4 dark:bg-dark-boxes">
-							<span className="text-2xl font-bold dark:text-dark-green">
+						<div className="border-border bg-muted/60 flex flex-col items-center rounded-lg border p-4">
+							<span className="text-primary text-2xl font-bold">
 								{formatCount(profile?.user?.devices.length || 0)}
 							</span>
 							<span className="text-sm text-gray-500 dark:text-gray-400">
 								{t('devices')}
 							</span>
 						</div>
-						<div className="flex flex-col items-center rounded-lg bg-gray-100 p-4 dark:bg-dark-boxes">
-							<span className="text-2xl font-bold dark:text-dark-green">
-								{sensorsCount}
+						<div className="border-border bg-muted/60 flex flex-col items-center rounded-lg border p-4">
+							<span className="text-primary text-2xl font-bold">
+								{formatCount(sensorsCount)}
 							</span>
 							<span className="text-sm text-gray-500 dark:text-gray-400">
 								{t('sensors')}
 							</span>
 						</div>
-						<div className="flex flex-col items-center rounded-lg bg-gray-100 p-4 dark:bg-dark-boxes">
-							<span className="text-2xl font-bold dark:text-dark-green">
-								{measurementsCount}
-							</span>
+						<div className="border-border bg-muted/60 flex flex-col items-center rounded-lg border p-4">
+							<div
+								className="text-primary text-2xl font-bold"
+								title={t('measurements_estimate_hint')}
+							>
+								{estimatedMeasurementCount === undefined ? (
+									<div role="status" aria-label={t('loading_measurements')}>
+										<Spinner />
+									</div>
+								) : estimatedMeasurementCount === null ? (
+									'—'
+								) : (
+									`≈${formatCount(estimatedMeasurementCount)}`
+								)}
+							</div>
 							<span className="text-sm text-gray-500 dark:text-gray-400">
 								{t('measurements')}
 							</span>
@@ -180,24 +230,64 @@ export default function ProfilePage() {
 					</div>
 				</div>
 
-				<div className="flex w-full flex-col gap-6 md:w-2/3">
-					<div className="rounded-xl bg-white p-6 shadow-lg dark:bg-dark-background">
-						<div className="mb-4 text-3xl font-semibold text-light-green dark:text-dark-green">
+				<div className="flex w-full max-w-full min-w-0 flex-col gap-6 lg:w-2/3">
+					<div className="border-border bg-card text-card-foreground max-w-full min-w-0 overflow-hidden rounded-xl border p-4 shadow-sm sm:p-6">
+						<div className="text-primary mb-4 text-2xl font-semibold sm:text-3xl">
 							{t('devices')}
 						</div>
 
 						{profile?.user?.devices && (
 							<DataTable
-								columns={getColumns(columnsTranslation, { isOwner })}
+								columns={
+									getColumns(columnsTranslation, hydrated, {
+										isOwner,
+									}) as ColumnDef<CustomTableFeatures, RowData, unknown>[]
+								}
 								data={profile.user.devices}
-									getRowClassName={(device) =>
-										device.archivedAt
-											? 'opacity-60 bg-slate-100 dark:bg-slate-900/40'
-											: ''
-									}
+								getRowClassName={(device) =>
+									device.archivedAt
+										? 'opacity-60 bg-slate-100 dark:bg-slate-900/40'
+										: ''
+								}
 							/>
 						)}
 					</div>
+
+					{deviceSchemas.length > 0 && (
+						<div className="border-border bg-card text-card-foreground min-w-0 rounded-xl border p-4 shadow-sm sm:p-6">
+							<div className="text-primary mb-4 text-2xl font-semibold sm:text-3xl">
+								{t('device_schemas')}
+							</div>
+							<div className="space-y-3">
+								{deviceSchemas.map((schema) => (
+									<div
+										key={schema.versionId}
+										className="border-border bg-muted/40 flex flex-col gap-3 rounded-lg border p-4 md:flex-row md:items-center md:justify-between"
+									>
+										<div className="space-y-1">
+											<div className="flex flex-wrap items-center gap-2">
+												<h3 className="font-medium">{schema.name}</h3>
+												<Badge variant="secondary">v{schema.version}</Badge>
+												<Badge variant="outline">
+													{schema.content.sensors.length} {t('sensors')}
+												</Badge>
+											</div>
+											{schema.description && (
+												<p className="text-muted-foreground text-sm">
+													{schema.description}
+												</p>
+											)}
+										</div>
+										<Button asChild variant="outline">
+											<a href={`/resources/device-schema/${schema.versionId}`}>
+												{t('download')}
+											</a>
+										</Button>
+									</div>
+								))}
+							</div>
+						</div>
+					)}
 				</div>
 			</div>
 		</div>

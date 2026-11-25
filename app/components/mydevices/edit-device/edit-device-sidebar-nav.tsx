@@ -16,10 +16,11 @@ export function EditDeviceSidebarNav({
 	...props
 }: SidebarNavProps) {
 	const pathname = useLocation().pathname
+
 	return (
 		<nav
 			className={cn(
-				'grid space-x-2 sm:flex sm:flex-row lg:flex lg:flex-col lg:space-x-0 lg:space-y-1',
+				'flex w-full gap-2 overflow-x-auto pb-2 lg:flex-col lg:gap-1 lg:overflow-visible lg:pb-0',
 				className,
 			)}
 			{...props}
@@ -28,15 +29,17 @@ export function EditDeviceSidebarNav({
 				<Link
 					key={item.href}
 					to={item.href}
+					prefetch="intent"
 					className={cn(
 						buttonVariants({ variant: 'ghost' }),
 						pathname === item.href
 							? 'bg-muted hover:bg-muted'
 							: 'hover:bg-transparent hover:underline',
-						'justify-start text-base',
+						'shrink-0 justify-start text-base lg:w-full',
 					)}
 				>
-					<item.icon className="mr-2 inline h-5 w-5 align-sub" /> {item.title}
+					<item.icon className="mr-2 inline h-5 w-5 align-sub" />
+					{item.title}
 				</Link>
 			))}
 		</nav>

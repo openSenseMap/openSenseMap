@@ -1,77 +1,321 @@
-import { type ActionFunctionArgs, type LoaderFunctionArgs } from 'react-router'
-import { transformDeviceToApiFormat } from '~/lib/device-transform'
-import { deleteDevice } from '~/lib/devices-service.server'
-import { getUserFromJwt } from '~/lib/jwt'
+import { type Route } from './+types/api.boxes.$deviceId'
 import {
 	DeviceUpdateError,
 	getDevice,
-	updateDevice,
 	type UpdateDeviceArgs,
-} from '~/models/device.server'
-import { type Device, type User } from '~/schema'
-import { StandardResponse } from '~/utils/response-utils'
+} from '~/db/models/device.server'
+import { type User } from '~/db/schema'
+import { transformDeviceToApiFormat } from '~/lib/device-transform'
+import { withAuthenticatedUser } from '~/lib/jwt'
+import { StandardResponse } from '~/lib/responses'
+import { deleteDevice, updateDevice } from '~/services/device-service.server'
+import { z } from 'zod'
+import { type ZodOpenApiPathItemObject } from 'zod-openapi'
+import {
+	BadRequestErrorSchema,
+	badRequestResponse,
+	ForbiddenErrorSchema,
+	forbiddenResponse,
+	internalServerErrorResponse,
+	InternalServerErrorSchema,
+	jsonErrorResponse,
+	NotFoundErrorSchema,
+	notFoundResponse,
+	standardErrorResponseSchema,
+	UnauthorizedErrorSchema,
+	unauthorizedResponse,
+} from '~/lib/openapi/errors'
+import { DevicePathParamsSchema } from '~/lib/openapi/schemas/common'
+import { apiMessages } from '~/lib/openapi/messages'
+import {
+	DeviceSensorUpdateSchema,
+	DeviceAddonsUpdateSchema,
+	ApiDeviceSchema,
+	type DeviceSensorUpdate,
+} from '~/lib/openapi/schemas/device'
+import { ExposureSchema } from '~/lib/api-schemas/query'
+import {
+	requestContentTypeJson,
+	responseContentTypeJson,
+} from '~/middleware/content-type-header.server'
+import { parseJsonBody } from '~/lib/request-parsing'
+import { DeviceLocationInputSchema } from '~/lib/openapi/schemas/location'
+import { ElevationLookupConsentSchema } from '~/lib/openapi/schemas/consent'
+import {
+	ElevationLookupError,
+	getTerrainElevation,
+} from '~/services/elevation-service.server'
+import { applyElevationConsentChoice } from '~/db/models/elevation-consent.server'
 
-/**
- * @openapi
- * /api/device/{deviceId}:
- *   get:
- *     summary: Get device by ID
- *     description: Retrieve a single device by their unique identifier
- *     tags:
- *       - Device
- *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         description: Unique identifier of the user
- *         schema:
- *           type: string
- *           example: "12345"
- *     responses:
- *       200:
- *         description: Device retrieved successfully
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 id:
- *                   type: string
- *                   example: "12345"
- *                 name:
- *                   type: string
- *                   example: "John Doe"
- *                 email:
- *                   type: string
- *                   example: "john.doe@example.com"
- *                 createdAt:
- *                   type: string
- *                   format: date-time
- *                   example: "2023-01-15T10:30:00Z"
- *       404:
- *         description: Device not found
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 error:
- *                   type: string
- *                   example: "Device not found"
- *       400:
- *         description: Device ID is required
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 error:
- *                   type: string
- *                   example: "Device ID is required."
- *       500:
- *         description: Internal server error
- */
-export async function loader({ params }: LoaderFunctionArgs) {
+const messages = {
+	conflictingSensorsAndAddons:
+		'sensors and addons can not appear in the same request.',
+	deviceNotOwned: 'You do not own this device',
+	deviceArchived: 'Device is archived and cannot be updated',
+	integrationCleanupFailed:
+		'Could not remove device integrations. Please try deleting the device again later.',
+}
+
+const UpdateDeviceRequestSchema = z
+	.object({
+		name: z.string().optional().meta({
+			description: 'Device name',
+			example: 'My device',
+		}),
+
+		exposure: ExposureSchema.optional(),
+
+		description: z.string().optional().meta({
+			description: 'Device description',
+			example: 'Sensor device on my balcony',
+		}),
+
+		image: z.string().optional().meta({
+			description: 'Device image URL or image value',
+		}),
+
+		deleteImage: z.boolean().optional().meta({
+			description: 'If true, the device image is removed.',
+			example: true,
+		}),
+
+		model: z.string().optional().meta({
+			description: 'Device model',
+			example: 'homeWifi',
+		}),
+
+		useAuth: z.boolean().optional().meta({
+			description: 'Whether device API-key authentication is enabled',
+			example: true,
+		}),
+
+		weblink: z.string().optional().meta({
+			description: 'Web link for the device.',
+			example: 'https://example.com',
+		}),
+
+		location: DeviceLocationInputSchema.optional(),
+
+		elevationLookupConsent: ElevationLookupConsentSchema.optional(),
+
+		grouptag: z
+			.union([z.string(), z.array(z.string())])
+			.transform((value) => (Array.isArray(value) ? value : [value]))
+			.optional()
+			.meta({
+				description: 'Group tags assigned to the device',
+				example: ['school', 'feinstaub'],
+			}),
+
+		sensors: z.array(DeviceSensorUpdateSchema).optional().meta({
+			description:
+				'Sensors to update or create. Must not be used together with `addons.add`.',
+		}),
+
+		addons: DeviceAddonsUpdateSchema.optional(),
+	})
+	.superRefine((body, ctx) => {
+		if (body.sensors && body.addons?.add) {
+			ctx.addIssue({
+				code: 'custom',
+				path: ['sensors'],
+				message: messages.conflictingSensorsAndAddons,
+			})
+		}
+	})
+	.meta({
+		id: 'UpdateDeviceRequest',
+		description: 'Device update payload.',
+	})
+
+const DeleteDeviceRequestSchema = z
+	.object({
+		password: z
+			.string()
+			.min(1, {
+				error: apiMessages.passwordRequired,
+			})
+			.meta({
+				description: 'Current user password required to delete the device',
+				example: 'myCurrentPassword123',
+				format: 'password',
+			}),
+	})
+	.meta({
+		id: 'DeleteDeviceRequest',
+		description: 'Device deletion confirmation payload.',
+	})
+export const openapi: ZodOpenApiPathItemObject = {
+	get: {
+		tags: ['Devices'],
+		summary: 'Get device by ID',
+		description: 'Retrieve a single device by its unique identifier.',
+
+		requestParams: {
+			path: DevicePathParamsSchema,
+		},
+
+		responses: {
+			200: {
+				description: 'Device retrieved successfully.',
+				content: {
+					'application/json': {
+						schema: ApiDeviceSchema,
+					},
+				},
+			},
+
+			400: badRequestResponse(
+				BadRequestErrorSchema,
+				'Bad request. The device ID path parameter is missing or malformed.',
+			),
+
+			404: notFoundResponse(NotFoundErrorSchema, 'Device not found.'),
+
+			500: internalServerErrorResponse(
+				InternalServerErrorSchema,
+				'Internal server error.',
+			),
+		},
+	},
+
+	put: {
+		tags: ['Devices'],
+		summary: 'Update device',
+		description:
+			'Updates a device. Requires JWT authorization. An optional location height is interpreted and stored as height above ground. Coordinates are sent to GPXZ and height above sea level is recalculated only when the authenticated user has granted the current elevation lookup consent. A missing consent or lookup failure does not fail the update.',
+		security: [{ bearerAuth: [] }],
+
+		requestParams: {
+			path: DevicePathParamsSchema,
+		},
+
+		requestBody: {
+			required: true,
+			content: {
+				'application/json': {
+					schema: UpdateDeviceRequestSchema,
+				},
+			},
+		},
+
+		responses: {
+			200: {
+				description: 'Device updated successfully.',
+				content: {
+					'application/json': {
+						schema: ApiDeviceSchema,
+					},
+				},
+			},
+
+			400: badRequestResponse(
+				BadRequestErrorSchema,
+				'Bad request. This can happen when the device id is missing or the update payload contains invalid or conflicting fields.',
+			),
+
+			403: forbiddenResponse(
+				ForbiddenErrorSchema,
+				'Invalid or missing JWT authorization.',
+			),
+
+			404: notFoundResponse(NotFoundErrorSchema, 'Device not found.'),
+
+			500: internalServerErrorResponse(
+				InternalServerErrorSchema,
+				'Internal server error.',
+			),
+		},
+	},
+
+	delete: {
+		tags: ['Devices'],
+		summary: 'Delete device',
+		description:
+			'Deletes a device. Requires JWT authorization and the current user password.',
+		security: [{ bearerAuth: [] }],
+
+		requestParams: {
+			path: DevicePathParamsSchema,
+		},
+
+		requestBody: {
+			required: true,
+			content: {
+				'application/json': {
+					schema: DeleteDeviceRequestSchema,
+				},
+			},
+		},
+
+		responses: {
+			200: {
+				description: 'Device deleted successfully.',
+				content: {
+					'application/json': {
+						schema: z.null().meta({
+							description: 'JSON null response indicating successful deletion.',
+						}),
+					},
+				},
+			},
+
+			400: badRequestResponse(
+				BadRequestErrorSchema,
+				'Bad request. This can happen when the device id or deletion password is missing.',
+			),
+
+			401: unauthorizedResponse(
+				UnauthorizedErrorSchema,
+				'Unauthorized. The provided password is incorrect.',
+			),
+
+			403: forbiddenResponse(
+				ForbiddenErrorSchema,
+				'The caller is unauthenticated or does not own the device.',
+			),
+
+			404: notFoundResponse(NotFoundErrorSchema, 'Device not found.'),
+
+			500: internalServerErrorResponse(
+				InternalServerErrorSchema,
+				'Internal server error.',
+			),
+			503: jsonErrorResponse(
+				messages.integrationCleanupFailed,
+				standardErrorResponseSchema('Service Unavailable'),
+			),
+		},
+	},
+}
+
+const parsePathParams = (params: Route.LoaderArgs['params']) => {
+	const parsed = DevicePathParamsSchema.safeParse(params)
+
+	if (!parsed.success) {
+		return StandardResponse.badRequest(apiMessages.deviceIdRequired)
+	}
+
+	return parsed.data
+}
+
+const okDeviceResponse = async (device: unknown) => {
+	const apiDevice = transformDeviceToApiFormat(device as any)
+	const parsed = await ApiDeviceSchema.safeParseAsync(apiDevice)
+
+	if (!parsed.success) {
+		return StandardResponse.internalServerError()
+	}
+
+	return StandardResponse.ok(parsed.data)
+}
+
+export const middleware: Route.MiddlewareFunction[] = [
+	requestContentTypeJson(['PUT', 'DELETE']),
+	responseContentTypeJson,
+]
+
+export async function loader({ params }: Route.LoaderArgs) {
 	const { deviceId } = params
 
 	if (!deviceId) return StandardResponse.badRequest('Device ID is required.')
@@ -81,108 +325,118 @@ export async function loader({ params }: LoaderFunctionArgs) {
 
 		if (!device) return StandardResponse.notFound('Device not found.')
 
-		return StandardResponse.ok(device)
+		return await okDeviceResponse(device)
 	} catch (error) {
-		console.error('Error fetching box:', error)
-
 		if (error instanceof Response) {
 			throw error
 		}
 
-		return new Response(
-			JSON.stringify({ error: 'Internal server error while fetching box' }),
-			{
-				status: 500,
-				headers: {
-					'Content-Type': 'application/json; charset=utf-8',
-				},
-			},
+		return StandardResponse.internalServerError(
+			'Internal server error while fetching device',
 		)
 	}
 }
 
-export async function action({ request, params }: ActionFunctionArgs) {
-	const { deviceId } = params
+export async function action({ request, params }: Route.ActionArgs) {
+	const parsedParams = parsePathParams(params)
+	if (parsedParams instanceof Response) return parsedParams
 
-	if (!deviceId) {
-		return Response.json({ error: 'Device ID is required.' }, { status: 400 })
+	if (request.method !== 'PUT' && request.method !== 'DELETE') {
+		return StandardResponse.methodNotAllowed('Method Not Allowed')
 	}
 
-	const jwtResponse = await getUserFromJwt(request)
+	return withAuthenticatedUser(request, async (user) => {
+		if (request.method === 'PUT') {
+			return await put(request, user, parsedParams.deviceId)
+		}
 
-	if (typeof jwtResponse === 'string') {
-		return Response.json(
-			{
-				code: 'Forbidden',
-				message:
-					'Invalid JWT authorization. Please sign in to obtain a new JWT.',
-			},
-			{ status: 403 },
+		if (request.method === 'DELETE') {
+			return await del(request, user, parsedParams.deviceId)
+		}
+
+		// was already checked, but it makes ts happy
+		return StandardResponse.methodNotAllowed('Method Not Allowed')
+	})
+}
+
+async function put(request: Request, user: User, deviceId: string) {
+	let rawBody: unknown
+
+	try {
+		rawBody = await request.json()
+	} catch {
+		return StandardResponse.badRequest('Invalid JSON in request body')
+	}
+
+	const parsedBody = UpdateDeviceRequestSchema.safeParse(rawBody)
+
+	if (!parsedBody.success) {
+		console.warn('PUT /boxes/:deviceId request validation failed', {
+			body: rawBody,
+			issues: parsedBody.error.issues,
+		})
+
+		return StandardResponse.badRequest(
+			parsedBody.error.issues[0]?.message ?? 'Invalid request data',
 		)
 	}
 
-	switch (request.method) {
-		case 'PUT':
-			return await put(request, jwtResponse, deviceId)
-		case 'DELETE':
-			return await del(request, jwtResponse, deviceId)
-		default:
-			return Response.json({ message: 'Method Not Allowed' }, { status: 405 })
-	}
-}
-
-async function put(request: Request, user: any, deviceId: string) {
-	const body = await request.json()
+	const body = { ...parsedBody.data }
 
 	const currentDevice = await getDevice({ id: deviceId })
+
 	if (!currentDevice) {
-		return Response.json(
-			{ code: 'NotFound', message: 'Device not found' },
-			{ status: 404 },
-		)
+		return StandardResponse.notFound(apiMessages.deviceNotFound)
 	}
 
-	// Check for conflicting parameters (backwards compatibility)
+	if (currentDevice.userId !== user.id) {
+		return StandardResponse.forbidden(messages.deviceNotOwned)
+	}
+
 	if (body.sensors && body.addons?.add) {
-		return Response.json(
-			{
-				code: 'BadRequest',
-				message: 'sensors and addons can not appear in the same request.',
-			},
-			{ status: 400 },
+		return StandardResponse.badRequest(
+			'sensors and addons can not appear in the same request.',
 		)
 	}
 
 	if (body.addons?.add === 'feinstaub') {
 		const homeModels = ['homeWifi', 'homeEthernet']
+
 		if (currentDevice.model && homeModels.includes(currentDevice.model)) {
 			body.model = `${currentDevice.model}Feinstaub`
 
-			const hasPM10 = currentDevice.sensors.some(
-				(s) => s.sensorType === 'SDS 011' && s.title === 'PM10',
-			)
-			const hasPM25 = currentDevice.sensors.some(
-				(s) => s.sensorType === 'SDS 011' && s.title === 'PM2.5',
+			const currentSensors = currentDevice.sensors ?? []
+
+			const hasPM10 = currentSensors.some(
+				(sensor) => sensor.sensorType === 'SDS 011' && sensor.title === 'PM10',
 			)
 
-			if (!hasPM10 || !hasPM25) {
-				body.sensors = [
-					...(body.sensors ?? []),
-					!hasPM10 && {
-						new: true,
-						title: 'PM10',
-						unit: 'µg/m³',
-						sensorType: 'SDS 011',
-						// icon: 'osem-cloud',
-					},
-					!hasPM25 && {
-						new: true,
-						title: 'PM2.5',
-						unit: 'µg/m³',
-						sensorType: 'SDS 011',
-						// icon: 'osem-cloud',
-					},
-				].filter(Boolean)
+			const hasPM25 = currentSensors.some(
+				(sensor) => sensor.sensorType === 'SDS 011' && sensor.title === 'PM2.5',
+			)
+
+			const sensorsToAdd: DeviceSensorUpdate[] = []
+
+			if (!hasPM10) {
+				sensorsToAdd.push({
+					new: true,
+					title: 'PM10',
+					unit: 'µg/m³',
+					sensorType: 'SDS 011',
+				})
+			}
+
+			if (!hasPM25) {
+				sensorsToAdd.push({
+					new: true,
+					title: 'PM2.5',
+					unit: 'µg/m³',
+					sensorType: 'SDS 011',
+				})
+			}
+
+			if (sensorsToAdd.length > 0) {
+				body.sensors = [...(body.sensors ?? []), ...sensorsToAdd]
 			}
 		}
 	}
@@ -199,14 +453,57 @@ async function put(request: Request, user: any, deviceId: string) {
 	}
 
 	// Prepare location if provided
-	let locationData: { lat: number; lng: number; height?: number } | undefined
+	let locationData: UpdateDeviceArgs['location']
+	const mayLookupElevation =
+		body.location || body.elevationLookupConsent !== undefined
+			? await applyElevationConsentChoice(user.id, body.elevationLookupConsent)
+			: false
 	if (body.location) {
 		locationData = {
 			lat: body.location.lat,
 			lng: body.location.lng,
 		}
-		if (body.location.height !== undefined) {
-			locationData.height = body.location.height
+
+		const coordinatesChanged =
+			body.location.lat !== currentDevice.latitude ||
+			body.location.lng !== currentDevice.longitude
+		const heightWasSupplied = body.location.height !== undefined
+		const heightAboveGround = heightWasSupplied
+			? body.location.height
+			: currentDevice.heightAboveGround
+
+		if (heightWasSupplied) {
+			locationData.heightAboveGround = heightAboveGround ?? null
+		}
+
+		if (coordinatesChanged) {
+			locationData.heightAboveGround = heightAboveGround ?? null
+			locationData.terrainElevation = null
+			locationData.terrainElevationDataset = null
+		}
+
+		const shouldLookupElevation =
+			heightAboveGround !== null &&
+			heightAboveGround !== undefined &&
+			mayLookupElevation &&
+			(coordinatesChanged || currentDevice.terrainElevation === null)
+
+		if (shouldLookupElevation) {
+			try {
+				const elevationResult = await getTerrainElevation(
+					body.location.lat,
+					body.location.lng,
+				)
+				locationData.terrainElevation = elevationResult.elevation
+				locationData.terrainElevationDataset = elevationResult.dataset
+			} catch (error) {
+				console.warn('PUT /boxes/:deviceId terrain elevation lookup failed', {
+					error: error instanceof ElevationLookupError ? error.code : error,
+					deviceId,
+					latitude: body.location.lat,
+					longitude: body.location.lng,
+				})
+			}
 		}
 	}
 
@@ -224,70 +521,75 @@ async function put(request: Request, user: any, deviceId: string) {
 	}
 
 	try {
-		const updatedDevice = await updateDevice(deviceId, updateArgs)
+		const updateResult = await updateDevice(user.id, currentDevice, updateArgs)
 
-		const deviceWithSensors = await getDevice({ id: updatedDevice.id })
-
-		const apiResponse = transformDeviceToApiFormat(deviceWithSensors as any)
-
-		return Response.json(apiResponse, { status: 200 })
-	} catch (error) {
-		console.error('Error updating device:', error)
-
-		// Handle specific device update errors
-		if (error instanceof DeviceUpdateError) {
-			return Response.json(
-				{
-					code: error.statusCode === 400 ? 'BadRequest' : 'NotFound',
-					message: error.message,
-				},
-				{ status: error.statusCode },
-			)
+		if (updateResult === 'unauthorized') {
+			return StandardResponse.forbidden(messages.deviceNotOwned)
 		}
 
-		// Return generic error for unexpected errors
-		return Response.json(
-			{
-				code: 'InternalServerError',
-				message:
-					error instanceof Error ? error.message : 'Failed to update device',
-			},
-			{ status: 500 },
-		)
+		if (updateResult === 'archived') {
+			return StandardResponse.conflict(messages.deviceArchived)
+		}
+
+		const deviceWithSensors = await getDevice({ id: updateResult.id })
+
+		if (!deviceWithSensors) {
+			return StandardResponse.internalServerError()
+		}
+
+		const apiResponse = transformDeviceToApiFormat(deviceWithSensors)
+
+		const responseParsed = await ApiDeviceSchema.safeParseAsync(apiResponse)
+
+		if (!responseParsed.success) {
+			return StandardResponse.internalServerError()
+		}
+
+		return StandardResponse.ok(responseParsed.data)
+	} catch (error) {
+		if (error instanceof DeviceUpdateError) {
+			if (error.statusCode === 400) {
+				return StandardResponse.badRequest(error.message)
+			}
+
+			if (error.statusCode === 404) {
+				return StandardResponse.notFound(error.message)
+			}
+		}
+
+		return StandardResponse.internalServerError()
 	}
 }
 
 async function del(request: Request, user: User, deviceId: string) {
-	const device = (await getDevice({ id: deviceId })) as unknown as Device
+	const device = await getDevice({ id: deviceId })
 
-	if (!device) throw StandardResponse.notFound('Device not found')
+	if (!device) {
+		return StandardResponse.notFound('Device not found')
+	}
 
-	const body = await request.json()
-
-	if (!body.password)
-		throw StandardResponse.badRequest(
-			'Password is required for device deletion',
-		)
+	const parsedBody = await parseJsonBody(request, DeleteDeviceRequestSchema)
+	if (parsedBody instanceof Response) return parsedBody
 
 	try {
-		const deleted = await deleteDevice(user, device, body.password)
+		const deleted = await deleteDevice(user, device, parsedBody.password)
 
-		if (deleted === 'forbidden')
-			return StandardResponse.forbidden(
-				'Only the device owner can delete this device',
-			)
-		if (deleted === 'unauthorized')
+		if (deleted === 'forbidden') {
+			return StandardResponse.forbidden(messages.deviceNotOwned)
+		}
+		if (deleted === 'unauthorized') {
 			return StandardResponse.unauthorized('Password incorrect')
-		if (deleted === 'integration-cleanup-failed')
+		}
+		if (deleted === 'integration-cleanup-failed') {
 			return StandardResponse.errorResponse(
 				'Service Unavailable',
-				'Could not remove device integrations. Please try deleting the device again later.',
+				messages.integrationCleanupFailed,
 				503,
 			)
+		}
 
 		return StandardResponse.ok(null)
-	} catch (err) {
-		console.warn(err)
+	} catch {
 		return StandardResponse.internalServerError()
 	}
 }

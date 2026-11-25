@@ -1,8 +1,9 @@
-import { data, type ActionFunctionArgs } from 'react-router'
+import { data } from 'react-router'
+import { type Route } from './+types/resources.measurement.$deviceId.$sensorId'
+import { measurement, type Measurement } from '~/db/schema'
 import { drizzleClient } from '~/db.server'
-import { measurement, type Measurement } from '~/schema'
 
-export const action = async ({ request }: ActionFunctionArgs) => {
+export const action = async ({ request }: Route.ActionArgs) => {
 	if (request.method !== 'POST') {
 		return data({ message: 'Method not allowed' }, 405)
 	}

@@ -1,5 +1,4 @@
 import clsx from 'clsx'
-import { format, formatDistanceToNow } from 'date-fns'
 import {
 	ChevronUp,
 	Minus,
@@ -15,6 +14,7 @@ import {
 	CalendarPlus,
 	Hash,
 	LandPlot,
+	Mountain,
 	Image as ImageIcon,
 } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
@@ -25,14 +25,13 @@ import {
 	useLoaderData,
 	useMatches,
 	useNavigate,
-	useNavigation,
 	useParams,
 	useSearchParams,
 	Link,
+	NavLink,
 } from 'react-router'
 import { MarkdownContent } from '../markdown-content'
 import SensorIcon from '../sensor-icon'
-import Spinner from '../spinner'
 import {
 	Accordion,
 	AccordionContent,
@@ -40,15 +39,6 @@ import {
 	AccordionTrigger,
 } from '../ui/accordion'
 import { Alert, AlertDescription, AlertTitle } from '../ui/alert'
-import {
-	AlertDialog,
-	AlertDialogCancel,
-	AlertDialogContent,
-	AlertDialogFooter,
-	AlertDialogHeader,
-	AlertDialogTitle,
-	AlertDialogTrigger,
-} from '../ui/alert-dialog'
 import { Badge } from '../ui/badge'
 import { Button } from '../ui/button'
 import {
@@ -67,19 +57,16 @@ import {
 	DropdownMenuTrigger,
 } from '../ui/dropdown-menu'
 import { Separator } from '../ui/separator'
-import {
-	Tooltip,
-	TooltipContent,
-	TooltipProvider,
-	TooltipTrigger,
-} from '../ui/tooltip'
+import { Tooltip, TooltipContent, TooltipTrigger } from '../ui/tooltip'
 import { useToast } from '../ui/use-toast'
 import EntryLogs from './entry-logs'
-import ShareLink from './share-link'
 import { useGlobalCompareMode } from './useGlobalCompareMode'
+import { type SensorWithLatestMeasurement } from '~/db/schema'
+import { useCopyToClipboard } from '~/hooks/use-copy-to-clipboard'
+import { getArchiveLink } from '~/lib/archive-link'
 import { type loader } from '~/routes/explore.$deviceId'
-import { type SensorWithLatestMeasurement } from '~/schema'
-import { getArchiveLink } from '~/utils/device'
+import { dateDiffToNowInWords } from '~/lib/date'
+import { calculateHeightAboveSeaLevel } from '~/lib/elevation'
 
 export interface MeasurementProps {
 	sensorId: string
@@ -90,15 +77,25 @@ export interface MeasurementProps {
 }
 
 export default function DeviceDetailBox() {
-	const navigation = useNavigation()
 	const navigate = useNavigate()
 	const matches = useMatches()
 	const { toast } = useToast()
-	const { t } = useTranslation("device-detail-box")
+	const { copyToClipboard } = useCopyToClipboard()
+	const { t, i18n } = useTranslation('device-detail-box')
+	const dateFormatter = new Intl.DateTimeFormat(i18n.resolvedLanguage, {
+		year: 'numeric',
+		month: 'long',
+		day: 'numeric',
+	})
 
 	const sensorIds = new Set()
 
 	const data = useLoaderData<typeof loader>()
+	const exploreData = matches.find((match) => match.pathname === '/explore')
+		?.loaderData as { user?: { id?: string } } | undefined
+	const isOwner =
+		typeof data.device?.userId === 'string' &&
+		exploreData?.user?.id === data.device.userId
 	const nodeRef = useRef<HTMLDivElement>(null)
 	// state variables
 	const [open, setOpen] = useState(true)
@@ -111,7 +108,9 @@ export default function DeviceDetailBox() {
 	const [sensors, setSensors] = useState<SensorWithLatestMeasurement[]>()
 	useEffect(() => {
 		const sortedSensors = [...(data.sensors as any)].sort(
-			(a, b) => (a.id as unknown as number) - (b.id as unknown as number),
+			(a, b) =>
+				(a.order ?? Number.MAX_SAFE_INTEGER) -
+					(b.order ?? Number.MAX_SAFE_INTEGER) || a.id.localeCompare(b.id),
 		)
 		setSensors(sortedSensors)
 	}, [data])
@@ -119,6 +118,26 @@ export default function DeviceDetailBox() {
 	const [searchParams] = useSearchParams()
 
 	const { deviceId } = useParams() // Get the deviceId from the URL params
+	const handleCopyDeviceUrl = async () => {
+		if (!deviceId) return
+
+		try {
+			const deviceUrl = new URL(
+				`/explore/${encodeURIComponent(deviceId)}`,
+				window.location.origin,
+			).href
+			const copied = await copyToClipboard(deviceUrl)
+			if (!copied) return
+
+			toast({
+				title: t('copied_to_clipboard'),
+				description: t('share_link_hint'),
+				variant: 'success',
+			})
+		} catch {
+			toast({ title: t('copy_failed'), variant: 'destructive' })
+		}
+	}
 
 	const createSensorLink = (sensorIdToBeSelected: string) => {
 		const lastSegment = matches[matches.length - 1]?.params?.['*']
@@ -162,7 +181,6 @@ export default function DeviceDetailBox() {
 		setOffsetPositionY(data.y)
 	}
 
-
 	useEffect(() => {
 		let interval: any = null
 		if (refreshOn) {
@@ -180,6 +198,11 @@ export default function DeviceDetailBox() {
 
 	if (!data.device) return null
 
+	const heightAboveSeaLevel = calculateHeightAboveSeaLevel(
+		data.device.terrainElevation,
+		data.device.heightAboveGround,
+	)
+
 	return (
 		<>
 			{open && (
@@ -193,19 +216,14 @@ export default function DeviceDetailBox() {
 				>
 					<div
 						ref={nodeRef}
-						className="absolute bottom-6 left-4 right-4 top-14 z-40 flex flex-row px-4 py-2 md:bottom-[30px] md:left-[10px] md:top-auto md:max-h-[calc(100vh-8rem)] md:w-1/3 md:p-0"
+						className="absolute top-30 right-4 bottom-6 left-4 z-40 flex flex-row px-4 py-2 lg:top-auto lg:bottom-7.5 lg:left-2.5 lg:max-h-[calc(100dvh-8rem)] lg:w-[min(28rem,calc(100vw-2rem))] lg:p-0"
 					>
 						<div
 							id="deviceDetailBox"
 							className={
-								'shadow-zinc-800/5 ring-zinc-900/5 relative float-left flex h-full max-h-[calc(100vh-4rem)] w-auto flex-col gap-4 rounded-xl bg-white px-4 py-2 text-sm font-medium text-zinc-800 shadow-lg ring-1 dark:bg-zinc-800 dark:text-zinc-200 dark:opacity-95 dark:ring-white dark:backdrop-blur-sm md:max-h-[calc(100vh-8rem)]'
+								'relative float-left flex h-full max-h-[calc(100dvh-4rem)] w-full min-w-0 flex-col gap-4 rounded-xl bg-white px-4 py-2 text-sm font-medium text-zinc-800 shadow-lg ring-1 shadow-zinc-800/5 ring-zinc-900/5 lg:max-h-[calc(100dvh-8rem)] dark:bg-zinc-800 dark:text-zinc-200 dark:opacity-95 dark:ring-white dark:backdrop-blur-xs'
 							}
 						>
-							{navigation.state === 'loading' && (
-								<div className="bg-white/30 dark:bg-zinc-800/30 absolute inset-0 z-50 flex items-center justify-center backdrop-blur-sm">
-									<Spinner />
-								</div>
-							)}
 							<div
 								id="deviceDetailBoxTop"
 								className="flex w-full cursor-move items-center gap-3 py-2"
@@ -213,27 +231,24 @@ export default function DeviceDetailBox() {
 								<div
 									className={
 										data.device.status === 'active'
-											? 'h-4 w-4 rounded-full bg-light-green'
+											? 'bg-light-green h-4 w-4 rounded-full'
 											: 'h-4 w-4 rounded-full bg-red-500'
 									}
 								></div>
-								<div className="flex flex-1 text-center text-xl text-zinc-600 dark:dark:text-zinc-100">
+								<div className="min-w-0 flex-1 truncate text-center text-xl text-zinc-600 dark:dark:text-zinc-100">
 									{data.device.name}
 								</div>
-								<AlertDialog>
-									<AlertDialogTrigger asChild>
-										<Share2 className="cursor-pointer" />
-									</AlertDialogTrigger>
-									<AlertDialogContent>
-										<AlertDialogHeader>
-											<AlertDialogTitle>{t('share_link')}</AlertDialogTitle>
-											<ShareLink />
-										</AlertDialogHeader>
-										<AlertDialogFooter>
-											<AlertDialogCancel>{t('close')}</AlertDialogCancel>
-										</AlertDialogFooter>
-									</AlertDialogContent>
-								</AlertDialog>
+								<Button
+									type="button"
+									variant="ghost"
+									size="icon"
+									className="h-8 w-8 p-0"
+									onClick={handleCopyDeviceUrl}
+									aria-label={t('copy_device_link')}
+									title={t('copy_device_link')}
+								>
+									<Share2 className="h-4 w-4" />
+								</Button>
 								<DropdownMenu>
 									<DropdownMenuTrigger asChild>
 										<Button variant="ghost" className="h-8 w-8 p-0">
@@ -261,7 +276,7 @@ export default function DeviceDetailBox() {
 													href={getArchiveLink(data.device)}
 													target="_blank"
 													rel="noopener noreferrer"
-													title="Open archive"
+													title={t('open_archive')}
 													className="w-full cursor-pointer"
 												>
 													{t('open_archive')}
@@ -275,7 +290,7 @@ export default function DeviceDetailBox() {
 													href={data.device.link || '#'}
 													target="_blank"
 													rel="noopener noreferrer"
-													title="Open external link"
+													title={t('open_external_link')}
 													className="w-full cursor-pointer"
 												>
 													{t('open_external_link')}
@@ -300,50 +315,69 @@ export default function DeviceDetailBox() {
 								/>
 							</div>
 							<div className="no-scrollbar relative flex-1 overflow-y-scroll">
-								<div className="space-y-4 sm:flex sm:space-x-4 sm:space-y-0">
+								<div className="space-y-4 md:flex md:space-y-0 md:space-x-4">
 									<div className="md:w-1/2">
 										{data.deviceImageUrl ? (
-												<img
-													className="w-full rounded-lg object-cover"
-													alt="device_image"
-													src={data.deviceImageUrl}
-												/>
-											) : (
-												<div className="w-full rounded-lg object-cover text-muted-foreground">
-													<ImageIcon strokeWidth={1} className="h-full w-full" />
-												</div>
-											)}
+											<img
+												className="w-full rounded-lg object-cover"
+												alt={t('device_image')}
+												src={data.deviceImageUrl}
+											/>
+										) : (
+											<div className="text-muted-foreground w-full rounded-lg object-cover">
+												<ImageIcon strokeWidth={1} className="h-full w-full" />
+											</div>
+										)}
 									</div>
-									<div className="space-y-2 sm:w-1/2">
+									<div className="space-y-2 md:w-1/2">
 										<InfoItem
 											icon={LandPlot}
-											title="Exposure"
-											text={data.device.exposure || 'Unknown'}
+											title={t('exposure')}
+											text={
+												data.device.exposure
+													? t(`exposure_values.${data.device.exposure}`, {
+															defaultValue: data.device.exposure,
+														})
+													: t('unknown')
+											}
 										/>
+										{heightAboveSeaLevel !== null ? (
+											<InfoItem
+												icon={Mountain}
+												title={t('height_above_sea_level')}
+												text={`${Math.round(heightAboveSeaLevel)} m`}
+											/>
+										) : null}
 										<InfoItem
 											icon={Cpu}
-											title="Sensor Model"
-											text={data.device.sensorWikiModel || 'Unknown'}
+											title={t('sensor_model')}
+											text={data.device.sensorWikiModel || t('unknown')}
 										/>
 										<Separator className="my-2" />
 										<InfoItem
 											icon={Rss}
-											title="Last Updated"
-											text={format(new Date(data.device.updatedAt), 'PPP')}
+											title={t('last_updated')}
+											text={dateFormatter.format(
+												new Date(data.device.updatedAt),
+											)}
 										/>
 										<Separator className="my-2" />
 										<InfoItem
 											icon={CalendarPlus}
-											title="Created At"
-											text={format(new Date(data.device.createdAt), 'PPP')}
+											title={t('created_at')}
+											text={dateFormatter.format(
+												new Date(data.device.createdAt),
+											)}
 										/>
 										{data.device.expiresAt && (
 											<>
 												<Separator className="my-2" />
 												<InfoItem
 													icon={CalendarPlus}
-													title="Expires At"
-													text={format(new Date(data.device.expiresAt), 'PPP')}
+													title={t('expires_at')}
+													text={dateFormatter.format(
+														new Date(data.device.expiresAt),
+													)}
 												/>
 											</>
 										)}
@@ -352,11 +386,11 @@ export default function DeviceDetailBox() {
 								{data.device.tags && data.device.tags.length > 0 && (
 									<div className="pt-4">
 										<div className="space-y-2">
-											<div className="text-sm font-medium text-muted-foreground">
-												Tags
+											<div className="text-muted-foreground text-sm font-medium">
+												{t('tags')}
 											</div>
 											<div className="flex items-center space-x-2">
-												<Hash className="h-4 w-4 shrink-0 text-muted-foreground" />
+												<Hash className="text-muted-foreground h-4 w-4 shrink-0" />
 												<div className="flex flex-wrap gap-2">
 													{data.device.tags.map((tag: string) => (
 														<Badge
@@ -368,7 +402,7 @@ export default function DeviceDetailBox() {
 																	.get('tags')
 																	?.split(',')
 																	.includes(tag)
-																	? 'bg-green-100 dark:bg-dark-green'
+																	? 'dark:bg-dark-green bg-green-100'
 																	: '',
 															)}
 															onClick={(event) => {
@@ -448,14 +482,22 @@ export default function DeviceDetailBox() {
 											{t('sensors')}
 										</AccordionTrigger>
 										<AccordionContent>
-											<div
-												className={
-													navigation.state === 'loading'
-														? 'pointer-events-none'
-														: ''
-												}
-											>
-												<div className="grid gap-4 md:grid-cols-2 2xl:grid-cols-4">
+											<div>
+												{isOwner && (
+													<Alert className="mb-4 py-3">
+														<AlertDescription className="text-xs">
+															{t('sensor_order_hint')}{' '}
+															<Link
+																to={`/device/${data.device.id}/edit/sensors`}
+																prefetch="intent"
+																className="font-medium underline underline-offset-4"
+															>
+																{t('sensor_order_hint_link')}
+															</Link>
+														</AlertDescription>
+													</Alert>
+												)}
+												<div className="grid gap-4 md:grid-cols-2">
 													{sensors &&
 														sensors.map(
 															(sensor: SensorWithLatestMeasurement) => {
@@ -467,10 +509,10 @@ export default function DeviceDetailBox() {
 																			className="flex h-full flex-col"
 																			onClick={() =>
 																				toast({
-																					title:
-																						'Cant select more than 2 sensors',
-																					description:
-																						'Deselect one sensor to select another',
+																					title: t('sensor_limit_title'),
+																					description: t(
+																						'sensor_limit_description',
+																					),
 																					variant: 'destructive',
 																				})
 																			}
@@ -504,16 +546,17 @@ export default function DeviceDetailBox() {
 																					</CardTitle>
 																					<SensorIcon
 																						title={sensor.title || ''}
-																						className="ml-2 h-4 w-4 shrink-0 text-muted-foreground"
+																						icon={sensor.icon}
+																						className="text-muted-foreground ml-2 h-4 w-4 shrink-0"
 																					/>
 																				</CardHeader>
-																				<CardContent className="flex-grow">
+																				<CardContent className="grow">
 																					<div className="flex flex-row items-center space-x-2">
 																						<div className="text-2xl font-bold">
 																							{sensor.lastMeasurement?.value ??
 																								'–'}
 																						</div>
-																						<p className="text-xs text-muted-foreground">
+																						<p className="text-muted-foreground text-xs">
 																							{sensor.unit}
 																						</p>
 																					</div>
@@ -524,14 +567,20 @@ export default function DeviceDetailBox() {
 																						<div
 																							className={
 																								sensor.status === 'active'
-																									? 'h-2 w-2 rounded-full bg-light-green'
+																									? 'bg-light-green h-2 w-2 rounded-full'
 																									: 'h-2 w-2 rounded-full bg-red-500'
 																							}
 																						></div>
-																						<p className="text-xs text-muted-foreground">
+																						<p className="text-muted-foreground text-xs">
 																							{sensor.lastMeasurement
-																								? `${formatDistanceToNow(new Date(sensor.lastMeasurement.createdAt), { addSuffix: true })}`
-																								: 'No recent data'}
+																								? dateDiffToNowInWords(
+																										i18n.language,
+																										new Date(
+																											sensor.lastMeasurement
+																												.createdAt,
+																										),
+																									)
+																								: t('no_recent_data')}
 																						</p>
 																					</div>
 																				</CardFooter>
@@ -540,10 +589,16 @@ export default function DeviceDetailBox() {
 																	)
 																}
 																return (
-																	<Link
+																	<NavLink
 																		key={sensor.id}
 																		to={sensorLink}
-																		className="h-full"
+																		className={({ isPending }) =>
+																			clsx(
+																				'h-full transition-opacity',
+																				isPending &&
+																					'pointer-events-none opacity-50',
+																			)
+																		}
 																	>
 																		<Card
 																			key={sensor.id}
@@ -581,16 +636,17 @@ export default function DeviceDetailBox() {
 																					</CardTitle>
 																					<SensorIcon
 																						title={sensor.title || ''}
-																						className="ml-2 h-4 w-4 shrink-0 text-muted-foreground"
+																						icon={sensor.icon}
+																						className="text-muted-foreground ml-2 h-4 w-4 shrink-0"
 																					/>
 																				</CardHeader>
-																				<CardContent className="flex-grow">
+																				<CardContent className="grow">
 																					<div className="flex flex-row items-center space-x-2">
 																						<div className="text-2xl font-bold">
 																							{sensor.lastMeasurement?.value ??
 																								'–'}
 																						</div>
-																						<p className="text-xs text-muted-foreground">
+																						<p className="text-muted-foreground text-xs">
 																							{sensor.unit}
 																						</p>
 																					</div>
@@ -601,20 +657,26 @@ export default function DeviceDetailBox() {
 																						<div
 																							className={
 																								sensor.status === 'active'
-																									? 'h-2 w-2 rounded-full bg-light-green'
+																									? 'bg-light-green h-2 w-2 rounded-full'
 																									: 'h-2 w-2 rounded-full bg-red-500'
 																							}
 																						></div>
-																						<p className="text-xs text-muted-foreground">
+																						<p className="text-muted-foreground text-xs">
 																							{sensor.lastMeasurement
-																								? `${formatDistanceToNow(new Date(sensor.lastMeasurement.createdAt), { addSuffix: true })}`
-																								: 'No recent data'}
+																								? dateDiffToNowInWords(
+																										i18n.language,
+																										new Date(
+																											sensor.lastMeasurement
+																												.createdAt,
+																										),
+																									)
+																								: t('no_recent_data')}
 																						</p>
 																					</div>
 																				</CardFooter>
 																			</label>
 																		</Card>
-																	</Link>
+																	</NavLink>
 																)
 															},
 														)}
@@ -629,7 +691,7 @@ export default function DeviceDetailBox() {
 				</Draggable>
 			)}
 			{compareMode && (
-				<Alert className="absolute bottom-4 left-1/2 right-1/2 w-1/4 -translate-x-1/2 -translate-y-1/2 transform animate-pulse dark:bg-zinc-800 dark:text-zinc-200 dark:opacity-95">
+				<Alert className="absolute right-1/2 bottom-4 left-1/2 w-1/4 -translate-x-1/2 -translate-y-1/2 transform animate-pulse dark:bg-zinc-800 dark:text-zinc-200 dark:opacity-95">
 					<XSquare
 						className="h-4 w-4 cursor-pointer"
 						onClick={() => {
@@ -648,20 +710,18 @@ export default function DeviceDetailBox() {
 					onClick={() => {
 						setOpen(true)
 					}}
-					className="absolute bottom-[10px] left-4 flex cursor-pointer rounded-xl border border-gray-100 bg-white shadow-lg transition-colors duration-300 ease-in-out hover:brightness-90 dark:bg-zinc-800 dark:text-zinc-200 dark:opacity-90 sm:bottom-[30px] sm:left-[10px]"
+					className="absolute bottom-2.5 left-4 flex cursor-pointer rounded-xl border border-gray-100 bg-white shadow-lg transition-colors duration-300 ease-in-out hover:brightness-90 sm:bottom-7.5 sm:left-2.5 dark:bg-zinc-800 dark:text-zinc-200 dark:opacity-90"
 				>
-					<TooltipProvider>
-						<Tooltip>
-							<TooltipTrigger asChild>
-								<div className="px-4 py-2">
-									<ChevronUp />
-								</div>
-							</TooltipTrigger>
-							<TooltipContent>
-								<p>{t('open_device_details')}</p>
-							</TooltipContent>
-						</Tooltip>
-					</TooltipProvider>
+					<Tooltip>
+						<TooltipTrigger asChild>
+							<div className="px-4 py-2">
+								<ChevronUp />
+							</div>
+						</TooltipTrigger>
+						<TooltipContent>
+							<p>{t('open_device_details')}</p>
+						</TooltipContent>
+					</Tooltip>
 				</div>
 			)}
 		</>
@@ -679,9 +739,9 @@ const InfoItem = ({
 }) =>
 	text && (
 		<div className="space-y-1">
-			<div className="text-sm font-medium text-muted-foreground">{title}</div>
+			<div className="text-muted-foreground text-sm font-medium">{title}</div>
 			<div className="flex items-center space-x-2 text-sm">
-				<Icon className="h-4 w-4 shrink-0 text-muted-foreground" />
+				<Icon className="text-muted-foreground h-4 w-4 shrink-0" />
 				<span>{text}</span>
 			</div>
 		</div>

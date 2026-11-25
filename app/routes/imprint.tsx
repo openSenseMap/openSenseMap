@@ -75,14 +75,14 @@ export default function Imprint({
 			<header>
 				<nav className="relative mx-auto flex h-16 max-w-7xl justify-between py-6 dark:border-gray-300 dark:bg-black">
 					<div className="container flex flex-wrap items-center justify-between px-4 font-serif">
-						<div className="flex max-w-screen-xl flex-wrap items-center justify-between">
+						<div className="flex max-w-(--breakpoint-xl) flex-wrap items-center justify-between">
 							<Link to="/" className="flex items-center md:pr-10">
 								<img
-									src="/logo.png"
+									src="/img/logo.png"
 									className="mr-3 h-6 sm:h-9"
 									alt="osem Logo"
 								/>
-								<span className="hidden self-center whitespace-nowrap text-xl text-light-green dark:text-dark-green md:block">
+								<span className="text-light-green dark:text-dark-green hidden self-center text-xl whitespace-nowrap md:block">
 									openSenseMap
 								</span>
 							</Link>

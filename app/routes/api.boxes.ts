@@ -1,340 +1,160 @@
-import {
-	type LoaderFunctionArgs,
-	type ActionFunction,
-	type ActionFunctionArgs,
-} from 'react-router'
-import { transformDeviceToApiFormat } from '~/lib/device-transform'
-import { BoxesQuerySchema, CreateBoxSchema } from '~/lib/devices-service.server'
-import { getUserFromJwt } from '~/lib/jwt'
+import { type Route } from './+types/api.boxes'
 import {
 	createDevice,
 	findDevices,
 	type FindDevicesOptions,
-} from '~/models/device.server'
-import { type Device, type User } from '~/schema'
-import { StandardResponse } from '~/utils/response-utils'
+} from '~/db/models/device.server'
+import { type User } from '~/db/schema'
+import { transformDeviceToApiFormat } from '~/lib/device-transform'
+import { StandardResponse } from '~/lib/responses'
 
-/**
- * @openapi
- * /api/boxes:
- *   post:
- *     tags:
- *       - Boxes
- *     summary: Create a new box
- *     description: Creates a new box/device with sensors
- *     operationId: createBox
- *     security:
- *       - bearerAuth: []
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required:
- *               - name
- *               - location
- *             properties:
- *               name:
- *                 type: string
- *                 description: Box name
- *                 example: "trala"
- *               exposure:
- *                 type: string
- *                 enum: ["indoor", "outdoor", "mobile", "unknown"]
- *                 description: Box exposure type
- *                 example: "mobile"
- *               location:
- *                 type: array
- *                 items:
- *                   type: number
- *                 minItems: 2
- *                 maxItems: 2
- *                 description: Box location as [longitude, latitude]
- *                 example: [-122.406417, 37.785834]
- *               grouptag:
- *                 type: array
- *                 items:
- *                   type: string
- *                 description: Box group tags
- *                 example: ["bike", "atrai", "arnsberg"]
- *               model:
- *                 type: string
- *                 enum: ["homeV2Lora", "homeV2Ethernet", "homeV2Wifi", "senseBox:Edu", "luftdaten.info", "custom"]
- *                 description: Box model type
- *                 example: "custom"
- *               sensors:
- *                 type: array
- *                 items:
- *                   type: object
- *                   required:
- *                     - id
- *                     - title
- *                     - sensorType
- *                     - unit
- *                   properties:
- *                     id:
- *                       type: string
- *                       description: Sensor ID
- *                       example: "0"
- *                     icon:
- *                       type: string
- *                       description: Sensor icon
- *                       example: "osem-thermometer"
- *                     title:
- *                       type: string
- *                       description: Sensor title
- *                       example: "Temperature"
- *                     sensorType:
- *                       type: string
- *                       description: Sensor type
- *                       example: "HDC1080"
- *                     unit:
- *                       type: string
- *                       description: Sensor unit
- *                       example: "°C"
- *     responses:
- *       201:
- *         description: Box created successfully
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/Box'
- *       400:
- *         description: Bad request - validation error
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 code:
- *                   type: string
- *                   example: "Bad Request"
- *                 message:
- *                   type: string
- *                   example: "Invalid request data"
- *                 errors:
- *                   type: array
- *                   items:
- *                     type: string
- *       403:
- *         description: Forbidden - invalid or missing JWT token
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 code:
- *                   type: string
- *                   example: "Forbidden"
- *                 message:
- *                   type: string
- *                   example: "Invalid JWT authorization. Please sign in to obtain new JWT."
- *       405:
- *         description: Method not allowed - only POST is supported
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 message:
- *                   type: string
- *                   example: "Method Not Allowed"
- *       500:
- *         description: Internal server error
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 code:
- *                   type: string
- *                   example: "Internal Server Error"
- *                 message:
- *                   type: string
- *                   example: "The server was unable to create the box. Please try again later."
- * components:
- *   schemas:
- *     Box:
- *       type: object
- *       description: Box/Device object
- *       properties:
- *         _id:
- *           type: string
- *           description: Unique box identifier
- *           example: "clx1234567890abcdef"
- *         name:
- *           type: string
- *           description: Box name
- *           example: "My Weather Station"
- *         description:
- *           type: string
- *           description: Box description
- *           example: "A weather monitoring station"
- *         image:
- *           type: string
- *           format: uri
- *           description: Box image URL
- *           example: "https://example.com/image.jpg"
- *         link:
- *           type: string
- *           format: uri
- *           description: Box website link
- *           example: "https://example.com"
- *         grouptag:
- *           type: array
- *           items:
- *             type: string
- *           description: Box group tags
- *           example: ["weather", "outdoor"]
- *         exposure:
- *           type: string
- *           enum: ["indoor", "outdoor", "mobile", "unknown"]
- *           description: Box exposure type
- *           example: "outdoor"
- *         model:
- *           type: string
- *           enum: ["homeV2Lora", "homeV2Ethernet", "homeV2Wifi", "senseBox:Edu", "luftdaten.info", "custom"]
- *           description: Box model
- *           example: "homeV2Wifi"
- *         latitude:
- *           type: number
- *           description: Box latitude
- *           example: 52.520008
- *         longitude:
- *           type: number
- *           description: Box longitude
- *           example: 13.404954
- *         useAuth:
- *           type: boolean
- *           description: Whether box requires authentication
- *           example: true
- *         public:
- *           type: boolean
- *           description: Whether box is public
- *           example: false
- *         status:
- *           type: string
- *           enum: ["active", "inactive", "old"]
- *           description: Box status
- *           example: "inactive"
- *         createdAt:
- *           type: string
- *           format: date-time
- *           description: Box creation timestamp
- *           example: "2024-01-15T10:30:00Z"
- *         updatedAt:
- *           type: string
- *           format: date-time
- *           description: Box last update timestamp
- *           example: "2024-01-15T10:30:00Z"
- *         expiresAt:
- *           type: string
- *           format: date-time
- *           nullable: true
- *           description: Box expiration date
- *           example: "2024-12-31T23:59:59Z"
- *         userId:
- *           type: string
- *           description: Owner user ID
- *           example: "user_123456"
- *         sensorWikiModel:
- *           type: string
- *           nullable: true
- *           description: Sensor Wiki model identifier
- *           example: "homeV2Wifi"
- *         currentLocation:
- *           type: object
- *           description: Current location as GeoJSON Point
- *           properties:
- *             type:
- *               type: string
- *               example: "Point"
- *             coordinates:
- *               type: array
- *               items:
- *                 type: number
- *               example: [13.404954, 52.520008]
- *             timestamp:
- *               type: string
- *               format: date-time
- *               example: "2023-01-01T00:00:00.000Z"
- *         lastMeasurementAt:
- *           type: string
- *           format: date-time
- *           description: Last measurement timestamp
- *           example: "2023-01-01T00:00:00.000Z"
- *         loc:
- *           type: array
- *           description: Location history as GeoJSON features
- *           items:
- *             type: object
- *             properties:
- *               type:
- *                 type: string
- *                 example: "Feature"
- *               geometry:
- *                 type: object
- *                 properties:
- *                   type:
- *                     type: string
- *                     example: "Point"
- *                   coordinates:
- *                     type: array
- *                     items:
- *                       type: number
- *                     example: [13.404954, 52.520008]
- *                   timestamp:
- *                     type: string
- *                     format: date-time
- *                     example: "2023-01-01T00:00:00.000Z"
- *         integrations:
- *           type: object
- *           description: Box integrations
- *           properties:
- *             mqtt:
- *               type: object
- *               properties:
- *                 enabled:
- *                   type: boolean
- *                   example: false
- *         sensors:
- *           type: array
- *           items:
- *             type: object
- *             properties:
- *               _id:
- *                 type: string
- *                 description: Sensor ID
- *                 example: "sensor123"
- *               title:
- *                 type: string
- *                 description: Sensor title
- *                 example: "Temperature"
- *               unit:
- *                 type: string
- *                 description: Sensor unit
- *                 example: "°C"
- *               sensorType:
- *                 type: string
- *                 description: Sensor type
- *                 example: "HDC1080"
- *               lastMeasurement:
- *                 type: object
- *                 description: Last measurement data
- *                 properties:
- *                   createdAt:
- *                     type: string
- *                     format: date-time
- *                     example: "2023-01-01T00:00:00.000Z"
- *                   value:
- *                     type: string
- *                     example: "25.13"
- */
-export async function loader({ request }: LoaderFunctionArgs) {
+import { type ZodOpenApiPathItemObject } from 'zod-openapi'
+import {
+	ApiDeviceSchema,
+	DevicesGeoJsonResponseSchema,
+	DevicesResponseSchema,
+} from '~/lib/openapi/schemas/device'
+import {
+	BadRequestErrorSchema,
+	badRequestResponse,
+	ForbiddenErrorSchema,
+	forbiddenResponse,
+	internalServerErrorResponse,
+	InternalServerErrorSchema,
+	MethodNotAllowedErrorSchema,
+	methodNotAllowedResponse,
+	UnprocessableContentErrorSchema,
+	unprocessableContentResponse,
+} from '~/lib/openapi/errors'
+import { withAuthenticatedUser } from '~/lib/jwt'
+import {
+	DevicesQuerySchema,
+	CreateDeviceSchema,
+} from '~/lib/api-schemas/devices'
+import {
+	ElevationLookupError,
+	getTerrainElevation,
+} from '~/services/elevation-service.server'
+import { applyElevationConsentChoice } from '~/db/models/elevation-consent.server'
+
+const DevicesQueryParamsSchema = DevicesQuerySchema.meta({
+	id: 'DevicesQueryParams',
+	description:
+		'Query parameters used to filter and format the devices response.',
+})
+
+const CreateDeviceRequestSchema = CreateDeviceSchema.meta({
+	id: 'CreateDeviceRequest',
+	description: 'Payload for creating a new device.',
+})
+
+const CreatedDeviceResponseSchema = ApiDeviceSchema.meta({
+	id: 'CreatedDeviceResponse',
+	description:
+		'Created device response transformed through `transformDeviceToApiFormat`.',
+})
+
+export const openapi: ZodOpenApiPathItemObject = {
+	get: {
+		tags: ['Devices'],
+		summary: 'Get devices',
+		description:
+			'Find devices using query parameters. By default, a JSON array of devices is returned. If `format=geojson`, a GeoJSON FeatureCollection is returned.',
+
+		requestParams: {
+			query: DevicesQueryParamsSchema,
+		},
+
+		responses: {
+			200: {
+				description: 'Devices retrieved successfully.',
+				content: {
+					'application/json': {
+						schema: DevicesResponseSchema,
+					},
+					'application/geo+json': {
+						schema: DevicesGeoJsonResponseSchema,
+					},
+				},
+			},
+
+			422: unprocessableContentResponse(
+				UnprocessableContentErrorSchema,
+				'Invalid query parameter.',
+			),
+
+			500: internalServerErrorResponse(
+				InternalServerErrorSchema,
+				'Internal server error.',
+			),
+		},
+	},
+
+	post: {
+		tags: ['Devices'],
+		summary: 'Create a new device',
+		description:
+			'Creates a new device with optional sensors. An optional location height is interpreted and stored as height above ground. Coordinates are sent to GPXZ and height above sea level is calculated only when the authenticated user has granted the current elevation lookup consent. A missing consent or lookup failure does not fail device creation.',
+		security: [{ bearerAuth: [] }],
+
+		requestBody: {
+			required: true,
+			content: {
+				'application/json': {
+					schema: CreateDeviceRequestSchema,
+				},
+			},
+		},
+
+		responses: {
+			201: {
+				description: 'Device created successfully.',
+				content: {
+					'application/json': {
+						schema: CreatedDeviceResponseSchema,
+					},
+				},
+			},
+
+			400: badRequestResponse(
+				BadRequestErrorSchema,
+				'Bad request. This can happen when the request body is not valid JSON or does not match CreateDeviceSchema.',
+			),
+
+			403: forbiddenResponse(
+				ForbiddenErrorSchema,
+				'Invalid or missing JWT authorization.',
+			),
+
+			405: methodNotAllowedResponse(
+				MethodNotAllowedErrorSchema,
+				'Method not allowed.',
+			),
+
+			500: internalServerErrorResponse(
+				InternalServerErrorSchema,
+				'Internal server error.',
+			),
+		},
+	},
+}
+
+function normalizeBoxesQueryParams(query: Record<string, unknown>) {
+	const maxDistance = query.maxDistance ?? query.maxdistance
+
+	return {
+		...query,
+		maxDistance,
+	}
+}
+
+export async function loader({ request }: Route.LoaderArgs) {
 	const url = new URL(request.url)
 	const queryObj = Object.fromEntries(url.searchParams)
-	const parseResult = BoxesQuerySchema.safeParse(queryObj)
+
+	const normalizedQueryObj = normalizeBoxesQueryParams(queryObj)
+
+	const parseResult = DevicesQuerySchema.safeParse(normalizedQueryObj)
 
 	if (!parseResult.success) {
 		const { fieldErrors } = parseResult.error.flatten()
@@ -353,44 +173,51 @@ export async function loader({ request }: LoaderFunctionArgs) {
 	if (params.format === 'geojson') {
 		const geojson = {
 			type: 'FeatureCollection',
-			features: devices.map((device: Device) => ({
+			features: devices.map((device) => ({
 				type: 'Feature',
 				geometry: {
 					type: 'Point',
-					coordinates: [device.longitude, device.latitude],
+					coordinates:
+						device.heightAboveSeaLevel === null
+							? [device.longitude, device.latitude]
+							: [device.longitude, device.latitude, device.heightAboveSeaLevel],
 				},
 				properties: {
 					...device,
+					height: device.heightAboveSeaLevel,
 				},
 			})),
 		}
 
-		return geojson
-	} else {
-		return devices
+		return Response.json(geojson, {
+			headers: {
+				'Content-Type': 'application/geo+json; charset=utf-8',
+			},
+		})
 	}
+	return Response.json(
+		devices.map((device) => ({
+			...device,
+			height: device.heightAboveSeaLevel,
+		})),
+		{
+			headers: {
+				'Content-Type': 'application/json; charset=utf-8',
+			},
+		},
+	)
 }
 
-export const action: ActionFunction = async ({
-	request,
-}: ActionFunctionArgs) => {
+export const action = async ({ request }: Route.ActionArgs) => {
 	try {
-		// Check authentication
-		const jwtResponse = await getUserFromJwt(request)
-
-		if (typeof jwtResponse === 'string')
-			return StandardResponse.forbidden(
-				'Invalid JWT authorization. Please sign in to obtain new JWT.',
-			)
-
-		switch (request.method) {
-			case 'POST':
-				return await post(request, jwtResponse)
-			default:
-				return StandardResponse.methodNotAllowed('Method Not Allowed')
+		if (request.method !== 'POST') {
+			return StandardResponse.methodNotAllowed('Method Not Allowed')
 		}
-	} catch (err) {
-		console.error('Error in action:', err)
+
+		return await withAuthenticatedUser(request, async (user) => {
+			return await post(request, user)
+		})
+	} catch {
 		return StandardResponse.internalServerError()
 	}
 }
@@ -406,31 +233,51 @@ async function post(request: Request, user: User) {
 		}
 
 		// Validate request data
-		const validationResult = CreateBoxSchema.safeParse(requestData)
+		const validationResult = CreateDeviceSchema.safeParse(requestData)
 		if (!validationResult.success) {
-			return Response.json(
-				{
-					code: 'Bad Request',
-					message: 'Invalid request data',
-					errors: validationResult.error.errors.map(
-						(err) => `${err.path.join('.')}: ${err.message}`,
-					),
-				},
-				{ status: 400 },
+			return StandardResponse.badRequest(
+				validationResult.error.issues[0]?.message ?? 'Invalid request data',
 			)
 		}
 
 		const validatedData = validationResult.data
 		const sensorsProvided = validatedData.sensors?.length > 0
-		// Extract longitude and latitude from location array [longitude, latitude]
-		const [longitude, latitude] = validatedData.location
-		const newBox = await createDevice(
+		// Request height is relative to ground; sea-level height is best-effort.
+		const [longitude, latitude, heightAboveGround] = validatedData.location
+		let terrainElevation: number | null = null
+		let terrainElevationDataset: string | null = null
+		const mayLookupElevation = await applyElevationConsentChoice(
+			user.id,
+			validatedData.elevationLookupConsent,
+		)
+
+		if (heightAboveGround !== undefined && mayLookupElevation) {
+			try {
+				const elevationResult = await getTerrainElevation(latitude, longitude)
+				terrainElevation = elevationResult.elevation
+				terrainElevationDataset = elevationResult.dataset
+			} catch (error) {
+				console.warn('POST /boxes terrain elevation lookup failed', {
+					error: error instanceof ElevationLookupError ? error.code : error,
+					latitude,
+					longitude,
+				})
+			}
+		}
+
+		const newDevice = await createDevice(
 			{
 				name: validatedData.name,
 				exposure: validatedData.exposure,
 				model: sensorsProvided ? undefined : validatedData.model,
+				sensorTemplates: sensorsProvided
+					? undefined
+					: validatedData.sensorTemplates,
 				latitude: latitude,
 				longitude: longitude,
+				heightAboveGround: heightAboveGround ?? null,
+				terrainElevation,
+				terrainElevationDataset,
 				tags: validatedData.grouptag,
 				sensors: sensorsProvided
 					? validatedData.sensors.map((s) => ({
@@ -444,11 +291,10 @@ async function post(request: Request, user: User) {
 		)
 
 		// Build response object using helper function
-		const responseData = transformDeviceToApiFormat(newBox)
+		const responseData = transformDeviceToApiFormat(newDevice)
 
 		return StandardResponse.created(responseData)
-	} catch (err) {
-		console.error('Error creating box:', err)
+	} catch {
 		return StandardResponse.internalServerError()
 	}
 }
