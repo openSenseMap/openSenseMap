@@ -23,6 +23,7 @@ import {
 	updateLastMeasurements,
 } from '~/lib/measurement-server-helper'
 import { type MeasurementTiming } from '~/lib/measurement-timing.server'
+import { ArchivedDeviceError } from './device.server'
 
 // This function retrieves measurements from the database based on the provided parameters.
 export function getMeasurement(
