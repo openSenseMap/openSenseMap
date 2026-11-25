@@ -122,6 +122,10 @@ export async function findOrCreateLocations(
 							}
 						}),
 					)
+					// Instead of doing an OnConflictDoNothing the location column is set to the value proposed
+					// by the INSERT operation, essentially making this a no-op because the location is the reason
+					// for the conflict (current = inserted). OnConflictDoUpdate however will return a value
+					// and OnConflictDoNothing won't.
 					.onConflictDoUpdate({
 						target: location.location,
 						set: { location: sql`excluded.location` },
