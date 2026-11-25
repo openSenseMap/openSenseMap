@@ -1,5 +1,11 @@
 import { z } from 'zod'
 
+const exploreHomeCacheTtlSecondsSchema = z
+	.string()
+	.regex(/^\d+$/)
+	.refine((value) => Number.isSafeInteger(Number(value) * 1_000))
+	.optional()
+
 const schema = z.object({
 	NODE_ENV: z.enum(['production', 'development', 'test'] as const),
 	DATABASE_URL: z.string(),
@@ -9,6 +15,7 @@ const schema = z.object({
 		.regex(/^[1-9]\d*$/)
 		.optional(),
 	SESSION_SECRET: z.string(),
+	EXPLORE_HOME_CACHE_TTL_SECONDS: exploreHomeCacheTtlSecondsSchema,
 	NOMINATIM_SEARCH_API: z.string(),
 	GPXZ_API_URL: z.string().url().optional(),
 	GPXZ_API_KEY: z.string().min(1).optional(),
@@ -72,7 +79,13 @@ export function getEnv({
 }: {
 	sentryPerformanceTracingEnabled?: boolean
 } = {}) {
+	const { data: exploreHomeCacheTtlSeconds } =
+		exploreHomeCacheTtlSecondsSchema.safeParse(
+			process.env.EXPLORE_HOME_CACHE_TTL_SECONDS,
+		)
+
 	return {
+		EXPLORE_HOME_CACHE_TTL_SECONDS: Number(exploreHomeCacheTtlSeconds ?? 300),
 		NOMINATIM_SEARCH_API: process.env.NOMINATIM_SEARCH_API,
 		OSEM_GITHUB_URL: process.env.OSEM_API_URL,
 		MODE: process.env.NODE_ENV,

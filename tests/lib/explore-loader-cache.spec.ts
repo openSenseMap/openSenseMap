@@ -1,7 +1,7 @@
-import { beforeEach, describe, expect, it, vi } from 'vite-plus/test'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vite-plus/test'
+import { getEnv } from '~/lib/env.server'
 import {
 	clearExploreLoaderCache,
-	EXPLORE_HOME_CACHE_TTL_MS,
 	loadExploreDataWithCache,
 } from '~/lib/explore-loader-cache'
 import { shouldRevalidate } from '~/lib/explore-revalidation'
@@ -10,12 +10,19 @@ const url = (path: string) => new URL(path, 'https://example.com')
 const data = (version: number) => ({ devices: [{ version }] })
 type TestData = ReturnType<typeof data>
 const loadCached = (path: string, load: () => Promise<TestData>) =>
-	loadExploreDataWithCache(url(path), load)
+	loadExploreDataWithCache(
+		url(path),
+		load,
+		getEnv().EXPLORE_HOME_CACHE_TTL_SECONDS * 1_000,
+	)
 
 beforeEach(() => {
 	vi.useRealTimers()
+	vi.stubEnv('EXPLORE_HOME_CACHE_TTL_SECONDS', undefined)
 	clearExploreLoaderCache()
 })
+
+afterEach(() => vi.unstubAllEnvs())
 
 describe('explore client loader cache', () => {
 	it('reuses the Home map after a filtered load and ignores chart controls', async () => {
@@ -44,16 +51,35 @@ describe('explore client loader cache', () => {
 		expect(load).toHaveBeenCalledTimes(2)
 	})
 
-	it('expires the Home map ten minutes after loading it', async () => {
-		vi.useFakeTimers()
+	it.each([
+		{ setting: undefined, seconds: 300 },
+		{ setting: '45', seconds: 45 },
+		{ setting: '-1', seconds: 300 },
+	])(
+		'expires the Home map after $seconds seconds for setting $setting',
+		async ({ setting, seconds }) => {
+			vi.useFakeTimers()
+			vi.stubEnv('EXPLORE_HOME_CACHE_TTL_SECONDS', setting)
+			const load = vi
+				.fn<() => Promise<TestData>>()
+				.mockResolvedValueOnce(data(1))
+				.mockResolvedValueOnce(data(2))
+			await loadCached('/explore', load)
+			vi.advanceTimersByTime(seconds * 1_000 - 1)
+			expect(await loadCached('/explore', load)).toEqual(data(1))
+			vi.advanceTimersByTime(1)
+			expect(await loadCached('/explore', load)).toEqual(data(2))
+			expect(load).toHaveBeenCalledTimes(2)
+		},
+	)
+
+	it('loads fresh Home data when the cache lifetime is zero', async () => {
+		vi.stubEnv('EXPLORE_HOME_CACHE_TTL_SECONDS', '0')
 		const load = vi
 			.fn<() => Promise<TestData>>()
 			.mockResolvedValueOnce(data(1))
 			.mockResolvedValueOnce(data(2))
-		await loadCached('/explore', load)
-		vi.advanceTimersByTime(EXPLORE_HOME_CACHE_TTL_MS - 1)
 		expect(await loadCached('/explore', load)).toEqual(data(1))
-		vi.advanceTimersByTime(1)
 		expect(await loadCached('/explore', load)).toEqual(data(2))
 		expect(load).toHaveBeenCalledTimes(2)
 	})
