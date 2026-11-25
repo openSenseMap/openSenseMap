@@ -285,6 +285,24 @@ export function getLocations(
 		)
 		.orderBy(desc(deviceToLocation.time))
 }
+
+export async function getDeviceLocations({ id }: Pick<Device, 'id'>) {
+	const locations = await drizzleClient
+		.select({
+			time: deviceToLocation.time,
+			x: sql<number>`ST_X(${location.location})`.as('x'),
+			y: sql<number>`ST_Y(${location.location})`.as('y'),
+		})
+		.from(location)
+		.innerJoin(deviceToLocation, eq(deviceToLocation.locationId, location.id))
+		.where(eq(deviceToLocation.deviceId, id))
+		.orderBy(desc(deviceToLocation.time))
+
+	return locations.map(({ time, x, y }) => ({
+		time,
+		geometry: { x, y },
+	}))
+}
 export function getDeviceWithoutSensors({ id }: Pick<Device, 'id'>) {
 	return drizzleClient.query.device.findFirst({
 		where: (device, { eq }) => eq(device.id, id),

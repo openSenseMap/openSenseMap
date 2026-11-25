@@ -1,4 +1,8 @@
-import { createDevice, deleteDevice } from '~/db/models/device.server'
+import {
+	createDevice,
+	deleteDevice,
+	getDevice,
+} from '~/db/models/device.server'
 import { deleteUserByEmail } from '~/db/models/user.server'
 import { type User } from '~/db/schema'
 import { registerUser } from '~/services/user-service.server'
