@@ -16,8 +16,6 @@ import { MarkdownContent } from '~/components/markdown-content'
 import { Button } from '~/components/ui/button'
 import { updateDevice, deleteDevice } from '~/lib/devices-service.server'
 import { getDevice, getDeviceWithoutSensors } from '~/models/device.server'
-import { deleteDeviceIntegrations } from '~/models/integration.server'
-import { verifyLogin } from '~/models/user.server'
 import { type Device } from '~/schema'
 import {
 	uploadDeviceImage,
@@ -213,13 +211,22 @@ export async function action({ request, params }: ActionFunctionArgs) {
 				})
 			}
 
+			if (!device) throw new Response('Device not found', { status: 404 })
+
 			const userEmail = await getUserEmail(request)
 			invariant(typeof userEmail === 'string', 'email not found')
 			invariant(typeof passwordDelete === 'string', 'password must be a string')
 
-			const user = await verifyLogin(userEmail, passwordDelete)
+			const result = await deleteDevice(
+				{ id: userId, email: userEmail },
+				device,
+				passwordDelete,
+			)
 
-			if (!user) {
+			if (result === 'forbidden') {
+				throw new Response('Forbidden', { status: 403 })
+			}
+			if (result === 'unauthorized') {
 				return data(
 					{
 						errors: {
@@ -231,28 +238,19 @@ export async function action({ request, params }: ActionFunctionArgs) {
 					{ status: 400 },
 				)
 			}
-
-			// Delete device image before deleting device
-			const device = (await getDeviceWithoutSensors({ id: deviceID })) as Device
-			if (device?.image) {
-				try {
-					await deleteDeviceImage(device.image)
-				} catch (error) {
-					console.error('Failed to delete device image:', error)
-				}
+			if (result === 'integration-cleanup-failed') {
+				return data(
+					{
+						errors: {
+							exposure: null,
+							passwordDelete: null,
+							image: null,
+							integrationCleanup: true,
+						},
+					},
+					{ status: 503 },
+				)
 			}
-
-			const integrationDeletionResults = await deleteDeviceIntegrations(deviceID)
-
-			const failedDeletions = integrationDeletionResults.filter((result) => !result.ok)
-			if (failedDeletions.length > 0) {
-				console.error('Failed to delete one or more integrations before device deletion', {
-					deviceID,
-					failedDeletions,
-				})
-			}
-
-			await deleteDevice(user, device, passwordDelete)
 
 			return redirect('/profile/me')
 		}
@@ -274,7 +272,7 @@ export default function () {
 	const [tags, setTags] = useState<string[]>(device?.tags ?? [])
 	const [newTag, setNewTag] = useState('')
 	const [website, setWebsite] = useState(device?.website || '')
-	const { t } = useTranslation('edit-device-general')
+	const { t } = useTranslation(['edit-device-general', 'delete-device'])
 
 	const [imagePreview, setImagePreview] = useState<string | null>(
 		imageUrl || null,
@@ -643,6 +641,11 @@ Installed on the school roof.
 									</div>
 								)}
 							</div>
+							{actionData?.errors && 'integrationCleanup' in actionData.errors && (
+								<p role="alert" className="mt-1 text-sm text-red-600">
+									{t('integration_cleanup_failed', { ns: 'delete-device' })}
+								</p>
+							)}
 							<div className="flex justify-end">
 								<button
 									type="submit"

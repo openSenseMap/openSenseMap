@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { deleteDeviceIntegrations } from '~/lib/integration-service.server'
 import {
 	ArchivedDeviceError,
 	createDevice as createDeviceInDb,
@@ -273,20 +274,38 @@ export const updateDevice = async (
 	return updateDeviceById(device.id, args)
 }
 /**
- * Deletes a device after verifiying that the user is entitled by checking
- * the password.
- * @param user The user deleting the device
- * @param password The users password to verify
- * @returns True if the device was deleted, otherwise false or "unauthorized"
- * if the user is not entitled to delete the device with the given parameters
+ * Deletes a device and its integrations after checking ownership and password.
  */
 export const deleteDevice = async (
-	user: User,
-	device: Device,
+	user: Pick<User, 'id' | 'email'>,
+	device: Pick<Device, 'id' | 'userId' | 'image'>,
 	password: string,
-): Promise<boolean | 'unauthorized'> => {
+): Promise<
+	boolean | 'unauthorized' | 'forbidden' | 'integration-cleanup-failed'
+> => {
+	if (device.userId !== user.id) return 'forbidden'
+
 	const verifiedUser = await verifyLogin(user.email, password)
-	if (verifiedUser === null) return 'unauthorized'
+	if (verifiedUser?.id !== user.id) return 'unauthorized'
+
+	try {
+		const failures = (await deleteDeviceIntegrations(device.id)).filter(
+			(result) => result.status === 'failed',
+		)
+		if (failures.length > 0) {
+			console.error('Failed to delete device integrations', {
+				deviceId: device.id,
+				failures,
+			})
+			return 'integration-cleanup-failed'
+		}
+	} catch (error) {
+		console.error('Failed to check device integrations', {
+			deviceId: device.id,
+			error,
+		})
+		return 'integration-cleanup-failed'
+	}
 
 	if (device.image) {
 		try {

@@ -20,9 +20,8 @@ import {
 } from '~/components/ui/card'
 import { Input } from '~/components/ui/input'
 import { Label } from '~/components/ui/label'
-import { deleteDevice, getDeviceWithoutSensors, getUserDevice } from '~/models/device.server'
-import { verifyLogin } from '~/models/user.server'
-import { deleteDeviceImage } from '~/utils/s3.server'
+import { deleteDevice } from '~/lib/devices-service.server'
+import { getUserDevice } from '~/models/device.server'
 import { getUserEmail, getUserId } from '~/utils/session.server'
 
 export async function loader({ request, params }: LoaderFunctionArgs) {
@@ -52,24 +51,30 @@ export async function action({ request, params }: ActionFunctionArgs) {
 	const userEmail = await getUserEmail(request)
 	invariant(typeof userEmail === 'string', 'email not found')
 
-	const user = await verifyLogin(userEmail, passwordDelete)
-	if (!user) {
+	const device = await getUserDevice({ id: deviceId, userId })
+	if (!device) return redirect('/profile/me')
+
+	const result = await deleteDevice(
+		{ id: userId, email: userEmail },
+		device,
+		passwordDelete,
+	)
+
+	if (result === 'forbidden') {
+		throw new Response('Forbidden', { status: 403 })
+	}
+	if (result === 'unauthorized') {
 		return data(
-			{ errors: { passwordDelete: 'Invalid password' } },
+			{ errors: { passwordDelete: 'Invalid password', integrationCleanup: false } },
 			{ status: 400 },
 		)
 	}
-
-	const device = await getDeviceWithoutSensors({ id: deviceId })
-	if (device?.image) {
-		try {
-			await deleteDeviceImage(device.image)
-		} catch (err) {
-			console.error('Failed to delete device image:', err)
-		}
+	if (result === 'integration-cleanup-failed') {
+		return data(
+			{ errors: { passwordDelete: null, integrationCleanup: true } },
+			{ status: 503 },
+		)
 	}
-
-	await deleteDevice({ id: deviceId })
 
 	return redirect('/profile/me')
 }
@@ -120,6 +125,12 @@ export default function DeviceDeletePage() {
 								</div>
 							)}
 						</div>
+
+						{actionData?.errors?.integrationCleanup && (
+							<p role="alert" className="text-sm text-red-600">
+								{t('integration_cleanup_failed')}
+							</p>
+						)}
 
 						<Button type="submit" variant="destructive" disabled={!password}>
 							{t('delete_device')}

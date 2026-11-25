@@ -272,8 +272,18 @@ async function del(request: Request, user: User, deviceId: string) {
 	try {
 		const deleted = await deleteDevice(user, device, body.password)
 
+		if (deleted === 'forbidden')
+			return StandardResponse.forbidden(
+				'Only the device owner can delete this device',
+			)
 		if (deleted === 'unauthorized')
 			return StandardResponse.unauthorized('Password incorrect')
+		if (deleted === 'integration-cleanup-failed')
+			return StandardResponse.errorResponse(
+				'Service Unavailable',
+				'Could not remove device integrations. Please try deleting the device again later.',
+				503,
+			)
 
 		return StandardResponse.ok(null)
 	} catch (err) {

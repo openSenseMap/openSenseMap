@@ -1,5 +1,6 @@
 {
     "delete_device": "Delete device",
     "confirm_permanent_deletion": "This will permanently delete <b>{{device}}</b> and all associated data. Please confirm with your password.",
-    "password": "Password"
+    "password": "Password",
+    "integration_cleanup_failed": "Could not remove device integrations. Please try deleting the device again later."
 }
