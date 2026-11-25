@@ -6,6 +6,9 @@ running as a public beta at
 
 <img width="1510" height="858" alt="Screenshot OSeM" src="https://github.com/user-attachments/assets/70da4cff-1751-4a13-89e8-607a5198df37">
 
+![](https://status.opensensemap.org/api/badge/2/uptime?style=for-the-badge)
+![](https://status.opensensemap.org/api/badge/13/uptime?labelPrefix=Staging+&style=for-the-badge)
+
 ## Project setup
 
 If you do need to set the project up locally yourself, feel free to follow these
@@ -37,7 +40,7 @@ above. Elevation lookup additionally requires a GPXZ API key.
 
 ### Setup Steps
 
-1. Clone the repo: `git clone https://github.com/openSenseMap/frontend`
+1. Clone the repo: `git clone https://github.com/openSenseMap/openSenseMap`
 2. Copy `.env.example` into `.env`
 3. Activate the Node.js version listed in [.node-version](./.node-version) with
    your preferred version manager
@@ -109,6 +112,16 @@ Afterwards follow these steps:
 4. Push to the branch (`git push origin feat/my-new-feature`)
 5. Create a new pull request against this repository's `dev` branch, linking
    your issue.
+
+#### Phenomenon metadata
+
+Sensor records and device schemas may include `sensorWikiType` (sensor type
+metadata), `sensorWikiPhenomenon` (canonical phenomenon ID), and
+`sensorWikiUnit` (canonical unit ID). Despite their historical names, new-device
+matching can fill the latter two from the bundled
+[phenomenon catalog](./app/lib/sensor-wiki/aliases.json) (see its
+[contribution guide](./app/lib/sensor-wiki/PHENOMENON_CATALOG.md)), and Explore
+uses the same catalog for filtering.
 
 #### How the repository is organized
 

@@ -1,100 +1,23 @@
-type SensorLike = {
-	id: string
-	title?: string
-	sensorType?: string
-}
-
-const luftdatenMatchings: Record<string, string[]> = {
-	p0: ['pm01', 'pm0', 'p1.0', 'p0'],
-	p01: ['pm0.1', 'p0.1'],
-	p03: ['pm0.3', 'pm03', 'p0.3', 'p03'],
-	p05: ['pm0.5', 'pm05', 'p0.5', 'p05'],
-	p1: ['pm10', 'p10', 'p1'],
-	p2: ['pm2.5', 'pm25', 'p2.5', 'p25', 'p2'],
-	p4: ['pm4', 'p4'],
-	p5: ['pm5', 'p5'],
-	n1: ['nc1.0', 'nc1', 'n1.0', 'n1'],
-	n01: ['nc0.1', 'n0.1', 'nc01', 'n01'],
-	n03: ['nc0.3', 'n0.3', 'nc03', 'n03'],
-	n05: ['nc0.5', 'n0.5', 'nc05', 'n05'],
-	n4: ['nc4.0', 'n4.0', 'nc4', 'n4'],
-	n5: ['nc5', 'n5'],
-	n10: ['nc10', 'n10'],
-	n25: ['nc2.5', 'n2.5'],
-	co2: ['co2', 'carbon_dioxide', 'kohlendioxid', 'kohlenstoffdioxid'],
-	co2_ppm: ['co2', 'carbon_dioxide', 'kohlendioxid', 'kohlenstoffdioxid'],
-	temperature: ['temperatur'],
-	humidity: ['rel. luftfeuchte', 'luftfeuchtigkeit', 'luftfeuchte'],
-	pressure: ['luftdruck', 'druck'],
-	signal: ['stärke', 'signal'],
-	noise_laeq: ['schallpegel', 'geräuschpegel'],
-}
-
-function findLuftdatenSensorId(
-	sensors: SensorLike[],
-	value_type: string,
-): string | undefined {
-	if (!value_type) return undefined
-
-	// split at first underscore into sensor type + phenomenon
-	const lower = value_type.toLowerCase()
-	const splitAtIndex = lower.indexOf('_')
-
-	let vt_sensortype = ''
-	let vt_phenomenon = ''
-
-	if (splitAtIndex > 0) {
-		vt_sensortype = lower.slice(0, splitAtIndex)
-		vt_phenomenon = lower.slice(splitAtIndex + 1)
-	} else {
-		const parts = lower.split('_')
-		vt_sensortype = parts[0] ?? ''
-		vt_phenomenon = parts[1] ?? ''
-	}
-
-	// special cases
-	// DHT11/DHT22: no underscore prefix for temperature/humidity
-	if (
-		!vt_phenomenon &&
-		(vt_sensortype === 'temperature' || vt_sensortype === 'humidity')
-	) {
-		vt_phenomenon = vt_sensortype
-		vt_sensortype = 'dht'
-	} else if (!vt_phenomenon && vt_sensortype === 'signal') {
-		vt_phenomenon = vt_sensortype
-		vt_sensortype = 'wifi'
-	}
-
-	if (!luftdatenMatchings[vt_phenomenon]) return undefined
-
-	for (const sensor of sensors) {
-		if (!sensor?.id) continue
-		if (!sensor.title) continue
-
-		const title = sensor.title.toLowerCase()
-
-		if (sensor.sensorType) {
-			const type = sensor.sensorType.toLowerCase()
-			if (!type.startsWith(vt_sensortype)) continue
-		}
-
-		const aliases = luftdatenMatchings[vt_phenomenon]
-		const titleMatches =
-			title === vt_phenomenon ||
-			aliases.includes(title) ||
-			aliases.some((alias) => title.includes(alias))
-
-		if (titleMatches) return sensor.id
-	}
-
-	return undefined
-}
+import {
+	findUniqueSensorIdByTitle,
+	type SensorLike,
+} from '~/services/decoders/legacy-title-matcher'
+import { decodeLuftdatenMeasurements } from '~/services/decoders/luftdaten-decoder.server'
+import { type SensorDefinitionId } from '~/lib/sensor-definitions'
+import { getSensorDefinitionId } from '~/lib/sensor-routing'
 
 const hackairMatchings: Record<string, string[]> = {
 	pm10: ['pm10', 'p10', 'p1'],
 	pm25: ['pm2.5', 'pm25', 'p2.5', 'p25', 'p2'],
 	temperature: ['temperatur'],
 	humidity: ['rel. luftfeuchte', 'luftfeuchtigkeit', 'luftfeuchte'],
+}
+
+const hackairDefinitionMappings: Partial<
+	Record<SensorDefinitionId, readonly string[]>
+> = {
+	sds011_pm10: ['pm10'],
+	sds011_pm25: ['pm25'],
 }
 
 function findHackairSensorId(
@@ -106,24 +29,34 @@ function findHackairSensorId(
 	// Old behavior: use first token before underscore, remove dots
 	const [vt_sensortype] = readingKey.toLowerCase().replace('.', '').split('_')
 
-	if (!hackairMatchings[vt_sensortype]) return undefined
+	if (!Object.hasOwn(hackairMatchings, vt_sensortype)) return undefined
+	const aliases = hackairMatchings[vt_sensortype]
 
-	for (const sensor of sensors) {
-		if (!sensor?.id) continue
-		if (!sensor.title) continue
-
-		const title = sensor.title.toLowerCase()
-		const aliases = hackairMatchings[vt_sensortype]
-
-		const titleMatches =
-			title === vt_sensortype ||
-			aliases.includes(title) ||
-			aliases.some((alias) => title.includes(alias))
-
-		if (titleMatches) return sensor.id
+	const definitionMatches = sensors.filter((sensor) => {
+		const definitionId = getSensorDefinitionId(sensor.data)
+		return definitionId
+			? hackairDefinitionMappings[definitionId]?.includes(vt_sensortype)
+			: false
+	})
+	if (definitionMatches.length > 1) {
+		console.warn(
+			`Ambiguous hackAIR sensor definition mapping for key ${readingKey}`,
+		)
+		return undefined
 	}
+	if (definitionMatches.length === 1) return definitionMatches[0].id
 
-	return undefined
+	const legacySensors = sensors.filter((sensor) => {
+		const definitionId = getSensorDefinitionId(sensor.data)
+		return !definitionId || !hackairDefinitionMappings[definitionId]
+	})
+
+	return findUniqueSensorIdByTitle(
+		legacySensors,
+		[vt_sensortype, ...aliases],
+		aliases,
+		`Ambiguous hackAIR sensor mapping for key ${readingKey}`,
+	)
 }
 
 function parseLocation(
@@ -192,7 +125,7 @@ const decodeHandlers: {
 	[key: string]: { decodeMessage: (data: any, options: any) => any[] }
 } = {
 	'application/json': {
-		decodeMessage: (body: any, {}: { sensors: any[] }) => {
+		decodeMessage: (body: any) => {
 			if (Array.isArray(body)) {
 				return body.map((measurement) => ({
 					sensor_id: measurement.sensor_id ?? measurement.sensor,
@@ -228,7 +161,7 @@ const decodeHandlers: {
 	},
 
 	'text/csv': {
-		decodeMessage: (body: string, {}: { sensors: any[] }) => {
+		decodeMessage: (body: string) => {
 			const lines = body.trim().split('\n')
 			return lines.map((line) => {
 				const parts = line.split(',').map((part) => part.trim())
@@ -256,37 +189,7 @@ const decodeHandlers: {
 	},
 
 	luftdaten: {
-		decodeMessage: (body: any, { sensors }: { sensors: any[] }) => {
-			if (!body)
-				throw new Error('Cannot decode empty message (luftdaten decoder)')
-			if (!sensors) throw new Error('luftdaten handler needs sensors')
-			if (!body.sensordatavalues || !Array.isArray(body.sensordatavalues)) {
-				throw new Error('Invalid luftdaten json. Missing `sensordatavalues`')
-			}
-
-			const out = body.sensordatavalues
-				.map((sdv: any) => {
-					const sensor_id = findLuftdatenSensorId(sensors, sdv.value_type)
-					if (!sensor_id) return null
-
-					const value = parseFloat(sdv.value)
-					if (Number.isNaN(value)) return null
-
-					return {
-						sensor_id,
-						value,
-						createdAt: new Date(),
-						location: null,
-					}
-				})
-				.filter(Boolean) as any[]
-
-			if (out.length === 0) {
-				throw new Error('No applicable values found')
-			}
-
-			return out
-		},
+		decodeMessage: decodeLuftdatenMeasurements,
 	},
 
 	hackair: {

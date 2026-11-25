@@ -11,7 +11,8 @@ import {
 import { verifyLogin } from '~/db/models/user.server'
 import { type Device, type User } from '~/db/schema'
 import { uploadedDeviceSchemaV1 } from '~/lib/device-schemas/device-schema-v1'
-import { deleteDeviceImage } from '~/lib/s3.server'
+import { UiDeviceModelZodEnum } from '~/lib/device-enums'
+import { getSensorTemplateValidationError } from '~/lib/model-definitions'
 
 export const CreateDeviceServiceSchema = z
 	.object({
@@ -32,16 +33,7 @@ export const CreateDeviceServiceSchema = z
 		heightAboveGround: z.number().optional().nullable(),
 		terrainElevation: z.number().optional().nullable(),
 		terrainElevationDataset: z.string().optional().nullable(),
-		model: z
-			.enum([
-				'homeV2Lora',
-				'homeV2Ethernet',
-				'homeV2Wifi',
-				'senseBox:Edu',
-				'luftdaten.info',
-				'custom',
-			])
-			.optional(),
+		model: UiDeviceModelZodEnum.optional(),
 		sensorTemplates: z.array(z.string()).optional(),
 		sensors: z
 			.array(
@@ -50,15 +42,39 @@ export const CreateDeviceServiceSchema = z
 					unit: z.string().min(1, 'Sensor unit is required'),
 					sensorType: z.string().min(1, 'Sensor type is required'),
 					icon: z.string().optional(),
+					sensorWikiType: z.string().optional(),
+					sensorWikiPhenomenon: z.string().optional(),
+					sensorWikiUnit: z.string().optional(),
 				}),
 			)
 			.optional(),
 		deviceSchema: uploadedDeviceSchemaV1.optional(),
 		deviceSchemaVersionId: z.string().optional(),
 	})
-	.refine((data) => !(data.model && data.sensors && data.model !== 'custom'), {
-		message: 'Model and sensors cannot be specified at the same time.',
-		path: ['sensors'],
+	.refine(
+		(data) =>
+			!(
+				data.model &&
+				(data.sensors?.length ?? 0) > 0 &&
+				data.model !== 'custom'
+			),
+		{
+			message: 'Model and sensors cannot be specified at the same time.',
+			path: ['sensors'],
+		},
+	)
+	.superRefine((data, ctx) => {
+		const message = getSensorTemplateValidationError(
+			data.model,
+			data.sensorTemplates,
+		)
+		if (message) {
+			ctx.addIssue({
+				code: 'custom',
+				path: ['sensorTemplates'],
+				message,
+			})
+		}
 	})
 
 export type CreateDeviceServiceInput = z.infer<typeof CreateDeviceServiceSchema>
@@ -242,14 +258,7 @@ export const deleteDevice = async (
 	const verifiedUser = await verifyLogin(user.email, password)
 	if (verifiedUser === null) return 'unauthorized'
 
-	if (device.image) {
-		try {
-			await deleteDeviceImage(device.image)
-		} catch (e) {
-			console.error('Failed to delete device image:', e)
-		}
-	}
-	return (await deleteDeviceById({ id: device.id })).count > 0
+	return deleteDeviceById({ id: device.id })
 }
 
 type TagsRow = {

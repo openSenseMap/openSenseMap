@@ -1,16 +1,22 @@
 import { addDays } from 'date-fns'
-import { redirect, useLoaderData } from 'react-router'
+import { redirect } from 'react-router'
 import { type Route } from './+types/explore.$deviceId.$sensorId.$'
 import Graph from '~/components/device-detail/graph'
 import MobileBoxView from '~/components/map/layers/mobile/mobile-box-view'
-import { getDevice } from '~/db/models/device.server'
-import { getMeasurement } from '~/db/models/measurement.query.server'
+import { getDeviceExposure } from '~/db/models/device.server'
+import {
+	getChartMeasurement,
+	MAX_CHART_MEASUREMENTS_PER_SENSOR,
+} from '~/db/models/measurement.query.server'
 import { getSensor } from '~/db/models/sensor.server'
 import { type SensorWithMeasurementData } from '~/db/schema'
 import {
 	categorizeIntoTrips,
 	type LocationPoint,
 } from '~/lib/mobile-box-helper'
+import { shouldRevalidateExceptRootPreferences } from '~/lib/root-preference-revalidation'
+
+export { shouldRevalidateExceptRootPreferences as shouldRevalidate }
 
 interface SensorWithColor extends SensorWithMeasurementData {
 	color: string
@@ -24,7 +30,7 @@ export async function loader({ params, request }: Route.LoaderArgs) {
 		return redirect('/explore')
 	}
 
-	const device = await getDevice({ id: deviceId })
+	const device = await getDeviceExposure({ id: deviceId })
 
 	if (!device) {
 		return redirect('/explore')
@@ -40,15 +46,48 @@ export async function loader({ params, request }: Route.LoaderArgs) {
 	}
 
 	const sensor1 = (await getSensor(sensorId)) as SensorWithColor
-	const sensor1Data = await getMeasurement(
+	const sensor1Data = await getChartMeasurement(
 		sensorId,
 		aggregation,
 		startDate ? new Date(startDate) : undefined,
 		endDate ? addDays(new Date(endDate), 1) : undefined,
 	)
+	let sensor2: SensorWithColor | null = null
+	let sensor2Data: Awaited<ReturnType<typeof getChartMeasurement>> | null = null
+
+	if (sensorId2) {
+		sensor2 = (await getSensor(sensorId2)) as SensorWithColor
+		sensor2Data = await getChartMeasurement(
+			sensorId2,
+			aggregation,
+			startDate ? new Date(startDate) : undefined,
+			endDate ? addDays(new Date(endDate), 1) : undefined,
+		)
+	}
+
+	const limitExceeded =
+		sensor1Data.length > MAX_CHART_MEASUREMENTS_PER_SENSOR ||
+		(sensor2Data?.length ?? 0) > MAX_CHART_MEASUREMENTS_PER_SENSOR
+	const showingLatestOnly =
+		limitExceeded && aggregation === 'raw' && !startDate && !endDate
+
+	// A selected range must never show a partial chart as though it were complete.
+	if (limitExceeded && !showingLatestOnly) {
+		sensor1.data = []
+		if (sensor2) sensor2.data = []
+		return {
+			device,
+			sensors: sensor2 ? [sensor1, sensor2] : [sensor1],
+			startDate,
+			endDate,
+			aggregation,
+			limitExceeded,
+			showingLatestOnly,
+		}
+	}
 
 	const normalizedSensor1Data = (
-		sensor1Data as {
+		sensor1Data.slice(0, MAX_CHART_MEASUREMENTS_PER_SENSOR) as {
 			sensorId: string
 			locationId: bigint | null
 			time: Date
@@ -119,19 +158,9 @@ export async function loader({ params, request }: Route.LoaderArgs) {
 		sensor1.color = sensor1.color || '#8da0cb'
 	}
 
-	let sensor2: SensorWithColor | null = null
-
-	if (sensorId2) {
-		sensor2 = (await getSensor(sensorId2)) as SensorWithColor
-		const sensor2Data = await getMeasurement(
-			sensorId2,
-			aggregation,
-			startDate ? new Date(startDate) : undefined,
-			endDate ? addDays(new Date(endDate), 1) : undefined,
-		)
-
+	if (sensor2 && sensor2Data) {
 		const normalizedSensor2Data = (
-			sensor2Data as {
+			sensor2Data.slice(0, MAX_CHART_MEASUREMENTS_PER_SENSOR) as {
 				sensorId: string
 				locationId: bigint | null
 				time: Date
@@ -207,12 +236,12 @@ export async function loader({ params, request }: Route.LoaderArgs) {
 		startDate,
 		endDate,
 		aggregation,
+		limitExceeded,
+		showingLatestOnly,
 	}
 }
 
-export default function SensorView() {
-	const loaderData = useLoaderData<typeof loader>()
-
+export default function SensorView({ loaderData }: Route.ComponentProps) {
 	return (
 		<>
 			<Graph
@@ -220,10 +249,13 @@ export default function SensorView() {
 				sensors={loaderData.sensors}
 				startDate={loaderData.startDate ?? undefined}
 				endDate={loaderData.endDate ?? undefined}
+				limitExceeded={loaderData.limitExceeded}
+				showingLatestOnly={loaderData.showingLatestOnly}
 			/>
-			{loaderData.device?.exposure === 'mobile' && (
-				<MobileBoxView sensors={loaderData.sensors} />
-			)}
+			{loaderData.device?.exposure === 'mobile' &&
+				(!loaderData.limitExceeded || loaderData.showingLatestOnly) && (
+					<MobileBoxView sensors={loaderData.sensors} />
+				)}
 		</>
 	)
 }

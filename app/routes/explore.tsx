@@ -13,9 +13,9 @@ import {
 	useOutlet,
 	useNavigate,
 	useSearchParams,
-	useLoaderData,
 	useParams,
 	useLocation,
+	useNavigation,
 } from 'react-router'
 import { type Route } from './+types/explore'
 import Map from '~/components/map'
@@ -27,7 +27,7 @@ import {
 	getUserDeviceLocations,
 } from '~/db/models/device.server'
 import { getMeasurement } from '~/db/models/measurement.query.server'
-import { getProfileByUserId } from '~/db/models/profile.server'
+import { getProfileMapPreferencesByUserId } from '~/db/models/profile.server'
 import { getSensors } from '~/db/models/sensor.server'
 import { type Device } from '~/db/schema'
 import { getCSV, getJSON, getTXT } from '~/lib/file-exports'
@@ -59,10 +59,17 @@ import {
 	type ClusterFeature,
 } from '~/components/cluster-marker'
 import MapHeader from '~/components/map/topbar'
-import { getMeasurementsCount } from '~/db/models/measurement.server'
+import { DeviceDetailPending } from '~/components/device-detail/device-detail-pending'
+import Spinner from '~/components/spinner'
 import { getTags } from '~/services/device-service.server'
 import { getPhenomena } from '~/db/models/phenomena.server'
 import { DOWNLOAD_FILTER_KEYS } from '~/components/header/download'
+import { sensorMatchesAnyPhenomenonFilter } from '~/lib/phenomenon-filter'
+import { sensorWikiAliasEntries } from '~/lib/sensor-wiki/alias-catalog'
+import { getExplorePendingUi } from '~/lib/explore-pending-navigation'
+import { getApproximateMeasurementCount } from '~/services/statistics-service.server'
+
+export { shouldRevalidate } from '~/lib/explore-revalidation'
 
 const INITIAL_VIEW_STATE = {
 	zoom: 2,
@@ -75,6 +82,8 @@ const MAX_MY_AREA_LONGITUDE_SPAN = 60
 const DEVICE_SOURCE_ID = 'osem-devices'
 const DEVICE_CLUSTER_LAYER_ID = 'devices-clusters-layer'
 const MIN_CLUSTER_SIZE = 5
+// Keep full-screen 5K and high-DPI maps above MapLibre's 4096px downscaling threshold.
+const EXPLORE_MAX_CANVAS_SIZE: [number, number] = [8192, 8192]
 
 type MyAreaTarget =
 	| {
@@ -191,9 +200,13 @@ function parseMapHash(hash: string) {
 	})
 }
 
-function getHomeView(
-	profile: Awaited<ReturnType<typeof getProfileByUserId>> | null,
-) {
+type HomeViewProfile = {
+	homeLatitude: number | null
+	homeLongitude: number | null
+	homeZoom: number | null
+}
+
+function getHomeView(profile: HomeViewProfile | null | undefined) {
 	if (!profile) return null
 
 	return getValidMapViewport({
@@ -290,20 +303,20 @@ export async function action({ request }: { request: Request }) {
 	const deviceIds = parseCsv(formdata.get('devices'))
 	const format = String(formdata.get('format') ?? 'csv')
 	const aggregate = String(formdata.get('aggregate') ?? 'raw')
+	const includeCoordinates =
+		aggregate === 'raw' && formdata.get('coordinates') === 'on'
 
 	const includeFields = {
 		title: formdata.get('title') === 'on',
 		unit: formdata.get('unit') === 'on',
 		value: formdata.get('value') === 'on',
 		timestamp: formdata.get('timestamp') === 'on',
+		coordinates: includeCoordinates,
 	}
 
 	const filterParams = getDownloadFilterParams(formdata)
 
-	const selectedPhenomena = parseCsv(formdata.get('phenomenon')).map(
-		(phenomenon) => phenomenon.toLowerCase(),
-	)
-
+	const selectedPhenomena = parseCsv(formdata.get('phenomenon'))
 	const measurementTimeRange =
 		getMeasurementTimeRangeFromSearchParams(filterParams)
 
@@ -326,7 +339,11 @@ export async function action({ request }: { request: Request }) {
 		const filteredSensors =
 			selectedPhenomena.length > 0
 				? sensors.filter((sensor) =>
-						selectedPhenomena.includes(sensor.title?.toLowerCase() ?? ''),
+						sensorMatchesAnyPhenomenonFilter(
+							sensor,
+							selectedPhenomena,
+							sensorWikiAliasEntries,
+						),
 					)
 				: sensors
 
@@ -435,7 +452,6 @@ export async function loader({ context, request }: Route.LoaderArgs) {
 	//* Get filter params
 	let locale = getLocale(context)
 	const url = new URL(request.url)
-	const filterParams = url.search
 	const urlFilterParams = new URLSearchParams(url.search)
 
 	const measurementTimeRange =
@@ -445,25 +461,27 @@ export async function loader({ context, request }: Route.LoaderArgs) {
 	const needsSensors =
 		Boolean(urlFilterParams.get('phenomenon')) || Boolean(measurementTimeRange)
 
-	const devices = needsSensors
-		? await getDevicesWithSensors({ measurementTimeRange })
-		: await getDevices('geojson')
-
-	const availableTags = await getTags()
-
-	const measurementCount = await getMeasurementsCount()
-
-	const session = await getUserSession(request)
+	const [devices, availableTags, measurementCount, session, user, phenomena] =
+		await Promise.all([
+			needsSensors
+				? getDevicesWithSensors({ measurementTimeRange })
+				: getDevices('geojson'),
+			getTags(),
+			getApproximateMeasurementCount(),
+			getUserSession(request),
+			getUser(request),
+			getPhenomena(),
+		])
 	const message = session.get('global_message') || null
-
-	var filteredDevices = getFilteredDevices(devices, urlFilterParams)
-
-	const user = await getUser(request)
-	const phenomena = await getPhenomena()
+	const filteredDeviceCount = getFilteredDevices(
+		devices,
+		urlFilterParams,
+		sensorWikiAliasEntries,
+	).features.length
 
 	if (user) {
 		const [profile, userDeviceLocations] = await Promise.all([
-			getProfileByUserId(user.id),
+			getProfileMapPreferencesByUserId(user.id),
 			getUserDeviceLocations(user.id),
 		])
 		const userLocale = user.language
@@ -475,11 +493,10 @@ export async function loader({ context, request }: Route.LoaderArgs) {
 			availableTags,
 			phenomena,
 			measurementCount,
+			filteredDeviceCount,
 			user,
 			profile,
 			userDeviceLocations,
-			filteredDevices,
-			filterParams,
 			locale: userLocale,
 		}
 	}
@@ -488,11 +505,10 @@ export async function loader({ context, request }: Route.LoaderArgs) {
 		availableTags,
 		phenomena,
 		measurementCount,
+		filteredDeviceCount,
 		user,
 		profile: null,
 		userDeviceLocations: [],
-		filterParams,
-		filteredDevices,
 		message,
 		locale,
 	}
@@ -504,17 +520,16 @@ if (process.env.NODE_ENV === 'production') {
 	currentDate = new Date(Date.now() - 1000 * 600)
 }
 
-export default function Explore() {
+export default function Explore({ loaderData }: Route.ComponentProps) {
 	// data from our loader
 	const {
 		devices,
 		availableTags,
-		filteredDevices,
 		measurementCount,
 		user,
 		profile,
 		userDeviceLocations,
-	} = useLoaderData<typeof loader>()
+	} = loaderData
 	const { t } = useTranslation()
 	const mapRef = useRef<MapRef | null>(null)
 	const appliedInitialMyAreaRef = useRef(false)
@@ -523,7 +538,29 @@ export default function Explore() {
 	const clusterZoomRef = useRef<number | null>(null)
 	const navigate = useNavigate()
 	const location = useLocation()
+	const navigation = useNavigation()
+	const mapFilterSearch = useMemo(() => {
+		const params = new URLSearchParams(location.search)
+		for (const key of ['aggregation', 'date_from', 'date_to']) {
+			params.delete(key)
+		}
+		return params.toString()
+	}, [location.search])
+	const filteredDevices = useMemo(
+		() =>
+			getFilteredDevices(
+				devices,
+				new URLSearchParams(mapFilterSearch),
+				sensorWikiAliasEntries,
+			),
+		[devices, mapFilterSearch],
+	)
 	const outlet = useOutlet()
+	const pendingUi = getExplorePendingUi({
+		navigationState: navigation.state,
+		currentLocation: location,
+		nextLocation: navigation.location,
+	})
 	const [selectedPheno, setSelectedPheno] = useState<any | undefined>(undefined)
 	const [searchParams] = useSearchParams()
 	const [filteredData, setFilteredData] = useState<
@@ -1024,7 +1061,7 @@ export default function Explore() {
 	useEffect(() => removeAllClusterMarkers, [removeAllClusterMarkers])
 
 	return (
-		<div className="h-full w-full">
+		<div className="relative h-full w-full" aria-busy={pendingUi.filters}>
 			<MapProvider>
 				<MapHeader
 					devices={filteredDevices}
@@ -1033,6 +1070,18 @@ export default function Explore() {
 					onMyAreaClick={() => focusMyArea(myAreaTarget)}
 					canFocusMyArea={Boolean(myAreaTarget)}
 				/>
+				{pendingUi.filters && (
+					<div
+						className="pointer-events-none absolute top-20 left-1/2 z-30 flex -translate-x-1/2 items-center gap-2 rounded-full bg-white/90 px-3 py-2 text-sm text-zinc-800 shadow-lg ring-1 ring-black/5 backdrop-blur-xs dark:bg-zinc-800/90 dark:text-zinc-200 dark:ring-white/10"
+						role="status"
+						aria-live="polite"
+					>
+						<div className="scale-50">
+							<Spinner />
+						</div>
+						<span>{t('updating_map_results')}</span>
+					</div>
+				)}
 				{/* <Header devices={devices} /> */}
 				{selectedPheno && (
 					<Legend
@@ -1042,6 +1091,7 @@ export default function Explore() {
 				)}
 
 				<Map
+					maxCanvasSize={EXPLORE_MAX_CANVAS_SIZE}
 					interactiveLayerIds={
 						selectedPheno
 							? ['phenomenon-layer']
@@ -1167,9 +1217,12 @@ export default function Explore() {
 						/>
 					)}
 
-					{outlet && (
+					{(pendingUi.deviceDetail ||
+						(outlet && !pendingUi.dismissDeviceDetail)) && (
 						<div className="pointer-events-none absolute inset-0 z-50">
-							<div className="pointer-events-auto h-full w-full">{outlet}</div>
+							<div className="pointer-events-auto h-full w-full">
+								{pendingUi.deviceDetail ? <DeviceDetailPending /> : outlet}
+							</div>
 						</div>
 					)}
 				</Map>

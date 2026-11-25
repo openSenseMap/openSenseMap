@@ -6,8 +6,6 @@ import {
 	Link,
 	data,
 	redirect,
-	useActionData,
-	useLoaderData,
 	useNavigation,
 	useSearchParams,
 } from 'react-router'
@@ -23,8 +21,8 @@ import {
 	CardHeader,
 	CardTitle,
 } from '~/components/ui/card'
-import { Input } from '~/components/ui/input'
 import { Label } from '~/components/ui/label'
+import { PasswordInput } from '~/components/ui/password-input'
 
 import { getUserId } from '~/services/session-service.server'
 import { resetPassword } from '~/services/user-service.server'
@@ -121,9 +119,10 @@ export async function action({ request }: Route.ActionArgs) {
 	}
 }
 
-export default function PasswordResetRoute() {
-	const { token } = useLoaderData() as LoaderData
-	const actionData = useActionData() as ActionData | undefined
+export default function PasswordResetRoute({
+	loaderData: { token },
+	actionData,
+}: Route.ComponentProps) {
 	const navigation = useNavigation()
 	const [searchParams] = useSearchParams()
 	const { t } = useTranslation('reset-password')
@@ -159,12 +158,12 @@ export default function PasswordResetRoute() {
 						</CardDescription>
 					</CardHeader>
 					<CardFooter className="flex flex-col gap-2">
-						<Link to="/explore/login" className="w-full">
+						<Link to="/explore/login" prefetch="intent" className="w-full">
 							<Button className="bg-light-blue w-full">
 								{t('back_to_login')}
 							</Button>
 						</Link>
-						<Link to="/explore/forgot" className="w-full">
+						<Link to="/explore/forgot" prefetch="intent" className="w-full">
 							<Button variant="outline" className="w-full">
 								{t('request_new_reset_link')}
 							</Button>
@@ -199,7 +198,7 @@ export default function PasswordResetRoute() {
 							{t('password_reset_success_title')}
 						</h2>
 						<p className="mb-6">{t('password_reset_success_description')}</p>
-						<Link to="/explore/login" className="block">
+						<Link to="/explore/login" prefetch="intent" className="block">
 							<Button className="bg-light-blue w-full">
 								{t('back_to_login')}
 							</Button>
@@ -233,11 +232,10 @@ export default function PasswordResetRoute() {
 
 							<div className="space-y-2">
 								<Label htmlFor="newPassword">{t('new_password_label')}</Label>
-								<Input
+								<PasswordInput
 									ref={newPasswordRef}
 									id="newPassword"
 									name="newPassword"
-									type="password"
 									autoComplete="new-password"
 									aria-invalid={
 										actionData?.errors?.newPassword ? true : undefined
@@ -258,10 +256,9 @@ export default function PasswordResetRoute() {
 								<Label htmlFor="confirmPassword">
 									{t('confirm_password_label')}
 								</Label>
-								<Input
+								<PasswordInput
 									id="confirmPassword"
 									name="confirmPassword"
-									type="password"
 									autoComplete="new-password"
 									aria-invalid={
 										actionData?.errors?.confirmPassword ? true : undefined
@@ -296,6 +293,7 @@ export default function PasswordResetRoute() {
 										pathname: '/explore/login',
 										search: searchParams.toString(),
 									}}
+									prefetch="intent"
 								>
 									{t('login_label')}
 								</Link>

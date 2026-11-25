@@ -1,5 +1,4 @@
 import { and, desc, eq, gt, gte, inArray, lt, lte, sql } from 'drizzle-orm'
-import { ArchivedDeviceError } from './device.server'
 import {
 	type LastMeasurement,
 	location,
@@ -10,6 +9,7 @@ import {
 	measurements1monthView,
 	measurements1yearView,
 	device,
+	sensor,
 } from '~/db/schema'
 import { drizzleClient } from '~/db.server'
 import {
@@ -236,25 +236,7 @@ export async function saveMeasurements(
 	})
 
 	await drizzleClient.transaction(async (tx) => {
-		const [currentDevice] = await tx
-			.select({
-				id: device.id,
-				archivedAt: device.archivedAt,
-			})
-			.from(device)
-			.where(eq(device.id, minimalDevice.id))
-			.limit(1)
-		timing?.mark('transactionDeviceLookup')
-
-		if (!currentDevice) {
-			const error = new Error('Device not found')
-			error.name = 'NotFoundError'
-			throw error
-		}
-
-		if (currentDevice.archivedAt) {
-			throw new ArchivedDeviceError(currentDevice.id)
-		}
+		timing?.mark('transactionStart')
 
 		const locations =
 			deviceLocationUpdates.length > 0
@@ -302,6 +284,33 @@ export async function deleteMeasurementsForSensor(sensorId: string) {
 	return await drizzleClient
 		.delete(measurement)
 		.where(eq(measurement.sensorId, sensorId))
+}
+
+export async function deleteMeasurementsForDevice(deviceId: string) {
+	return drizzleClient.transaction(async (tx) => {
+		// Lock device sensors to serialize against concurrent measurement uploads.
+		const deviceSensors = await tx
+			.select({ id: sensor.id })
+			.from(sensor)
+			.where(eq(sensor.deviceId, deviceId))
+			.orderBy(sensor.id)
+			.for('update')
+
+		const sensorIds = deviceSensors.map(({ id }) => id)
+
+		if (sensorIds.length === 0) return 0
+
+		const result = await tx
+			.delete(measurement)
+			.where(inArray(measurement.sensorId, sensorIds))
+
+		await tx
+			.update(sensor)
+			.set({ lastMeasurement: null })
+			.where(eq(sensor.deviceId, deviceId))
+
+		return result.count
+	})
 }
 
 export async function deleteSensorMeasurementsForTimes(

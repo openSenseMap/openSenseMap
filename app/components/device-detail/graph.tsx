@@ -12,7 +12,7 @@ import {
 	type ChartOptions,
 } from 'chart.js'
 import 'chartjs-adapter-date-fns'
-import { Download, RefreshCcw, X } from 'lucide-react'
+import { ChartLine, Download, RefreshCcw, X } from 'lucide-react'
 import {
 	useMemo,
 	useRef,
@@ -25,11 +25,17 @@ import {
 import { Line } from 'react-chartjs-2'
 import { isBrowser, isTablet } from 'react-device-detect'
 import Draggable, { type DraggableData } from 'react-draggable'
-import { useNavigate, useNavigation, useSearchParams } from 'react-router'
+import {
+	useLocation,
+	useNavigate,
+	useNavigation,
+	useSearchParams,
+} from 'react-router'
 import { AggregationFilter } from '../aggregation-filter'
 import { ClientOnly } from '../client-only'
 import { ColorPicker } from '../color-picker'
 import { DateRangeFilter } from '../daterange-filter'
+import { Alert, AlertDescription, AlertTitle } from '../ui/alert'
 import { HoveredPointContext } from '../map/layers/mobile/mobile-box-layer'
 import Spinner from '../spinner'
 import {
@@ -46,6 +52,7 @@ import {
 	type MeasurementChartData,
 	type MeasurementChartPoint,
 } from '~/lib/measurement-chart'
+import { getExplorePendingUi } from '~/lib/explore-pending-navigation'
 
 ChartJS.register(
 	LineElement,
@@ -126,6 +133,8 @@ interface GraphProps {
 	sensors: any[]
 	startDate?: string
 	endDate?: string
+	limitExceeded: boolean
+	showingLatestOnly: boolean
 }
 
 export default function Graph({
@@ -133,13 +142,22 @@ export default function Graph({
 	sensors,
 	startDate,
 	endDate,
+	limitExceeded,
+	showingLatestOnly,
 }: GraphProps) {
 	const { hoveredPoint, setHoveredPoint } = useContext(HoveredPointContext)
 	const navigation = useNavigation()
+	const location = useLocation()
+	const { graph: isGraphPending } = getExplorePendingUi({
+		navigationState: navigation.state,
+		currentLocation: location,
+		nextLocation: navigation.location,
+	})
 	const { t, i18n } = useTranslation('graph')
 	const navigate = useNavigate()
 	const [offsetPositionX, setOffsetPositionX] = useState(0)
 	const [offsetPositionY, setOffsetPositionY] = useState(0)
+	const [connectDots, setConnectDots] = useState(false)
 	const [currentZoom, setCurrentZoom] = useState<{
 		xMin: number
 		xMax: number
@@ -203,8 +221,17 @@ export default function Graph({
 		}
 
 		previousChartInputRef.current = { sensors, isAggregated }
-		setChartData(createMeasurementChartData(sensors, isAggregated))
-	}, [sensors, isAggregated])
+
+		const newChartData = createMeasurementChartData(sensors, isAggregated)
+
+		setChartData({
+			...newChartData,
+			datasets: newChartData.datasets.map((dataset) => ({
+				...dataset,
+				showLine: connectDots,
+			})),
+		})
+	}, [sensors, isAggregated, connectDots])
 
 	const options: ChartOptions<'line'> = useMemo(() => {
 		return {
@@ -403,6 +430,20 @@ export default function Graph({
 		}))
 	}
 
+	function handleConnectDotsClick() {
+		const nextConnectDots = !connectDots
+
+		setConnectDots(nextConnectDots)
+
+		setChartData((prevData) => ({
+			...prevData,
+			datasets: prevData.datasets.map((dataset) => ({
+				...dataset,
+				showLine: nextConnectDots,
+			})),
+		}))
+	}
+
 	function handlePngDownloadClick() {
 		if (chartRef.current) {
 			const imageString = chartRef.current.canvas.toDataURL('image/png', 1.0)
@@ -495,9 +536,14 @@ export default function Graph({
 					ref={nodeRef}
 					className="absolute top-14 right-4 bottom-6 left-4 z-40 flex flex-col gap-2 rounded-xl bg-white px-4 pt-2 text-sm font-medium text-zinc-800 shadow-lg ring-1 shadow-zinc-800/5 ring-zinc-900/5 md:top-auto md:right-4 md:bottom-7.5 md:left-auto md:h-[35%] md:max-h-[35%] md:w-[60vw] dark:bg-zinc-800 dark:text-zinc-200 dark:opacity-95 dark:ring-white dark:backdrop-blur-xs"
 				>
-					{navigation.state === 'loading' && (
-						<div className="absolute inset-0 z-50 flex items-center justify-center bg-gray-100/30 backdrop-blur-[1.5px]">
+					{isGraphPending && (
+						<div
+							className="absolute inset-0 z-50 flex items-center justify-center bg-gray-100/30 backdrop-blur-[1.5px]"
+							role="status"
+							aria-live="polite"
+						>
 							<Spinner />
+							<span className="sr-only">{t('loading_graph')}</span>
 						</div>
 					)}
 					<div
@@ -509,6 +555,26 @@ export default function Graph({
 							<AggregationFilter />
 						</div>
 						<div className="flex h-full items-start justify-end gap-4 py-2">
+							<Tooltip>
+								<TooltipTrigger asChild>
+									<button
+										type="button"
+										onClick={handleConnectDotsClick}
+										aria-pressed={connectDots}
+										className={`cursor-pointer rounded p-1 ${
+											connectDots ? 'bg-zinc-200 dark:bg-zinc-700' : ''
+										}`}
+									>
+										<ChartLine />
+									</button>
+								</TooltipTrigger>
+
+								<TooltipContent>
+									<p>
+										{connectDots ? t('disconnect_points') : t('connect_points')}
+									</p>
+								</TooltipContent>
+							</Tooltip>
 							{currentZoom !== null &&
 								currentZoom.xMax !== 0 &&
 								currentZoom.xMin !== 0 && (
@@ -524,21 +590,24 @@ export default function Graph({
 										</TooltipContent>
 									</Tooltip>
 								)}
-							<DropdownMenu>
-								<DropdownMenuTrigger>
-									<Download />
-								</DropdownMenuTrigger>
-								<DropdownMenuContent>
-									<DropdownMenuItem onClick={handlePngDownloadClick}>
-										PNG
-									</DropdownMenuItem>
-									{sensors.length < 2 && (
-										<DropdownMenuItem onClick={handleCsvDownloadClick}>
-											CSV
+
+							{(!limitExceeded || showingLatestOnly) && (
+								<DropdownMenu>
+									<DropdownMenuTrigger>
+										<Download />
+									</DropdownMenuTrigger>
+									<DropdownMenuContent>
+										<DropdownMenuItem onClick={handlePngDownloadClick}>
+											PNG
 										</DropdownMenuItem>
-									)}
-								</DropdownMenuContent>
-							</DropdownMenu>
+										{sensors.length < 2 && (
+											<DropdownMenuItem onClick={handleCsvDownloadClick}>
+												CSV
+											</DropdownMenuItem>
+										)}
+									</DropdownMenuContent>
+								</DropdownMenu>
+							)}
 							<X
 								className="cursor-pointer"
 								onClick={() => {
@@ -554,9 +623,24 @@ export default function Graph({
 							/>
 						</div>
 					</div>
+					{showingLatestOnly && (
+						<p
+							role="status"
+							className="px-2 text-sm text-amber-800 dark:text-amber-300"
+						>
+							{t('showing_latest_only')}
+						</p>
+					)}
 					<div className="flex min-h-0 w-full flex-1 items-center justify-center">
-						{(sensors[0].data.length === 0 && sensors[1] === undefined) ||
-						(sensors[0].data.length === 0 && sensors[1].data.length === 0) ? (
+						{limitExceeded && !showingLatestOnly ? (
+							<Alert variant="warning" className="max-w-xl">
+								<AlertTitle>{t('limit_exceeded_title')}</AlertTitle>
+								<AlertDescription>
+									{t('limit_exceeded_description')}
+								</AlertDescription>
+							</Alert>
+						) : (sensors[0].data.length === 0 && sensors[1] === undefined) ||
+						  (sensors[0].data.length === 0 && sensors[1].data.length === 0) ? (
 							<div>{t('no_data_in_range')}</div>
 						) : (
 							<ClientOnly fallback={<Spinner />}>

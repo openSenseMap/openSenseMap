@@ -105,11 +105,11 @@ export const NewUserEmail = ({
 					<Text>
 						{intl.formatMessage({ id: 'support' })} {}
 						<Link
-							href={`mailto:support@opensensemap.org?Subject=Nutzer%20Registrierung%20${encodeURIComponent(
+							href={`mailto:info@opensensemap.org?Subject=Nutzer%20Registrierung%20${encodeURIComponent(
 								email,
 							)}`}
 						>
-							support@opensensemap.org
+							info@opensensemap.org
 						</Link>
 					</Text>
 					<Text>{intl.formatMessage({ id: 'salutation' })}</Text>

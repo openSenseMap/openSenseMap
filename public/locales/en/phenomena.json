@@ -1,0 +1,22 @@
+{
+	"air_temperature": "Air temperature",
+	"ambient_light": "Ambient light",
+	"barometric_pressure": "Barometric pressure",
+	"co2": "CO2",
+	"humidity": "Humidity",
+	"pm10": "PM10",
+	"pm10_concentration": "PM10 concentration",
+	"pm25": "PM2.5",
+	"precipitation": "Precipitation",
+	"relative_humidity": "Relative humidity",
+	"soil_moisture": "Soil moisture",
+	"sound_level": "Sound level",
+	"temperature": "Temperature",
+	"ultraviolet_a_light": "Ultraviolet A light",
+	"volatile_organic_compound_voc": "Volatile organic compound (VOC)",
+	"voltage": "Voltage",
+	"water_level": "Water level",
+	"water_temperature": "Water temperature",
+	"wind_direction": "Wind direction",
+	"wind_speed": "Wind speed"
+}

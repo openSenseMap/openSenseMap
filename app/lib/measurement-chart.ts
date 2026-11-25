@@ -1,4 +1,4 @@
-import type { ChartData, ChartDataset, Point } from 'chart.js'
+import { type ChartData, type ChartDataset, type Point } from 'chart.js'
 
 export interface MeasurementChartPoint extends Point {
 	x: number
@@ -42,7 +42,7 @@ export type MeasurementChartDataset = ChartDataset<
 	label: string
 	data: MeasurementChartPoint[]
 	pointRadius: number
-	showLine: false
+	showLine: boolean
 	borderColor: string
 	backgroundColor: string
 	yAxisID: string
@@ -71,22 +71,41 @@ function toNumericValue(value: unknown) {
 	return Number.isFinite(numericValue) ? numericValue : null
 }
 
+// Moves the decimal point through the number's string form, so 1.005 becomes
+// exactly 100.5 (1.005 * 100 is 100.49999999999999 in floating point).
+function shiftDecimals(value: number, places: number) {
+	const [mantissa, exponent = '0'] = String(value).split('e')
+	return Number(`${mantissa}e${Number(exponent) + places}`)
+}
+
+// Aggregated averages come back with many decimals; two are enough to display.
+function roundToTwoDecimals(value: number | null) {
+	return value === null
+		? null
+		: shiftDecimals(Math.round(shiftDecimals(value, 2)), -2)
+}
+
 // Filters once so that value/min/max series stay index-aligned.
 function normalizeMeasurements(
 	measurements: MeasurementChartMeasurement[],
+	isAggregated: boolean,
 ): NormalizedMeasurement[] {
+	const round = isAggregated
+		? roundToTwoDecimals
+		: (value: number | null) => value
+
 	return measurements
 		.map((measurement): NormalizedMeasurement | null => {
 			const timestamp = toTimestamp(measurement.time)
-			const value = toNumericValue(measurement.value)
+			const value = round(toNumericValue(measurement.value))
 
 			if (timestamp === null || value === null) return null
 
 			return {
 				timestamp,
 				value,
-				minValue: toNumericValue(measurement.min_value),
-				maxValue: toNumericValue(measurement.max_value),
+				minValue: round(toNumericValue(measurement.min_value)),
+				maxValue: round(toNumericValue(measurement.max_value)),
 				locationId: measurement.locationId ?? null,
 			}
 		})
@@ -125,7 +144,10 @@ export function createMeasurementChartData(
 			const label = includeDeviceName
 				? `${sensor.title} (${sensor.device_name})`
 				: sensor.title
-			const normalizedMeasurements = normalizeMeasurements(sensor.data)
+			const normalizedMeasurements = normalizeMeasurements(
+				sensor.data,
+				isAggregated,
+			)
 			const createBaseDataset = (
 				measurements: NormalizedMeasurement[],
 			): MeasurementChartDataset => ({

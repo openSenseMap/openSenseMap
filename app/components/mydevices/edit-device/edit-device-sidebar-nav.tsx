@@ -29,6 +29,7 @@ export function EditDeviceSidebarNav({
 				<Link
 					key={item.href}
 					to={item.href}
+					prefetch="intent"
 					className={cn(
 						buttonVariants({ variant: 'ghost' }),
 						pathname === item.href

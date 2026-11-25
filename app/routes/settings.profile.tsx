@@ -1,7 +1,7 @@
 import { CopyIcon, CopyCheckIcon, InfoIcon } from 'lucide-react'
 import { useCallback, useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Form, Link, Outlet, useActionData, useLoaderData } from 'react-router'
+import { Form, Link, Outlet } from 'react-router'
 import { type Route } from './+types/settings.profile'
 
 import { Avatar, AvatarFallback, AvatarImage } from '~/components/ui/avatar'
@@ -29,7 +29,10 @@ import {
 	getOwnedDeviceSchemasWithVersions,
 	updateDeviceSchemaVisibility,
 } from '~/db/models/device-schema.server'
-import { getProfileByUserId, updateProfile } from '~/db/models/profile.server'
+import {
+	getSettingsProfileByUserId,
+	updateProfile,
+} from '~/db/models/profile.server'
 import { getUserById } from '~/db/models/user.server'
 import { useCopyToClipboard } from '~/hooks/use-copy-to-clipboard'
 import {
@@ -37,15 +40,19 @@ import {
 	useAutosaveFetcher,
 } from '~/hooks/use-autosave-fetcher'
 import { getInitials } from '~/lib/strings'
+import { shouldRevalidateExceptRootPreferences } from '~/lib/root-preference-revalidation'
 import { requireUserId } from '~/services/session-service.server'
 import { AutosaveStatusText } from '~/components/autosave-status.text'
+import { UnsavedChangesBlocker } from '~/components/unsaved-changes-blocker'
+
+export { shouldRevalidateExceptRootPreferences as shouldRevalidate }
 
 export async function loader({ request }: Route.LoaderArgs) {
 	const userId = await requireUserId(request)
 
 	const [user, profile, deviceSchemas] = await Promise.all([
 		getUserById(userId),
-		getProfileByUserId(userId),
+		getSettingsProfileByUserId(userId),
 		getOwnedDeviceSchemasWithVersions(userId),
 	])
 
@@ -125,7 +132,7 @@ export async function action({
 	request,
 }: Route.ActionArgs): Promise<SettingsProfileActionData> {
 	const userId = await requireUserId(request)
-	const profile = await getProfileByUserId(userId)
+	const profile = await getSettingsProfileByUserId(userId)
 
 	if (!profile || !userId) {
 		return {
@@ -252,10 +259,10 @@ type ProfileAutosaveValues = {
 	isPublic: boolean
 }
 
-export default function EditUserProfilePage() {
-	const data = useLoaderData<typeof loader>()
-	const actionData = useActionData<typeof action>()
-
+export default function EditUserProfilePage({
+	loaderData: data,
+	actionData,
+}: Route.ComponentProps) {
 	const [displayName, setDisplayName] = useState(data.profile.displayName)
 	const [isPublic, setIsPublic] = useState(data.profile.public ?? false)
 
@@ -359,7 +366,7 @@ export default function EditUserProfilePage() {
 	}, [data.profile.displayName, data.profile.public, autosave.resetLastSaved])
 
 	const handlePublicChange = useCallback(
-		(checked: boolean) => {
+		async (checked: boolean) => {
 			setIsPublic(checked)
 
 			const nextValues = {
@@ -368,7 +375,7 @@ export default function EditUserProfilePage() {
 			}
 
 			if (validateAutosave(nextValues)) {
-				autosave.submit(nextValues)
+				await autosave.submit(nextValues)
 			}
 		},
 		[autosave, displayName, validateAutosave],
@@ -398,6 +405,7 @@ export default function EditUserProfilePage() {
 
 	return (
 		<div className="space-y-6">
+			<UnsavedChangesBlocker autosaveState={autosave.navigationState} />
 			<Card className="space-y-6">
 				<CardHeader>
 					<CardTitle>{t('profile_settings')}</CardTitle>
@@ -500,7 +508,11 @@ export default function EditUserProfilePage() {
 							<Avatar className="h-full w-full">
 								<AvatarImage
 									className="aspect-auto h-full w-full rounded-full object-cover"
-									src={'/resources/file/' + data.profile.profileImage?.id}
+									src={
+										data.profile.image
+											? `/resources/profile-image/${data.profile.id}?v=${encodeURIComponent(data.profile.image)}`
+											: undefined
+									}
 								/>
 								<AvatarFallback>
 									{getInitials(data.profile?.displayName ?? '')}
@@ -510,6 +522,7 @@ export default function EditUserProfilePage() {
 							<Link
 								preventScrollReset
 								to="photo"
+								prefetch="intent"
 								className="border-night-700 bg-night-500 pointer-events-auto absolute top-3 -right-3 flex h-4 w-4 items-center justify-center rounded-full border-4 p-5"
 								title={t('change_profile_photo')}
 								aria-label={t('change_profile_photo')}

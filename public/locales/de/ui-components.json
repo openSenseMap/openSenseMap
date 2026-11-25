@@ -7,6 +7,11 @@
 		"callout_title_caution": "Achtung"
 	},
 	"array_field": {
-		"add_item": "Eintrag hinzufügen"
+		"add_item": "Eintrag hinzufügen",
+		"remove_item": "Eintrag entfernen"
+	},
+	"password": {
+		"show": "Passwort anzeigen",
+		"hide": "Passwort ausblenden"
 	}
 }

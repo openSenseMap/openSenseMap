@@ -1,3 +1,11 @@
+type SensorDefinition = {
+	title: string
+	unit: string
+	sensorType: string
+	icon: string
+	image?: string
+}
+
 export const sensorDefinitions = {
 	windspeed: {
 		title: 'Windgeschwindigkeit',
@@ -254,6 +262,125 @@ export const sensorDefinitions = {
 		icon: 'osem-cloud',
 		image: '/img/sensor_images/SPS30.jpg',
 	},
+	sps30_nc05: {
+		title: 'NC0.5',
+		unit: '#/cm³',
+		sensorType: 'SPS30',
+		icon: 'osem-cloud',
+		image: '/img/sensor_images/SPS30.jpg',
+	},
+	sps30_nc1: {
+		title: 'NC1.0',
+		unit: '#/cm³',
+		sensorType: 'SPS30',
+		icon: 'osem-cloud',
+		image: '/img/sensor_images/SPS30.jpg',
+	},
+	sps30_nc25: {
+		title: 'NC2.5',
+		unit: '#/cm³',
+		sensorType: 'SPS30',
+		icon: 'osem-cloud',
+		image: '/img/sensor_images/SPS30.jpg',
+	},
+	sps30_nc4: {
+		title: 'NC4.0',
+		unit: '#/cm³',
+		sensorType: 'SPS30',
+		icon: 'osem-cloud',
+		image: '/img/sensor_images/SPS30.jpg',
+	},
+	sps30_nc10: {
+		title: 'NC10',
+		unit: '#/cm³',
+		sensorType: 'SPS30',
+		icon: 'osem-cloud',
+		image: '/img/sensor_images/SPS30.jpg',
+	},
+	sen55_pm1: {
+		title: 'PM1',
+		unit: 'µg/m³',
+		sensorType: 'SEN55',
+		icon: 'osem-cloud',
+	},
+	sen55_pm25: {
+		title: 'PM2.5',
+		unit: 'µg/m³',
+		sensorType: 'SEN55',
+		icon: 'osem-cloud',
+	},
+	sen55_pm4: {
+		title: 'PM4',
+		unit: 'µg/m³',
+		sensorType: 'SEN55',
+		icon: 'osem-cloud',
+	},
+	sen55_pm10: {
+		title: 'PM10',
+		unit: 'µg/m³',
+		sensorType: 'SEN55',
+		icon: 'osem-cloud',
+	},
+	sen55_nc05: {
+		title: 'NC0.5',
+		unit: '#/cm³',
+		sensorType: 'SEN55',
+		icon: 'osem-cloud',
+	},
+	sen55_nc1: {
+		title: 'NC1.0',
+		unit: '#/cm³',
+		sensorType: 'SEN55',
+		icon: 'osem-cloud',
+	},
+	sen55_nc25: {
+		title: 'NC2.5',
+		unit: '#/cm³',
+		sensorType: 'SEN55',
+		icon: 'osem-cloud',
+	},
+	sen55_nc4: {
+		title: 'NC4.0',
+		unit: '#/cm³',
+		sensorType: 'SEN55',
+		icon: 'osem-cloud',
+	},
+	sen55_nc10: {
+		title: 'NC10',
+		unit: '#/cm³',
+		sensorType: 'SEN55',
+		icon: 'osem-cloud',
+	},
+	sen55_typical_particle_size: {
+		title: 'Typische Partikelgröße',
+		unit: 'µm',
+		sensorType: 'SEN55',
+		icon: 'osem-cloud',
+	},
+	sen55_temperature: {
+		title: 'Temperatur',
+		unit: '°C',
+		sensorType: 'SEN55',
+		icon: 'osem-thermometer',
+	},
+	sen55_humidity: {
+		title: 'rel. Luftfeuchte',
+		unit: '%',
+		sensorType: 'SEN55',
+		icon: 'osem-humidity',
+	},
+	sen55_voc: {
+		title: 'VOC-Index',
+		unit: 'Index',
+		sensorType: 'SEN55',
+		icon: 'osem-gauge',
+	},
+	sen55_nox: {
+		title: 'NOx-Index',
+		unit: 'Index',
+		sensorType: 'SEN55',
+		icon: 'osem-gauge',
+	},
 	pms1003_pm10: {
 		title: 'PM10',
 		unit: 'µg/m³',
@@ -338,4 +465,6 @@ export const sensorDefinitions = {
 		icon: 'osem-humidity',
 		image: '/img/sensor_images/HDC1008.png',
 	},
-}
+} as const satisfies Record<string, SensorDefinition>
+
+export type SensorDefinitionId = keyof typeof sensorDefinitions

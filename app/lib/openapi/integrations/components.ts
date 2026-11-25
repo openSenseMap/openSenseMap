@@ -1,4 +1,4 @@
-import type { ZodOpenApiObject } from 'zod-openapi'
+import { type ZodOpenApiObject } from 'zod-openapi'
 import {
 	errorExamples,
 	mqttIntegrationConfigExample,
