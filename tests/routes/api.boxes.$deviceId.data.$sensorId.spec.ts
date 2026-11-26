@@ -17,7 +17,7 @@ import { registerUser } from '~/services/user-service.server'
 const DEVICE_SENSORS_ID_USER = generateTestUserCredentials()
 
 const DEVICE_SENSOR_ID_BOX = {
-	name: `${DEVICE_SENSORS_ID_USER}s Box`,
+	name: `${DEVICE_SENSORS_ID_USER.name}s Box`,
 	exposure: 'outdoor',
 	expiresAt: null,
 	tags: [],
@@ -93,7 +93,7 @@ describe('openSenseMap API Routes: /api/boxes/:deviceId/data/:sensorId', () => {
 		it('should return measurements for a single sensor of a box in json format', async () => {
 			// Arrange
 			const request = new Request(
-				`${BASE_URL}/api/boxes/${deviceId}/data/${sensors[0].id}?from-date=${new Date('1954-06-07 11:00:00+00')}&to-date=${new Date('1988-03-14 1:59:27+00')}`,
+				`${BASE_URL}/api/boxes/${deviceId}/data/${sensors[0].id}?from-date=${new Date('1954-06-07 11:00:00+00').toISOString()}&to-date=${new Date('1988-03-14 1:59:27+00').toISOString()}`,
 				{ method: 'GET' },
 			)
 
@@ -125,7 +125,7 @@ describe('openSenseMap API Routes: /api/boxes/:deviceId/data/:sensorId', () => {
 		it('should return measurements for a single sensor of a box in csv format', async () => {
 			// Arrange
 			const request = new Request(
-				`${BASE_URL}/api/boxes/${deviceId}/data/${sensors[0].id}?from-date=${new Date('1954-06-07 11:00:00+00')}&to-date=${new Date('1988-03-14 1:59:27+00')}&format=csv`,
+				`${BASE_URL}/api/boxes/${deviceId}/data/${sensors[0].id}?from-date=${new Date('1954-06-07 11:00:00+00').toISOString()}&to-date=${new Date('1988-03-14 1:59:27+00').toISOString()}&format=csv`,
 				{ method: 'GET' },
 			)
 
