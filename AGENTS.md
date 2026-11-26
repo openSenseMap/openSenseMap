@@ -31,7 +31,8 @@ sensor data.
 ## Development and Testing Commands
 
 - The project uses Vite+ for package management, runtime managment and command
-  execution
+  execution, docs are local at `node_modules/vite-plus/docs` or online at
+  https://viteplus.dev/guide/.
 - To run tests, use `vp test`. Always ensure the `.env` points to the local
   database instance before testing.
 - To start the development environment, spin up the local docker instance of the
