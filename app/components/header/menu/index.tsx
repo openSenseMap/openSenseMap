@@ -97,12 +97,6 @@ export default function Menu() {
 									</div>
 								)}
 
-								<Link to="/about" prefetch="intent">
-									<DropdownMenuItem className="cursor-pointer">
-										<Info className="mr-2 h-5 w-5" />
-										<span>{t('about_label')}</span>
-									</DropdownMenuItem>
-								</Link>
 								{!isExplore && (
 									<Link to="/explore" prefetch="intent">
 										<DropdownMenuItem className="cursor-pointer">
