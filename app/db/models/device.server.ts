@@ -850,11 +850,6 @@ export async function getDevices(format: DevicesFormat = 'json') {
 		.where(isNull(device.archivedAt))
 		.prepare('getDevices')
 
-	const explainResult = await drizzleClient.execute(
-		sql.raw(`EXPLAIN ANALYZE ${prepared.getQuery().sql}`),
-	)
-	console.log(explainResult)
-
 	const rows = await prepared.execute()
 	const devices = rows.map((row) => ({
 		...row.device,
