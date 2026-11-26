@@ -61,7 +61,7 @@ import { DOWNLOAD_FILTER_KEYS } from '~/components/header/download'
 import { sensorMatchesAnyPhenomenonFilter } from '~/lib/phenomenon-filter'
 import { sensorWikiAliasEntries } from '~/lib/sensor-wiki/alias-catalog'
 import { getExplorePendingUi } from '~/lib/explore-pending-navigation'
-import { getApproximateMeasurementCount } from '~/services/statistics-service.server'
+import { getApproximateRowCount } from '~/services/statistics-service.server'
 import { loadExploreDataWithCache } from '~/lib/explore-loader-cache'
 import { searchWithoutChartParams } from '~/lib/explore-map-search'
 
@@ -460,7 +460,7 @@ export async function loader({ url }: Route.LoaderArgs) {
 				? getDevicesWithSensors({ measurementTimeRange })
 				: getDevices('geojson'),
 			getTags(),
-			getApproximateMeasurementCount(),
+			getApproximateRowCount('measurement'),
 			getPhenomena(),
 		])
 	const filteredDeviceCount = getFilteredDevices(
