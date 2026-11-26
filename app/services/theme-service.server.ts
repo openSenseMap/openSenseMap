@@ -1,5 +1,5 @@
 import { createCookie } from 'react-router'
-import { ThemePreference, ThemePreferenceSchema } from '~/lib/theme'
+import { type ThemePreference, ThemePreferenceSchema } from '~/lib/theme'
 export const themeCookie = createCookie('theme', {
 	path: '/',
 	sameSite: 'lax',

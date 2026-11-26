@@ -192,7 +192,7 @@ export default function NewDeviceStepper() {
 			}))
 		}
 
-		stepper.prev()
+		void stepper.prev()
 	}
 
 	return (
@@ -219,7 +219,7 @@ export default function NewDeviceStepper() {
 																...current,
 																[stepper.current.id]: data,
 															}))
-															stepper.goTo(step.id)
+															void stepper.goTo(step.id)
 														}, onError)()
 													}}
 													className={` ${

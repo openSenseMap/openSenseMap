@@ -37,7 +37,13 @@ import { messages as NewLufdatenDeviceMessages } from '~/emails/new-device-luftd
 import { messages as NewSenseboxDeviceMessages } from '~/emails/new-device-sensebox'
 import { createDeviceApiKey } from '~/lib/jwt'
 import { sendMail } from '~/lib/mail.server'
-import { getSensorsForModel } from '~/lib/model-definitions'
+import {
+	getSensorsForModel,
+	getSensorTemplateValidationError,
+} from '~/lib/model-definitions'
+import { deleteDeviceImage } from '~/lib/s3.server'
+import { prepareSensorDefinitionEdit } from '~/lib/sensor-routing'
+import { logServerWarning } from '~/lib/sentry.server'
 import {
 	createOrReusePrivateDeviceSchemaVersionFromUpload,
 	getVisibleDeviceSchemaVersionForCreation,
@@ -110,7 +116,14 @@ export function assertDeviceIsMutable(
 	}
 }
 
-export function getDevice({ id }: Pick<Device, 'id'>) {
+export function getDevice({
+	id,
+	locationLimit,
+	locationRange,
+}: Pick<Device, 'id'> & {
+	locationLimit?: number
+	locationRange?: { start: Date; end: Date }
+}) {
 	return drizzleClient.query.device.findFirst({
 		where: (device, { eq }) => eq(device.id, id),
 		columns: BASE_DEVICE_COLUMNS,
@@ -132,6 +145,16 @@ export function getDevice({ id }: Pick<Device, 'id'>) {
 				},
 			},
 			locations: {
+				where: locationRange
+					? between(
+							deviceToLocation.time,
+							locationRange.start,
+							locationRange.end,
+						)
+					: undefined,
+				...(locationLimit === undefined
+					? {}
+					: { orderBy: desc(deviceToLocation.time), limit: locationLimit }),
 				// https://github.com/drizzle-team/drizzle-orm/pull/2778
 				// with: {
 				//   geometry: true
@@ -151,10 +174,16 @@ export function getDevice({ id }: Pick<Device, 'id'>) {
 						},
 					},
 				},
-				// limit: 1000,
 			},
 			sensors: true,
 		},
+	})
+}
+
+export function getDeviceExposure({ id }: Pick<Device, 'id'>) {
+	return drizzleClient.query.device.findFirst({
+		where: (device, { eq }) => eq(device.id, id),
+		columns: { exposure: true },
 	})
 }
 
@@ -181,6 +210,7 @@ export function getDeviceForMeasurementWrite({ id }: Pick<Device, 'id'>) {
 					id: true,
 					title: true,
 					sensorType: true,
+					data: true,
 				},
 			},
 		},
@@ -263,6 +293,24 @@ export function getLocations(
 			),
 		)
 		.orderBy(desc(deviceToLocation.time))
+}
+
+export async function getDeviceLocations({ id }: Pick<Device, 'id'>) {
+	const locations = await drizzleClient
+		.select({
+			time: deviceToLocation.time,
+			x: sql<number>`ST_X(${location.location})`.as('x'),
+			y: sql<number>`ST_Y(${location.location})`.as('y'),
+		})
+		.from(location)
+		.innerJoin(deviceToLocation, eq(deviceToLocation.locationId, location.id))
+		.where(eq(deviceToLocation.deviceId, id))
+		.orderBy(desc(deviceToLocation.time))
+
+	return locations.map(({ time, x, y }) => ({
+		time,
+		geometry: { x, y },
+	}))
 }
 export function getDeviceWithoutSensors({ id }: Pick<Device, 'id'>) {
 	return drizzleClient.query.device.findFirst({
@@ -601,11 +649,11 @@ export async function updateDevice(
 					})
 					nextSensorOrder += 1
 				} else if (hasEdited && s._id) {
-					const sensorExists = existingSensors.some(
+					const existingSensor = existingSensors.find(
 						(existing) => existing.id === s._id,
 					)
 
-					if (!sensorExists) {
+					if (!existingSensor) {
 						throw new DeviceUpdateError(
 							`Sensor with id ${s._id} not found for editing.`,
 						)
@@ -617,6 +665,15 @@ export async function updateDevice(
 						)
 					}
 
+					const routingEdit = prepareSensorDefinitionEdit(
+						existingDevice.model,
+						existingSensor,
+						{ unit: s.unit, sensorType: s.sensorType },
+					)
+					if (!routingEdit.success) {
+						throw new DeviceUpdateError(routingEdit.message)
+					}
+
 					await tx
 						.update(sensor)
 						.set({
@@ -624,6 +681,7 @@ export async function updateDevice(
 							unit: s.unit,
 							sensorType: s.sensorType,
 							icon: s.icon,
+							data: routingEdit.data,
 							updatedAt: sql`NOW()`,
 						})
 						.where(eq(sensor.id, s._id))
@@ -641,8 +699,54 @@ export async function updateDevice(
 	return result
 }
 
-export function deleteDevice({ id }: Pick<Device, 'id'>) {
-	return drizzleClient.delete(device).where(eq(device.id, id))
+export async function updateDeviceImageIfUnchanged({
+	id,
+	userId,
+	expectedImage,
+	image,
+}: Pick<Device, 'id' | 'userId'> & {
+	expectedImage: Device['image']
+	image: Device['image']
+}) {
+	const imageHasNotChanged = expectedImage
+		? eq(device.image, expectedImage)
+		: isNull(device.image)
+
+	const [updatedDevice] = await drizzleClient
+		.update(device)
+		.set({ image, updatedAt: sql`NOW()` })
+		.where(
+			and(
+				eq(device.id, id),
+				eq(device.userId, userId),
+				isNull(device.archivedAt),
+				imageHasNotChanged,
+			),
+		)
+		.returning()
+
+	return updatedDevice
+}
+
+export async function deleteDevice({ id }: Pick<Device, 'id'>) {
+	const [deletedDevice] = await drizzleClient
+		.delete(device)
+		.where(eq(device.id, id))
+		.returning({ id: device.id, image: device.image })
+
+	if (!deletedDevice) return false
+
+	if (deletedDevice.image) {
+		try {
+			await deleteDeviceImage(deletedDevice.image)
+		} catch (error) {
+			logServerWarning('Failed to delete image for deleted device', error, {
+				'device.id': deletedDevice.id,
+			})
+		}
+	}
+
+	return true
 }
 
 export function getUserDevices(userId: Device['userId']) {
@@ -837,6 +941,8 @@ export async function getDevicesWithSensors(options?: {
 			sensor: {
 				id: sensor.id,
 				title: sensor.title,
+				unit: sensor.unit,
+				sensorType: sensor.sensorType,
 				sensorWikiPhenomenon: sensor.sensorWikiPhenomenon,
 				lastMeasurement: sensor.lastMeasurement,
 			},
@@ -852,7 +958,12 @@ export async function getDevicesWithSensors(options?: {
 
 	type PartialSensor = Pick<
 		Sensor,
-		'id' | 'title' | 'sensorWikiPhenomenon' | 'lastMeasurement'
+		| 'id'
+		| 'title'
+		| 'unit'
+		| 'sensorType'
+		| 'sensorWikiPhenomenon'
+		| 'lastMeasurement'
 	>
 
 	const deviceMap = new Map<
@@ -1073,6 +1184,31 @@ export async function findDevices(
 	return devices
 }
 
+type SensorRoutingMetadata = {
+	sensorDefinitionId?: string
+	deviceSchemaSensorId?: string
+}
+
+function buildSensorData(
+	data: unknown,
+	routingMetadata: SensorRoutingMetadata = {},
+): unknown {
+	const isRecord =
+		Boolean(data) && typeof data === 'object' && !Array.isArray(data)
+	if (!isRecord && Object.keys(routingMetadata).length === 0) return data
+
+	const existingData = isRecord
+		? Object.fromEntries(
+				Object.entries(data as Record<string, unknown>).filter(
+					([key]) =>
+						key !== 'sensorDefinitionId' && key !== 'deviceSchemaSensorId',
+				),
+			)
+		: {}
+
+	return { ...existingData, ...routingMetadata }
+}
+
 export async function createDevice(deviceData: any, userId: string) {
 	try {
 		const [newDevice, usr] = await drizzleClient.transaction(async (tx) => {
@@ -1088,11 +1224,15 @@ export async function createDevice(deviceData: any, userId: string) {
 			let storedDeviceSchemaVersion = null
 			const isCustomDevice =
 				!deviceData.model || deviceData.model?.toLowerCase() === 'custom'
+			const hasExplicitSensors =
+				Array.isArray(deviceData.sensors) && deviceData.sensors.length > 0
+			const usesSensorDefinitions =
+				Boolean(deviceData.model) && !isCustomDevice && !hasExplicitSensors
 
 			// If model and sensors are both specified, reject (backwards compatibility)
 			if (
 				deviceData.model &&
-				deviceData.sensors &&
+				hasExplicitSensors &&
 				deviceData.model.toLowerCase() !== 'custom'
 			) {
 				throw new Error(
@@ -1101,29 +1241,20 @@ export async function createDevice(deviceData: any, userId: string) {
 			}
 
 			// If model is specified but sensors are not, get sensors from model layout
-			if (deviceData.model && !deviceData.sensors) {
-				const modelSensors = getSensorsForModel(deviceData.model as any)
+			if (deviceData.model && !hasExplicitSensors) {
+				const sensorTemplateError = getSensorTemplateValidationError(
+					deviceData.model,
+					deviceData.sensorTemplates,
+				)
+				if (sensorTemplateError) throw new Error(sensorTemplateError)
 
-				if (
-					!Array.isArray(modelSensors) &&
-					deviceData.model?.toLowerCase() !== 'custom'
-				) {
-					throw new Error(`Unknown model: ${deviceData.model}`)
-				}
-
-				if (
-					Array.isArray(deviceData.sensorTemplates) &&
-					deviceData.sensorTemplates.length > 0
-				) {
-					sensorsToAdd = modelSensors.filter((sensor) =>
-						deviceData.sensorTemplates.includes(sensor.id),
-					)
-				} else {
-					sensorsToAdd = modelSensors
-				}
+				sensorsToAdd = getSensorsForModel(
+					deviceData.model,
+					deviceData.sensorTemplates,
+				)
 			}
 
-			if (isCustomDevice && deviceData.sensors) {
+			if (isCustomDevice && hasExplicitSensors) {
 				sensorsToAdd = deviceData.sensors ?? []
 			}
 
@@ -1207,6 +1338,15 @@ export async function createDevice(deviceData: any, userId: string) {
 				sensorsToAdd.length > 0
 			) {
 				for (const [index, sensorData] of sensorsToAdd.entries()) {
+					const sensorMetadata = buildSensorData(
+						sensorData.data,
+						storedDeviceSchemaVersion
+							? { deviceSchemaSensorId: sensorData.id }
+							: usesSensorDefinitions
+								? { sensorDefinitionId: sensorData.id }
+								: undefined,
+					)
+
 					const [newSensor] = await tx
 						.insert(sensor)
 						.values({
@@ -1218,9 +1358,7 @@ export async function createDevice(deviceData: any, userId: string) {
 							sensorWikiPhenomenon: sensorData.sensorWikiPhenomenon,
 							sensorWikiUnit: sensorData.sensorWikiUnit,
 							deviceId: createdDevice.id,
-							data: storedDeviceSchemaVersion
-								? { deviceSchemaSensorId: sensorData.id }
-								: sensorData.data,
+							data: sensorMetadata,
 							order: sensorData.order ?? index,
 						})
 						.returning()

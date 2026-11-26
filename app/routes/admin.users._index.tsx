@@ -63,6 +63,7 @@ export default function AdminUsersIndexRoute({
 								<td className="border-r-2 border-black p-2">
 									<Link
 										to={`/admin/users/${user.id}`}
+										prefetch="intent"
 										className="cursor-pointer hover:underline hover:underline-offset-2"
 									>
 										Open

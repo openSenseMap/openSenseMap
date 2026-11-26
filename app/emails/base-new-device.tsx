@@ -141,9 +141,9 @@ export const BaseNewDeviceEmail = ({
 								fontSize: '14px',
 								textDecoration: 'underline',
 							}}
-							href={`mailto:info@opensenselab.org?Subject=Hilfe%20bei%20der%20Einrichtung&body=Bitte%20bei%20jeder%20Anfrage%20die%20ID%20(${device.id})%20mit%20angeben.%20Danke!`}
+							href={`mailto:info@opensensemap.org?Subject=Hilfe%20bei%20der%20Einrichtung&body=Bitte%20bei%20jeder%20Anfrage%20die%20ID%20(${device.id})%20mit%20angeben.%20Danke!`}
 						>
-							info@opensenselab.org
+							info@opensensemap.org
 						</Link>
 					</Text>
 					<Text>{i.formatMessage({ id: 'closing' })}</Text>

@@ -1,4 +1,8 @@
-import { createDevice, deleteDevice } from '~/db/models/device.server'
+import {
+	createDevice,
+	deleteDevice,
+	getDevice,
+} from '~/db/models/device.server'
 import { deleteUserByEmail } from '~/db/models/user.server'
 import { type User } from '~/db/schema'
 import { registerUser } from '~/services/user-service.server'
@@ -109,6 +113,26 @@ describe('Device Model: createDevice', () => {
 		expect(result).toHaveProperty('sensors')
 		expect(Array.isArray(result.sensors)).toBe(true)
 		expect(result.sensors).toHaveLength(0)
+	})
+
+	it('should persist the sensor definition ID in sensor data', async () => {
+		const result = await createDevice(
+			{
+				name: 'Device with catalog sensor',
+				latitude: 52.0,
+				longitude: 8.0,
+				exposure: 'indoor',
+				model: 'homeV2Wifi',
+				sensorTemplates: ['sps30_pm1'],
+			},
+			userId,
+		)
+
+		createdDeviceIds.push(result.id)
+		expect(result.sensors).toHaveLength(1)
+		expect(result.sensors[0].data).toEqual({
+			sensorDefinitionId: 'sps30_pm1',
+		})
 	})
 
 	it('should create device with tags/grouptag', async () => {

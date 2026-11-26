@@ -7,7 +7,7 @@ import { StandardResponse } from '~/lib/responses'
 import * as z from 'zod/v4'
 
 import { ApiDeviceSchema } from '~/lib/openapi/schemas/device'
-import { ZodOpenApiPathItemObject } from 'zod-openapi'
+import { type ZodOpenApiPathItemObject } from 'zod-openapi'
 import {
 	ForbiddenErrorSchema,
 	forbiddenResponse,

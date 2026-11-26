@@ -1,4 +1,7 @@
-import { ZodOpenApiPathItemObject, ZodOpenApiPathsObject } from 'zod-openapi'
+import {
+	type ZodOpenApiPathItemObject,
+	type ZodOpenApiPathsObject,
+} from 'zod-openapi'
 import { generateIntegrationApiSpec } from './openapi/integrations'
 
 const DEV_SERVER = {

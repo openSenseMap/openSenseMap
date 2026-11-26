@@ -1,5 +1,9 @@
 import { useState } from 'react'
-import { Outlet, useLoaderData, useMatches } from 'react-router'
+import {
+	Outlet,
+	useMatches,
+	type ShouldRevalidateFunctionArgs,
+} from 'react-router'
 import { type Route } from './+types/explore.$deviceId'
 import DeviceDetailBox from '~/components/device-detail/device-detail-box'
 import {
@@ -12,30 +16,46 @@ import { getSensorsWithLastMeasurement } from '~/db/models/sensor.server'
 import { getTripsForDisplay, type Trip } from '~/lib/mobile-box-helper'
 import { validLngLat } from '~/lib/location'
 import { getDeviceImageUrl } from '~/lib/s3.server'
-import { getLocale } from '~/middleware/i18next'
+import { shouldRevalidateExceptRootPreferences } from '~/lib/root-preference-revalidation'
 
-export async function loader({ context, params, request }: Route.LoaderArgs) {
-	const locale = getLocale(context)
-	// Extracting the selected sensors from the URL query parameters using the stringToArray function
-	const url = new URL(request.url)
-	const aggregation = url.searchParams.get('aggregation') || 'raw'
-	const startDate = url.searchParams.get('date_from') || undefined
-	const endDate = url.searchParams.get('date_to') || undefined
+export function shouldRevalidate(args: ShouldRevalidateFunctionArgs) {
+	if (
+		args.currentParams.deviceId === args.nextParams.deviceId &&
+		args.currentUrl.search !== args.nextUrl.search &&
+		(!args.formMethod || args.formMethod.toUpperCase() === 'GET')
+	) {
+		return (
+			args.currentUrl.searchParams.get('date_from') !==
+				args.nextUrl.searchParams.get('date_from') ||
+			args.currentUrl.searchParams.get('date_to') !==
+				args.nextUrl.searchParams.get('date_to')
+		)
+	}
 
+	return shouldRevalidateExceptRootPreferences(args)
+}
+
+export async function loader({ params, request }: Route.LoaderArgs) {
 	if (!params.deviceId) {
 		throw new Response('Device not found', { status: 502 })
 	}
 
-	const device = await getDevice({ id: params.deviceId })
-	const sensorsWithLastestMeasurement = await getSensorsWithLastMeasurement(
-		params.deviceId,
-	)
+	const { searchParams } = new URL(request.url)
+	const dateFrom = searchParams.get('date_from')
+	const dateTo = searchParams.get('date_to')
+	const start = dateFrom ? new Date(dateFrom) : undefined
+	const end = dateTo ? new Date(dateTo) : undefined
+	const locationRange =
+		start && end && start <= end ? { start, end } : undefined
+
+	const [device, sensorsWithLastestMeasurement] = await Promise.all([
+		getDevice({ id: params.deviceId, locationLimit: 1000, locationRange }),
+		getSensorsWithLastMeasurement(params.deviceId),
+	])
 
 	let mobileTrips: Trip[] = []
 
-	// The device locations are the canonical source for trip boundaries. The
-	// default view shows the latest trips; an explicit range shows every trip in
-	// that range so the device, sensor map, and graph all use the same selection.
+	// Both map views use the device's bounded location history for trip boundaries.
 	if (device?.exposure === 'mobile' && device?.locations) {
 		const formattedLocations = device.locations.flatMap((location) => {
 			const timestamp = new Date(location.time).getTime()
@@ -55,8 +75,8 @@ export async function loader({ context, params, request }: Route.LoaderArgs) {
 		})
 		mobileTrips = getTripsForDisplay(
 			formattedLocations,
-			startDate ? new Date(startDate) : undefined,
-			endDate ? new Date(endDate) : undefined,
+			locationRange?.start,
+			locationRange?.end,
 		)
 		const visiblePointTimes = new Set(
 			mobileTrips.flatMap((trip) => trip.points.map((point) => point.time)),
@@ -72,7 +92,6 @@ export async function loader({ context, params, request }: Route.LoaderArgs) {
 		})
 	}
 
-	// Find all sensors from the device response that have the same id as one of the sensor array value
 	let deviceImageUrl: string | null = null
 
 	if (device?.image) {
@@ -89,20 +108,14 @@ export async function loader({ context, params, request }: Route.LoaderArgs) {
 		mobileTrips,
 		deviceImageUrl,
 		sensors: sensorsWithLastestMeasurement,
-		aggregation,
-		fromDate: startDate,
-		toDate: endDate,
 		OSEM_API_URL: process.env.OSEM_API_URL,
-		locale,
 	}
 
 	return data
 }
 
 // Defining the component that will render the page
-export default function DeviceId() {
-	// Retrieving the data returned by the loader using the useLoaderData hook
-	const data = useLoaderData<typeof loader>()
+export default function DeviceId({ loaderData: data }: Route.ComponentProps) {
 	const matches = useMatches()
 	const [hoveredPoint, setHoveredPoint] = useState<HoveredMeasurement | null>(
 		null,

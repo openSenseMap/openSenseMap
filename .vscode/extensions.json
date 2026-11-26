@@ -3,6 +3,7 @@
 	"recommendations": [
 		"bradlc.vscode-tailwindcss",
 		"lokalise.i18n-ally",
-		"oxc.oxc-vscode"
+		"oxc.oxc-vscode",
+		"VoidZero.vite-plus-extension-pack"
 	]
 }

@@ -126,9 +126,9 @@ export const NewSketchEmail = ({
 					<Text>
 						{intl.formatMessage({ id: 'support' })} {}
 						<Link
-							href={`mailto:support@opensensemap.org?Subject=Neuer%20Sketch%20Box-Id%20${device._id}`}
+							href={`mailto:info@opensensemap.org?Subject=Neuer%20Sketch%20Box-Id%20${device._id}`}
 						>
-							support@opensensemap.org
+							info@opensensemap.org
 						</Link>
 					</Text>
 					<Text>{intl.formatMessage({ id: 'salutation' })}</Text>

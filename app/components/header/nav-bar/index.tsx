@@ -7,7 +7,7 @@ import NavbarHandler from './nav-bar-handler'
 import FilterVisualization from '~/components/map/filter-visualization'
 import { type DeviceFeatureCollection } from '~/components/search/search-types'
 import { cn } from '~/lib/utils'
-import { topbarSurface } from '~/components/map/topbar-styles'
+import { topbarSurface } from '~/components/ui/topbar-styles'
 import Download from '../download'
 
 interface NavBarProps {

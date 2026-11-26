@@ -100,11 +100,11 @@ export const PasswordResetEmail = ({
 					<Text>
 						{intl.formatMessage({ id: 'support' })} {}
 						<Link
-							href={`mailto:support@opensensemap.org?Subject=Password%20Zur%C3%BCcksetzen%20f%C3%BCr%20${encodeURIComponent(
+							href={`mailto:info@opensensemap.org?Subject=Password%20Zur%C3%BCcksetzen%20f%C3%BCr%20${encodeURIComponent(
 								user.email,
 							)}`}
 						>
-							support@opensensemap.org
+							info@opensensemap.org
 						</Link>
 					</Text>
 					<Text>{intl.formatMessage({ id: 'salutation' })}</Text>

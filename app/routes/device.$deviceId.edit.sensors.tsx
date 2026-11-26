@@ -14,8 +14,6 @@ import React, { useState } from 'react'
 import {
 	redirect,
 	Form,
-	useActionData,
-	useLoaderData,
 	useNavigation,
 	useOutletContext,
 	useSubmit,
@@ -42,6 +40,7 @@ import {
 } from '~/db/models/device.server'
 import { getSharedDeviceSchemaVersion } from '~/db/models/device-schema.server'
 import { assignIcon, getIcon, iconsList } from '~/lib/sensoricons'
+import { prepareSensorDefinitionEdit } from '~/lib/sensor-routing'
 import { getUserId } from '~/services/session-service.server'
 import { useCopyToClipboard } from '@/hooks/use-copy-to-clipboard'
 import { useToast } from '@/components/ui/use-toast'
@@ -207,6 +206,30 @@ export async function action({ request, params }: Route.ActionArgs) {
 		return { isUpdated: true }
 	}
 
+	const routingEditData = new Map<string, unknown>()
+	for (const submittedSensor of updatedSensorsDataJson) {
+		if (submittedSensor?.new === true || submittedSensor?.deleted === true) {
+			continue
+		}
+
+		const existingSensor = currentSensorsById.get(submittedSensor.id)
+		if (!existingSensor) {
+			return { isUpdated: false, message: 'Sensor not found.' }
+		}
+		const routingEdit = prepareSensorDefinitionEdit(
+			device.model,
+			existingSensor,
+			{
+				unit: submittedSensor.unit,
+				sensorType: submittedSensor.sensorType,
+			},
+		)
+		if (!routingEdit.success) {
+			return { isUpdated: false, message: routingEdit.message }
+		}
+		routingEditData.set(existingSensor.id, routingEdit.data)
+	}
+
 	let persistedOrder = 0
 
 	for (const sensor of updatedSensorsDataJson) {
@@ -226,15 +249,13 @@ export async function action({ request, params }: Route.ActionArgs) {
 			}
 			await deleteSensor(sensor.id)
 		} else if (!sensor?.new) {
-			if (!currentSensorsById.has(sensor.id)) {
-				return { isUpdated: false, message: 'Sensor not found.' }
-			}
 			await updateSensor({
 				id: sensor.id,
 				title: sensor.title,
 				unit: sensor.unit,
 				sensorType: sensor.sensorType,
 				icon: sensor.icon,
+				data: routingEditData.get(sensor.id),
 				order: persistedOrder,
 			})
 			persistedOrder++
@@ -255,9 +276,10 @@ export async function action({ request, params }: Route.ActionArgs) {
 }
 
 //**********************************
-export default function EditBoxSensors() {
-	const data = useLoaderData<typeof loader>()
-	const actionData = useActionData<typeof action>()
+export default function EditBoxSensors({
+	loaderData: data,
+	actionData,
+}: Route.ComponentProps) {
 	const navigation = useNavigation()
 	const submit = useSubmit()
 	const isSubmitting = navigation.state !== 'idle'

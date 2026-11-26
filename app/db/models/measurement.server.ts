@@ -1,5 +1,4 @@
 import { and, desc, eq, gt, gte, inArray, lt, lte, sql } from 'drizzle-orm'
-import { ArchivedDeviceError } from './device.server'
 import {
 	type LastMeasurement,
 	location,
@@ -10,11 +9,13 @@ import {
 	measurements1monthView,
 	measurements1yearView,
 	device,
+	sensor,
 } from '~/db/schema'
-import { drizzleClient } from '~/db.server'
+import { drizzleClient, type DatabaseTransaction } from '~/db.server'
 import {
 	type MinimalDevice,
 	type MeasurementWithLocation,
+	type LocationWithId,
 	getLocationUpdates,
 	findOrCreateLocations,
 	addLocationUpdates,
@@ -22,6 +23,7 @@ import {
 	updateLastMeasurements,
 } from '~/lib/measurement-server-helper'
 import { type MeasurementTiming } from '~/lib/measurement-timing.server'
+import { ArchivedDeviceError } from './device.server'
 
 // This function retrieves measurements from the database based on the provided parameters.
 export function getMeasurement(
@@ -235,45 +237,32 @@ export async function saveMeasurements(
 		locationUpdateCount: deviceLocationUpdates.length,
 	})
 
-	await drizzleClient.transaction(async (tx) => {
-		const [currentDevice] = await tx
-			.select({
-				id: device.id,
-				archivedAt: device.archivedAt,
-			})
-			.from(device)
-			.where(eq(device.id, minimalDevice.id))
-			.limit(1)
-		timing?.mark('transactionDeviceLookup')
+	// Run location writes as individual statements before opening the measurement
+	// transaction, so their locks are released before TimescaleDB creates chunks.
+	let locations: LocationWithId[] = []
+	if (deviceLocationUpdates.length > 0) {
+		await ensureDeviceCanReceiveMeasurements(drizzleClient, minimalDevice.id)
+		timing?.mark('locationDeviceLookup')
 
-		if (!currentDevice) {
-			const error = new Error('Device not found')
-			error.name = 'NotFoundError'
-			throw error
-		}
-
-		if (currentDevice.archivedAt) {
-			throw new ArchivedDeviceError(currentDevice.id)
-		}
-
-		const locations =
-			deviceLocationUpdates.length > 0
-				? await findOrCreateLocations(deviceLocationUpdates, tx)
-				: []
+		locations = await findOrCreateLocations(
+			deviceLocationUpdates,
+			drizzleClient,
+		)
 		timing?.mark('findOrCreateLocations', {
 			locationCount: locations.length,
 		})
 
-		if (deviceLocationUpdates.length > 0) {
-			await addLocationUpdates(
-				deviceLocationUpdates,
-				minimalDevice.id,
-				locations,
-				tx,
-			)
-		}
+		await addLocationUpdates(
+			deviceLocationUpdates,
+			minimalDevice.id,
+			locations,
+			drizzleClient,
+		)
 		timing?.mark('addLocationUpdates')
+	}
 
+	await drizzleClient.transaction(async (tx) => {
+		timing?.mark('transactionStart')
 		await insertMeasurementsWithLocation(
 			measurements,
 			locations,
@@ -286,6 +275,30 @@ export async function saveMeasurements(
 		timing?.mark('updateLastMeasurements')
 	})
 	timing?.mark('transaction')
+}
+
+async function ensureDeviceCanReceiveMeasurements(
+	db: Pick<DatabaseTransaction, 'select'>,
+	deviceId: string,
+): Promise<void> {
+	const [currentDevice] = await db
+		.select({
+			id: device.id,
+			archivedAt: device.archivedAt,
+		})
+		.from(device)
+		.where(eq(device.id, deviceId))
+		.limit(1)
+
+	if (!currentDevice) {
+		const error = new Error('Device not found')
+		error.name = 'NotFoundError'
+		throw error
+	}
+
+	if (currentDevice.archivedAt) {
+		throw new ArchivedDeviceError(currentDevice.id)
+	}
 }
 
 export async function insertMeasurements(measurements: any[]): Promise<void> {
@@ -302,6 +315,33 @@ export async function deleteMeasurementsForSensor(sensorId: string) {
 	return await drizzleClient
 		.delete(measurement)
 		.where(eq(measurement.sensorId, sensorId))
+}
+
+export async function deleteMeasurementsForDevice(deviceId: string) {
+	return drizzleClient.transaction(async (tx) => {
+		// Lock device sensors to serialize against concurrent measurement uploads.
+		const deviceSensors = await tx
+			.select({ id: sensor.id })
+			.from(sensor)
+			.where(eq(sensor.deviceId, deviceId))
+			.orderBy(sensor.id)
+			.for('update')
+
+		const sensorIds = deviceSensors.map(({ id }) => id)
+
+		if (sensorIds.length === 0) return 0
+
+		const result = await tx
+			.delete(measurement)
+			.where(inArray(measurement.sensorId, sensorIds))
+
+		await tx
+			.update(sensor)
+			.set({ lastMeasurement: null })
+			.where(eq(sensor.deviceId, deviceId))
+
+		return result.count
+	})
 }
 
 export async function deleteSensorMeasurementsForTimes(

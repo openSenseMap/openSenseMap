@@ -48,6 +48,12 @@ export default function Info() {
 					}
 				>
 					<DropdownMenuGroup>
+						<Link to="/about" prefetch="intent">
+							<DropdownMenuItem className="cursor-pointer">
+								<InfoIcon className="mr-2 h-5 w-5" />
+								<span>{t('about_label')}</span>
+							</DropdownMenuItem>
+						</Link>
 						<Link to={ENV.COMMUNITY_URL} target="_blank">
 							<DropdownMenuItem className="cursor-pointer">
 								<MessagesSquare className="mr-2 h-5 w-5" />
@@ -65,7 +71,7 @@ export default function Info() {
 					</DropdownMenuGroup>
 					<DropdownMenuSeparator />
 					<DropdownMenuGroup>
-						<Link to={'/privacy'}>
+						<Link to={'/privacy'} prefetch="intent">
 							<DropdownMenuItem className="cursor-pointer">
 								<FileLock2 className="mr-2 h-5 w-5" />
 								<span>{t('data_protection_label')}</span>

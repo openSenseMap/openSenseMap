@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { Form, Link, redirect, useActionData } from 'react-router'
+import { Form, Link, redirect } from 'react-router'
 import invariant from 'tiny-invariant'
 import { type Route } from './+types/admin.devices.$deviceId'
 
@@ -121,9 +121,9 @@ export async function action({
 
 export default function AdminDeviceDetailRoute({
 	loaderData,
+	actionData,
 }: Route.ComponentProps) {
 	const { device, users } = loaderData
-	const actionData = useActionData<typeof action>()
 
 	const [deviceLocation, setDeviceLocation] = useState<[number, number]>([
 		device.longitude,

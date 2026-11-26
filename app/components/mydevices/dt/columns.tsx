@@ -173,27 +173,37 @@ export function getColumns(
 								<DropdownMenuLabel>{t('actions')}</DropdownMenuLabel>
 								<DropdownMenuSeparator />
 								<DropdownMenuItem asChild>
-									<a href={`/device/${device.id}/overview`}>{t('overview')}</a>
+									<Link to={`/device/${device.id}/overview`} prefetch="intent">
+										{t('overview')}
+									</Link>
 								</DropdownMenuItem>
 								<DropdownMenuItem disabled={isArchived} asChild>
-									<a href={`/explore/${device.id}`}>{t('show_on_map')}</a>
+									<Link to={`/explore/${device.id}`} prefetch="intent">
+										{t('show_on_map')}
+									</Link>
 								</DropdownMenuItem>
 								<DropdownMenuItem disabled={isArchived} asChild={!isArchived}>
 									{isArchived ? (
 										<span>{t('edit')}</span>
 									) : (
-										<a href={`/device/${device.id}/edit/general`}>
+										<Link
+											to={`/device/${device.id}/edit/general`}
+											prefetch="intent"
+										>
 											{t('edit')}
-										</a>
+										</Link>
 									)}
 								</DropdownMenuItem>
 								<DropdownMenuItem disabled={isArchived} asChild={!isArchived}>
 									{isArchived ? (
 										<span>{t('data_upload')}</span>
 									) : (
-										<a href={`/device/${device.id}/dataupload`}>
+										<Link
+											to={`/device/${device.id}/dataupload`}
+											prefetch="intent"
+										>
 											{t('data_upload')}
-										</a>
+										</Link>
 									)}
 								</DropdownMenuItem>
 								{((device.model?.toLowerCase() ?? '').indexOf('sensebox') >=
@@ -220,7 +230,11 @@ export function getColumns(
 					)
 				else
 					return (
-						<Link to={`/explore/${device.id}`} title={t('show_on_map')}>
+						<Link
+							to={`/explore/${device.id}`}
+							prefetch="intent"
+							title={t('show_on_map')}
+						>
 							<span className="sr-only">Show on map</span>
 							<LucideMapPin className="h-4 w-4" />
 						</Link>

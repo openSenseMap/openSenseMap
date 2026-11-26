@@ -1,14 +1,20 @@
 import { useMemo } from 'react'
-import { redirect, useLoaderData, useRouteLoaderData } from 'react-router'
+import { redirect, useRouteLoaderData } from 'react-router'
 import { type Route } from './+types/explore.$deviceId.$sensorId.$'
 import { type loader as deviceLoader } from './explore.$deviceId'
 import Graph from '~/components/device-detail/graph'
 import MobileBoxView from '~/components/map/layers/mobile/mobile-box-view'
-import { getDevice } from '~/db/models/device.server'
-import { getMeasurement } from '~/db/models/measurement.query.server'
+import { getDeviceExposure } from '~/db/models/device.server'
+import {
+	getChartMeasurement,
+	MAX_CHART_MEASUREMENTS_PER_SENSOR,
+} from '~/db/models/measurement.query.server'
 import { getSensor } from '~/db/models/sensor.server'
 import { type SensorWithMeasurementData } from '~/db/schema'
 import { isTimeWithinTrips, type Trip } from '~/lib/mobile-box-helper'
+import { shouldRevalidateExceptRootPreferences } from '~/lib/root-preference-revalidation'
+
+export { shouldRevalidateExceptRootPreferences as shouldRevalidate }
 
 const EMPTY_TRIPS: Trip[] = []
 
@@ -17,7 +23,6 @@ interface SensorWithColor extends SensorWithMeasurementData {
 }
 
 type RawMeasurement = {
-	sensorId: string
 	locationId?: bigint | null
 	time: Date | null
 	value: number | null
@@ -32,18 +37,20 @@ function prepareSensorData(
 	measurements: RawMeasurement[],
 	sensorId: string,
 ): SensorWithMeasurementData['data'] {
-	return measurements.map((measurement) => ({
-		...measurement,
-		sensorId,
-		locationId:
-			measurement.locationId == null ? null : Number(measurement.locationId),
-		location: measurement.location
-			? {
-					...measurement.location,
-					id: Number(measurement.location.id),
-				}
-			: null,
-	}))
+	return measurements
+		.slice(0, MAX_CHART_MEASUREMENTS_PER_SENSOR)
+		.map((measurement) => ({
+			...measurement,
+			sensorId,
+			locationId:
+				measurement.locationId == null ? null : Number(measurement.locationId),
+			location: measurement.location
+				? {
+						...measurement.location,
+						id: Number(measurement.location.id),
+					}
+				: null,
+		}))
 }
 
 export async function loader({ params, request }: Route.LoaderArgs) {
@@ -54,7 +61,7 @@ export async function loader({ params, request }: Route.LoaderArgs) {
 		return redirect('/explore')
 	}
 
-	const device = await getDevice({ id: deviceId })
+	const device = await getDeviceExposure({ id: deviceId })
 
 	if (!device) {
 		return redirect('/explore')
@@ -64,34 +71,45 @@ export async function loader({ params, request }: Route.LoaderArgs) {
 	const aggregation = url.searchParams.get('aggregation') || 'raw'
 	const startDate = url.searchParams.get('date_from')
 	const endDate = url.searchParams.get('date_to')
+	const start = startDate ? new Date(startDate) : undefined
+	const end = endDate ? new Date(endDate) : undefined
 
 	if (!sensorId) {
 		throw new Response('Sensor 1 not found', { status: 404 })
 	}
 
 	const sensor1 = (await getSensor(sensorId)) as SensorWithColor
-	const sensor1Data = await getMeasurement(
+	const sensor1Data = await getChartMeasurement(
 		sensorId,
 		aggregation,
-		startDate ? new Date(startDate) : undefined,
-		endDate ? new Date(endDate) : undefined,
+		start,
+		end,
 	)
-
-	sensor1.data = prepareSensorData(sensor1Data as RawMeasurement[], sensorId)
-	sensor1.color = sensor1.color || '#8da0cb'
-
 	let sensor2: SensorWithColor | null = null
+	let sensor2Data: Awaited<ReturnType<typeof getChartMeasurement>> | null = null
 
 	if (sensorId2) {
 		sensor2 = (await getSensor(sensorId2)) as SensorWithColor
-		const sensor2Data = await getMeasurement(
-			sensorId2,
-			aggregation,
-			startDate ? new Date(startDate) : undefined,
-			endDate ? new Date(endDate) : undefined,
-		)
+		sensor2Data = await getChartMeasurement(sensorId2, aggregation, start, end)
+	}
 
-		sensor2.data = prepareSensorData(sensor2Data as RawMeasurement[], sensorId2)
+	const limitExceeded =
+		sensor1Data.length > MAX_CHART_MEASUREMENTS_PER_SENSOR ||
+		(sensor2Data?.length ?? 0) > MAX_CHART_MEASUREMENTS_PER_SENSOR
+	const showingLatestOnly =
+		limitExceeded && aggregation === 'raw' && !startDate && !endDate
+
+	// A selected range must never show a partial chart as though it were complete.
+	const hideMeasurements = limitExceeded && !showingLatestOnly
+	sensor1.data = hideMeasurements
+		? []
+		: prepareSensorData(sensor1Data, sensorId)
+	sensor1.color = sensor1.color || '#8da0cb'
+
+	if (sensor2 && sensorId2 && sensor2Data) {
+		sensor2.data = hideMeasurements
+			? []
+			: prepareSensorData(sensor2Data, sensorId2)
 		sensor2.color = sensor2.color || '#fc8d62'
 	}
 
@@ -101,52 +119,52 @@ export async function loader({ params, request }: Route.LoaderArgs) {
 		startDate,
 		endDate,
 		aggregation,
+		limitExceeded,
+		showingLatestOnly,
 	}
 }
 
-export default function SensorView() {
-	const loaderData = useLoaderData<typeof loader>()
+export default function SensorView({ loaderData }: Route.ComponentProps) {
 	const deviceData = useRouteLoaderData<typeof deviceLoader>(
 		'routes/explore.$deviceId',
 	)
 	const trips = deviceData?.mobileTrips ?? EMPTY_TRIPS
+	const { aggregation, device, startDate, endDate } = loaderData
+	const isMobile = device.exposure === 'mobile'
+	const hasDateRange = Boolean(startDate && endDate)
 	const sensors = useMemo(() => {
+		// The explicit chart range can exceed the map's location history limit.
 		if (
-			loaderData.device.exposure !== 'mobile' ||
-			loaderData.aggregation !== 'raw' ||
-			trips.length === 0 ||
-			!deviceData
+			!isMobile ||
+			aggregation !== 'raw' ||
+			hasDateRange ||
+			trips.length === 0
 		) {
 			return loaderData.sensors
 		}
 
 		return loaderData.sensors.map((sensor) => ({
 			...sensor,
-			data: Array.isArray(sensor.data)
-				? sensor.data.filter((measurement) =>
-						isTimeWithinTrips(measurement.time, trips),
-					)
-				: [],
+			data: sensor.data.filter((measurement) =>
+				isTimeWithinTrips(measurement.time, trips),
+			),
 		}))
-	}, [
-		deviceData,
-		loaderData.aggregation,
-		loaderData.device.exposure,
-		loaderData.sensors,
-		trips,
-	])
+	}, [aggregation, hasDateRange, isMobile, loaderData.sensors, trips])
 
 	return (
 		<>
 			<Graph
-				aggregation={loaderData.aggregation}
+				aggregation={aggregation}
 				sensors={sensors}
-				startDate={loaderData.startDate ?? undefined}
-				endDate={loaderData.endDate ?? undefined}
+				startDate={startDate ?? undefined}
+				endDate={endDate ?? undefined}
+				limitExceeded={loaderData.limitExceeded}
+				showingLatestOnly={loaderData.showingLatestOnly}
 			/>
-			{loaderData.device?.exposure === 'mobile' && (
-				<MobileBoxView sensors={sensors} trips={trips} />
-			)}
+			{isMobile &&
+				(!loaderData.limitExceeded || loaderData.showingLatestOnly) && (
+					<MobileBoxView sensors={sensors} trips={trips} />
+				)}
 		</>
 	)
 }

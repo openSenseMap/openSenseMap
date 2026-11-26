@@ -1,4 +1,4 @@
-import { ThemePreference } from '~/lib/theme'
+import { type ThemePreference } from '~/lib/theme'
 
 export function PreventFlashOnWrongTheme({
 	themePreference,

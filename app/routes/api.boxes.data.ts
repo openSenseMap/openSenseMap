@@ -4,6 +4,7 @@ import { findMatchingSensors } from '~/db/models/sensor.server'
 import { parseBoxesDataQuery } from '~/lib/api-schemas/boxes-data-query-schema'
 import { escapeCSVValue } from '~/lib/csv'
 import { StandardResponse } from '~/lib/responses'
+import { logServerError } from '~/lib/sentry.server'
 import { transformMeasurement } from '~/services/measurement-service.server'
 
 import * as z from 'zod/v4'
@@ -340,6 +341,11 @@ export async function loader({ request }: Route.LoaderArgs) {
 
 					controller.close()
 				} catch (error) {
+					logServerError('Measurement export stream failed', error, {
+						'app.operation': 'measurement.export_stream',
+						'export.format': params.format,
+						'export.column_count': params.columns.length,
+					})
 					console.error('Stream error:', error)
 					controller.error(error)
 				}
@@ -354,6 +360,9 @@ export async function loader({ request }: Route.LoaderArgs) {
 			}
 			return err
 		}
+		logServerError('Measurement export setup failed unexpectedly', err, {
+			'app.operation': 'measurement.export_setup',
+		})
 		return StandardResponse.internalServerError()
 	}
 }
