@@ -212,7 +212,7 @@ export async function getDeviceForSingleMeasurementWrite({
 	id,
 	sensorId,
 }: Pick<Device, 'id'> & { sensorId: string }) {
-	const prepared = await drizzleClient
+	const prepared = drizzleClient
 		.select({
 			id: device.id,
 			archivedAt: device.archivedAt,
