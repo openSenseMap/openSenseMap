@@ -48,6 +48,12 @@ export default function Info() {
 					}
 				>
 					<DropdownMenuGroup>
+						<Link to="/about" prefetch="intent">
+							<DropdownMenuItem className="cursor-pointer">
+								<InfoIcon className="mr-2 h-5 w-5" />
+								<span>{t('about_label')}</span>
+							</DropdownMenuItem>
+						</Link>
 						<Link to={ENV.COMMUNITY_URL} target="_blank">
 							<DropdownMenuItem className="cursor-pointer">
 								<MessagesSquare className="mr-2 h-5 w-5" />
