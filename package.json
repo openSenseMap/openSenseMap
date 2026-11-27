@@ -4,7 +4,7 @@
   "type": "module",
   "sideEffects": false,
   "scripts": {
-    "dev": "cross-env NODE_OPTIONS=--import=./instrument.server.mjs react-router dev",
+    "dev": "node --import=./instrument.server.mjs ./node_modules/@react-router/dev/bin.cjs dev",
     "build": "run-s build:*",
     "build:drizzle": "vp run db:generate",
     "build:react-router": "react-router build",

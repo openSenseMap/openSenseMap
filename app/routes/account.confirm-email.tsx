@@ -16,7 +16,7 @@ export async function loader({ request }: Route.LoaderArgs) {
 
 	const updated = await confirmEmail(token)
 
-	if (!updated) {
+	if (updated !== 'success') {
 		return redirect('/settings/account?emailConfirm=invalid_or_expired')
 	}
 
