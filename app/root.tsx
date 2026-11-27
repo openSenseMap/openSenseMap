@@ -15,7 +15,10 @@ import invariant from 'tiny-invariant'
 import { type Route } from './+types/root'
 import ErrorMessage from './components/error-message'
 import { TosGraceDialog } from './components/tos-grace-dialog'
+import { SentryPerformanceConsentBanner } from './components/sentry-performance-consent'
 import { Toaster } from './components/ui/toaster'
+import { getUserDeviceLocations } from './db/models/device.server'
+import { getProfileMapPreferencesByUserId } from './db/models/profile.server'
 import { getTosRequirementForUser } from './db/models/tos.server'
 import { updateUserPreferencesById } from './db/models/user.server'
 import { getEnv } from './lib/env.server'
@@ -31,8 +34,10 @@ import {
 	getThemePreference,
 	themeCookie,
 } from './services/theme-service.server'
+import { getSentryPerformanceConsent } from './services/sentry-consent.server'
 import { PreventFlashOnWrongTheme } from './components/prevent-theme-flash'
 import { TooltipProvider } from './components/ui/tooltip'
+import { clearExploreLoaderCache } from './lib/explore-loader-cache'
 
 export const middleware: Route.MiddlewareFunction[] = [
 	prometheusMetricsMiddleware,
@@ -40,29 +45,22 @@ export const middleware: Route.MiddlewareFunction[] = [
 	tosUiMiddleware,
 ]
 
+export const clientMiddleware: Route.ClientMiddlewareFunction[] = [
+	async ({ request }, next) => {
+		// Mutations can change the public map data.
+		const isMutation = request.method !== 'GET'
+		if (isMutation) clearExploreLoaderCache()
+		try {
+			await next()
+		} finally {
+			// Loads started during the mutation may have read the old data.
+			if (isMutation) clearExploreLoaderCache()
+		}
+	},
+]
+
 export const links = () => {
 	return [
-		{
-			rel: 'preload',
-			as: 'font',
-			href: '/fonts/RobotoSlab-Medium.woff2',
-			type: 'font/woff2',
-			crossOrigin: 'anonymous',
-		},
-		{
-			rel: 'preload',
-			as: 'font',
-			href: '/fonts/RobotoSlab-Regular.woff2',
-			type: 'font/woff2',
-			crossOrigin: 'anonymous',
-		},
-		{
-			rel: 'preload',
-			as: 'font',
-			href: '/fonts/Urbanist-Medium.woff2',
-			type: 'font/woff2',
-			crossOrigin: 'anonymous',
-		},
 		{
 			rel: 'preload',
 			as: 'font',
@@ -84,15 +82,25 @@ export const links = () => {
 	]
 }
 
-export async function loader({ context, request }: Route.LoaderArgs) {
+export function headers({ loaderHeaders }: Route.HeadersArgs) {
+	return loaderHeaders
+}
+
+export async function loader({ context, pattern, request }: Route.LoaderArgs) {
 	const locale = getLocale(context)
 	const user = await getUser(request)
-	const dismissedGraceTosVersionId = user
-		? await getDismissedGraceTosVersionId(request)
-		: undefined
-	const tosRequirement = user
-		? await getTosRequirementForUser(user.id)
-		: undefined
+	const isExplore = /^\/?explore(?:\/|$)/.test(pattern)
+	const [
+		dismissedGraceTosVersionId,
+		tosRequirement,
+		mapPreferences,
+		userDeviceLocations,
+	] = await Promise.all([
+		user ? getDismissedGraceTosVersionId(request) : undefined,
+		user ? getTosRequirementForUser(user.id) : undefined,
+		user && isExplore ? getProfileMapPreferencesByUserId(user.id) : null,
+		user && isExplore ? getUserDeviceLocations(user.id) : [],
+	])
 	const graceTos =
 		tosRequirement?.inGrace &&
 		!tosRequirement.accepted &&
@@ -115,8 +123,13 @@ export async function loader({ context, request }: Route.LoaderArgs) {
 		: cookieThemePreference
 
 	const theme = getServerTheme(themePreference)
+	const sentryPerformanceConsent = await getSentryPerformanceConsent(request)
 
-	const headers = new Headers()
+	// Intent prefetch can run before another tab changes the session cookie.
+	const headers = new Headers({
+		'Cache-Control': 'private, no-store',
+		Vary: 'Cookie',
+	})
 
 	// setting the cookie is required here to make sure we keep the server and client
 	// instance of i18n in synch
@@ -130,11 +143,16 @@ export async function loader({ context, request }: Route.LoaderArgs) {
 	return data(
 		{
 			user,
+			mapPreferences,
+			userDeviceLocations,
 			graceTos,
 			locale,
 			themePreference,
 			theme,
-			ENV: getEnv(),
+			sentryPerformanceConsent,
+			ENV: getEnv({
+				sentryPerformanceTracingEnabled: sentryPerformanceConsent === 'granted',
+			}),
 		},
 		{ headers },
 	)
@@ -242,8 +260,25 @@ const meta = () => (
 	</>
 )
 
+function EnvScript({ env }: { env: Window['ENV'] }) {
+	return (
+		<script
+			dangerouslySetInnerHTML={{
+				__html: `window.ENV = ${JSON.stringify(env).replaceAll('<', '\\u003c')}`,
+			}}
+		/>
+	)
+}
+
 export default function App({
-	loaderData: { locale, ENV, themePreference, theme, graceTos },
+	loaderData: {
+		locale,
+		ENV,
+		themePreference,
+		theme,
+		graceTos,
+		sentryPerformanceConsent,
+	},
 }: Route.ComponentProps) {
 	const { i18n } = useTranslation()
 	useEffect(() => {
@@ -270,15 +305,15 @@ export default function App({
 					<Outlet />
 				</TooltipProvider>
 				{graceTos && <TosGraceDialog key={graceTos.id} tos={graceTos} />}
+				<SentryPerformanceConsentBanner
+					consent={sentryPerformanceConsent}
+					sentryEnabled={Boolean(ENV.SENTRY_DSN)}
+				/>
 				<Toaster />
 
 				<ScrollRestoration />
+				<EnvScript env={ENV} />
 				<Scripts />
-				<script
-					dangerouslySetInnerHTML={{
-						__html: `window.ENV = ${JSON.stringify(ENV)}`,
-					}}
-				/>
 			</body>
 		</html>
 	)
@@ -303,6 +338,7 @@ export function ErrorBoundary() {
 				<div className="flex h-screen w-screen items-center justify-center">
 					<ErrorMessage />
 				</div>
+				<EnvScript env={globalThis.ENV} />
 				<Scripts />
 			</body>
 		</html>

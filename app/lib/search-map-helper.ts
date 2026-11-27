@@ -1,5 +1,8 @@
 import { type LngLatLike, type MapRef } from 'react-map-gl/maplibre'
-import { SearchResult, type SearchBBox } from '~/components/search/search-types'
+import {
+	type SearchResult,
+	type SearchBBox,
+} from '~/components/search/search-types'
 
 export const goToLocation = (map: MapRef | undefined, center: LngLatLike) => {
 	map?.flyTo({

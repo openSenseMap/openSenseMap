@@ -4,7 +4,7 @@ import {
 	getDevice,
 	type UpdateDeviceArgs,
 } from '~/db/models/device.server'
-import { type Device, type User } from '~/db/schema'
+import { type User } from '~/db/schema'
 import { transformDeviceToApiFormat } from '~/lib/device-transform'
 import { withAuthenticatedUser } from '~/lib/jwt'
 import { StandardResponse } from '~/lib/responses'
@@ -18,8 +18,10 @@ import {
 	forbiddenResponse,
 	internalServerErrorResponse,
 	InternalServerErrorSchema,
+	jsonErrorResponse,
 	NotFoundErrorSchema,
 	notFoundResponse,
+	standardErrorResponseSchema,
 	UnauthorizedErrorSchema,
 	unauthorizedResponse,
 } from '~/lib/openapi/errors'
@@ -56,6 +58,8 @@ const messages = {
 		'sensors and addons can not appear in the same request.',
 	deviceNotOwned: 'You do not own this device',
 	deviceArchived: 'Device is archived and cannot be updated',
+	integrationCleanupFailed:
+		'Could not remove device integrations. Please try deleting the device again later.',
 }
 
 const UpdateDeviceRequestSchema = z
@@ -279,7 +283,7 @@ export const openapi: ZodOpenApiPathItemObject = {
 
 			403: forbiddenResponse(
 				ForbiddenErrorSchema,
-				'Invalid or missing JWT authorization.',
+				'The caller is unauthenticated or does not own the device.',
 			),
 
 			404: notFoundResponse(NotFoundErrorSchema, 'Device not found.'),
@@ -287,6 +291,10 @@ export const openapi: ZodOpenApiPathItemObject = {
 			500: internalServerErrorResponse(
 				InternalServerErrorSchema,
 				'Internal server error.',
+			),
+			503: jsonErrorResponse(
+				messages.integrationCleanupFailed,
+				standardErrorResponseSchema('Service Unavailable'),
 			),
 		},
 	},
@@ -580,14 +588,20 @@ async function del(request: Request, user: User, deviceId: string) {
 	if (parsedBody instanceof Response) return parsedBody
 
 	try {
-		const deleted = await deleteDevice(
-			user,
-			device as Device,
-			parsedBody.password,
-		)
+		const deleted = await deleteDevice(user, device, parsedBody.password)
 
+		if (deleted === 'forbidden') {
+			return StandardResponse.forbidden(messages.deviceNotOwned)
+		}
 		if (deleted === 'unauthorized') {
 			return StandardResponse.unauthorized('Password incorrect')
+		}
+		if (deleted === 'integration-cleanup-failed') {
+			return StandardResponse.errorResponse(
+				'Service Unavailable',
+				messages.integrationCleanupFailed,
+				503,
+			)
 		}
 
 		if (!deleted) return StandardResponse.notFound('Device not found')

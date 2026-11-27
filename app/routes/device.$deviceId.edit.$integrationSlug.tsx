@@ -3,7 +3,7 @@ import validator from '@rjsf/validator-ajv8'
 import { eq } from 'drizzle-orm'
 import { Save } from 'lucide-react'
 import React from 'react'
-import { data, redirect, useFetcher, useLoaderData } from 'react-router'
+import { data, redirect, useFetcher } from 'react-router'
 import { type Route } from './+types/device.$deviceId.edit.$integrationSlug'
 import {
 	ArrayFieldItemTemplate,
@@ -16,6 +16,7 @@ import { BaseInputTemplate } from '~/components/rjsf/inputTemplate'
 import { toast } from '~/components/ui/use-toast'
 import { integration } from '~/db/schema/integration'
 import { drizzleClient } from '~/db.server'
+import { logServerError } from '~/lib/sentry.server'
 import { getUserId } from '~/services/session-service.server'
 
 // =====================================================
@@ -141,6 +142,10 @@ export async function action({ request, params }: Route.ActionArgs) {
 		)
 
 		if (!deleteRes.ok && deleteRes.status !== 404) {
+			logServerError('Device integration removal failed', deleteRes, {
+				'app.operation': 'integration.delete',
+				'integration.slug': intg.slug,
+			})
 			return data({ error: 'Failed to delete integration' }, { status: 500 })
 		}
 
@@ -157,6 +162,10 @@ export async function action({ request, params }: Route.ActionArgs) {
 	})
 
 	if (!response.ok) {
+		logServerError('Device integration update failed', response, {
+			'app.operation': 'integration.update',
+			'integration.slug': intg.slug,
+		})
 		const error = await response.json()
 		return data(
 			{ error: error.error || error.details || 'Failed to save configuration' },
@@ -167,8 +176,8 @@ export async function action({ request, params }: Route.ActionArgs) {
 	return data({ success: true })
 }
 
-export default function EditIntegration() {
-	const { intg, schema, uiSchema, integration } = useLoaderData<typeof loader>()
+export default function EditIntegration({ loaderData }: Route.ComponentProps) {
+	const { intg, schema, uiSchema, integration } = loaderData
 
 	const [formData, setFormData] = React.useState(() => {
 		if (!integration) {

@@ -1,9 +1,16 @@
-import moment from 'moment'
+import {
+	differenceInDays,
+	differenceInSeconds,
+	differenceInYears,
+	parseISO,
+} from 'date-fns'
 import { useMemo } from 'react'
 import { useMatches } from 'react-router'
 import { type MyBadge } from './db/models/badge.server'
 import { type User } from './db/schema/user'
 import { validLngLat } from './lib/location'
+import { type SensorWikiAliasEntry } from './lib/sensor-wiki/aliases'
+import { sensorMatchesAnyPhenomenonFilter } from './lib/phenomenon-filter'
 import { validateEmail as validateEmailNew } from './services/user-service'
 
 const DEFAULT_REDIRECT = '/'
@@ -94,6 +101,7 @@ export function validatePassLength(passwords: any) {
 export function getFilteredDevices(
 	devices: any,
 	filterParams: URLSearchParams,
+	sensorWikiAliasEntries: SensorWikiAliasEntry[],
 ) {
 	const statusFilter = filterParams.get('status')?.toLowerCase().split(',') || [
 		'all',
@@ -104,8 +112,8 @@ export function getFilteredDevices(
 		.split(',') || ['all']
 	const phenomenonList = filterParams
 		.get('phenomenon')
-		?.toLowerCase()
-		.split(',')
+		?.split(',')
+		.filter(Boolean)
 	const tagsFilter = filterParams.get('tags')?.toLowerCase().split(',') || []
 	const results = devices.features.filter((device: any) => {
 		// prevent data from invalid locations to be processed
@@ -116,9 +124,7 @@ export function getFilteredDevices(
 		)
 			return false
 
-		const sensorsList = device.properties.sensors?.map((s: any) =>
-			s.title.toLowerCase(),
-		)
+		const sensorsList = device.properties.sensors ?? []
 		const deviceTags =
 			device.properties.tags?.map((tag: string) => tag.toLowerCase()) || [] // Convert device tags to lowercase
 
@@ -132,7 +138,13 @@ export function getFilteredDevices(
 				statusFilter.includes(device.properties.status.toLowerCase())) &&
 			// If phenomenon is provided, check if any sensor matches the selected phenomenon
 			(!filterParams.get('phenomenon') ||
-				sensorsList.some((s: any) => phenomenonList?.includes(s))) &&
+				sensorsList.some((sensor: any) =>
+					sensorMatchesAnyPhenomenonFilter(
+						sensor,
+						phenomenonList ?? [],
+						sensorWikiAliasEntries,
+					),
+				)) &&
 			(tagsFilter.length === 0 ||
 				tagsFilter.some((tag) => deviceTags.includes(tag)))
 		)
@@ -146,9 +158,12 @@ export function getFilteredDevices(
 
 //* Get Minute Formatted String - last sensor measurement update
 export function getMinuteFormattedString(lastMeasurementAt: string) {
-	const secondsAgo = moment().diff(moment(lastMeasurementAt), 'seconds')
+	const secondsAgo = differenceInSeconds(
+		new Date(),
+		parseISO(lastMeasurementAt),
+	)
 
-	if (secondsAgo === null || secondsAgo === undefined) {
+	if (!Number.isFinite(secondsAgo)) {
 		return '-'
 	} else {
 		if (secondsAgo < 120) {
@@ -159,11 +174,12 @@ export function getMinuteFormattedString(lastMeasurementAt: string) {
 }
 
 export function diffFromCreateDate(DeviceCreatedAt: string) {
-	const createDate = moment(DeviceCreatedAt)
-	const yearsFromCreate = moment().diff(createDate, 'years')
+	const createDate = parseISO(DeviceCreatedAt)
+	const now = new Date()
+	const yearsFromCreate = differenceInYears(now, createDate)
 	return `Created ${
 		yearsFromCreate === 0
-			? `${moment().diff(createDate, 'days')} day(s)`
+			? `${differenceInDays(now, createDate)} day(s)`
 			: `${yearsFromCreate} year` + (yearsFromCreate > 1 ? 's' : '')
 	} ago`
 }

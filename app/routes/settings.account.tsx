@@ -3,9 +3,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { Trans, useTranslation } from 'react-i18next'
 import {
 	Form,
-	useActionData,
 	useFetcher,
-	useLoaderData,
 	data,
 	redirect,
 	useSearchParams,
@@ -254,9 +252,10 @@ export async function action({ request }: Route.ActionArgs) {
 	)
 }
 
-export default function EditUserProfilePage() {
-	const userData = useLoaderData<typeof loader>()
-	const actionData = useActionData<typeof action>()
+export default function EditUserProfilePage({
+	loaderData: userData,
+	actionData,
+}: Route.ComponentProps) {
 	const resendFetcher = useFetcher<typeof action>()
 	const passwordFetcher = useFetcher<typeof action>()
 	const { toast } = useToast()
@@ -301,7 +300,7 @@ export default function EditUserProfilePage() {
 
 	const emailChanged = email.trim() !== emailShown.trim()
 
-	function submitProfileWithPassword() {
+	async function submitProfileWithPassword() {
 		if (!profileFormRef.current) return
 
 		const formData = new FormData(profileFormRef.current)
@@ -309,7 +308,7 @@ export default function EditUserProfilePage() {
 		formData.set('intent', 'update-profile')
 		formData.set('passwordUpdate', emailPassword)
 
-		submit(formData, { method: 'post' })
+		await submit(formData, { method: 'post' })
 	}
 
 	function handleSaveClick(event: React.MouseEvent<HTMLButtonElement>) {
@@ -559,10 +558,10 @@ export default function EditUserProfilePage() {
 							placeholder={t('enter_current_password')}
 							value={emailPassword}
 							onChange={(event) => setEmailPassword(event.target.value)}
-							onKeyDown={(event) => {
+							onKeyDown={async (event) => {
 								if (event.key === 'Enter') {
 									event.preventDefault()
-									submitProfileWithPassword()
+									await submitProfileWithPassword()
 								}
 							}}
 						/>

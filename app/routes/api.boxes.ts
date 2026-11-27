@@ -211,7 +211,7 @@ export async function loader({ request }: Route.LoaderArgs) {
 			},
 		})
 	}
-	return Response.json(boxes)
+	return StandardResponse.ok(boxes)
 }
 
 export const action = async ({ request }: Route.ActionArgs) => {
@@ -276,9 +276,11 @@ async function post(request: Request, user: User) {
 				name: validatedData.name,
 				description: validatedData.description,
 				useAuth: validatedData.useAuth,
-				sensorTemplates: validatedData.sensorTemplates,
 				exposure: validatedData.exposure,
 				model: sensorsProvided ? undefined : validatedData.model,
+				sensorTemplates: sensorsProvided
+					? undefined
+					: validatedData.sensorTemplates,
 				latitude: latitude,
 				longitude: longitude,
 				heightAboveGround: heightAboveGround ?? null,

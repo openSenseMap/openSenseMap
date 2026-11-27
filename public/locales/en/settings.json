@@ -59,7 +59,7 @@
 	"newsletter_confirmation_link_invalid_description": "This info mails confirmation link is invalid or has already been used.",
 	"newsletter_disabled": "Info mails disabled.",
 	"newsletter_confirmation_failed": "We couldn't send the info mails confirmation email. Please try again later.",
-	"newsletter_sync_failed": "Info mails preference saved, but syncing with the email provider failed. Please contact us via support@opensensemap.org.",
+	"newsletter_sync_failed": "Info mails preference saved, but syncing with the email provider failed. Please contact us via info@opensensemap.org.",
 	"confirm_password": "Confirm password",
 	"enter_current_password": "Enter your current password",
 	"cancel": "Cancel",

@@ -11,7 +11,10 @@ import {
 import { verifyLogin } from '~/db/models/user.server'
 import { type Device, type User } from '~/db/schema'
 import { uploadedDeviceSchemaV1 } from '~/lib/device-schemas/device-schema-v1'
-import { deleteDeviceImage } from '~/lib/s3.server'
+import { UiDeviceModelZodEnum } from '~/lib/device-enums'
+import { getSensorTemplateValidationError } from '~/lib/model-definitions'
+import { logServerError } from '~/lib/sentry.server'
+import { deleteDeviceIntegrations } from '~/services/integration-service.server'
 
 export const CreateDeviceServiceSchema = z
 	.object({
@@ -32,16 +35,7 @@ export const CreateDeviceServiceSchema = z
 		heightAboveGround: z.number().optional().nullable(),
 		terrainElevation: z.number().optional().nullable(),
 		terrainElevationDataset: z.string().optional().nullable(),
-		model: z
-			.enum([
-				'homeV2Lora',
-				'homeV2Ethernet',
-				'homeV2Wifi',
-				'senseBox:Edu',
-				'luftdaten.info',
-				'custom',
-			])
-			.optional(),
+		model: UiDeviceModelZodEnum.optional(),
 		sensorTemplates: z.array(z.string()).optional(),
 		sensors: z
 			.array(
@@ -50,15 +44,39 @@ export const CreateDeviceServiceSchema = z
 					unit: z.string().min(1, 'Sensor unit is required'),
 					sensorType: z.string().min(1, 'Sensor type is required'),
 					icon: z.string().optional(),
+					sensorWikiType: z.string().optional(),
+					sensorWikiPhenomenon: z.string().optional(),
+					sensorWikiUnit: z.string().optional(),
 				}),
 			)
 			.optional(),
 		deviceSchema: uploadedDeviceSchemaV1.optional(),
 		deviceSchemaVersionId: z.string().optional(),
 	})
-	.refine((data) => !(data.model && data.sensors && data.model !== 'custom'), {
-		message: 'Model and sensors cannot be specified at the same time.',
-		path: ['sensors'],
+	.refine(
+		(data) =>
+			!(
+				data.model &&
+				(data.sensors?.length ?? 0) > 0 &&
+				data.model !== 'custom'
+			),
+		{
+			message: 'Model and sensors cannot be specified at the same time.',
+			path: ['sensors'],
+		},
+	)
+	.superRefine((data, ctx) => {
+		const message = getSensorTemplateValidationError(
+			data.model,
+			data.sensorTemplates,
+		)
+		if (message) {
+			ctx.addIssue({
+				code: 'custom',
+				path: ['sensorTemplates'],
+				message,
+			})
+		}
 	})
 
 export type CreateDeviceServiceInput = z.infer<typeof CreateDeviceServiceSchema>
@@ -227,33 +245,37 @@ export const updateDevice = async (
 	return updateDeviceById(device.id, args)
 }
 /**
- * Deletes a device after verifiying that the user is entitled by checking
- * the password.
- * @param user The user deleting the device
- * @param password The users password to verify
- * @returns True if the device was deleted, otherwise false or "unauthorized"
- * if the user is not entitled to delete the device with the given parameters
+ * Deletes a device and its integrations after checking ownership and password.
  */
 export const deleteDevice = async (
-	user: User,
-	device: Device,
+	user: Pick<User, 'id' | 'email'>,
+	device: Pick<Device, 'id' | 'userId'>,
 	password: string,
-): Promise<boolean | 'unauthorized'> => {
-	if (device.userId !== user.id) return 'unauthorized'
+): Promise<
+	boolean | 'unauthorized' | 'forbidden' | 'integration-cleanup-failed'
+> => {
+	if (device.userId !== user.id) return 'forbidden'
+
 	const verifiedUser = await verifyLogin(user.email, password)
-	if (verifiedUser === null) return 'unauthorized'
+	if (verifiedUser?.id !== user.id) return 'unauthorized'
 
-	const deleted = await deleteDeviceById({ id: device.id, userId: user.id })
-	if (!deleted.count) return false
-
-	if (device.image) {
-		try {
-			await deleteDeviceImage(device.image)
-		} catch (e) {
-			console.error('Failed to delete device image:', e)
+	try {
+		const results = await deleteDeviceIntegrations(device.id)
+		if (results.some((result) => result.status === 'failed')) {
+			return 'integration-cleanup-failed'
 		}
+	} catch (error) {
+		logServerError(
+			'Failed to check device integrations before deletion',
+			error,
+			{
+				'device.id': device.id,
+			},
+		)
+		return 'integration-cleanup-failed'
 	}
-	return true
+
+	return deleteDeviceById({ id: device.id, userId: user.id })
 }
 
 type TagsRow = {

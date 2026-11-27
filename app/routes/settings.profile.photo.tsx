@@ -1,17 +1,10 @@
 import { useForm, getInputProps, getFormProps } from '@conform-to/react'
 import { getZodConstraint, parseWithZod } from '@conform-to/zod/v4'
 import { type FileUpload, parseFormData } from '@mjackson/form-data-parser'
-import { eq } from 'drizzle-orm'
+import { and, eq, isNull } from 'drizzle-orm'
 import { useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import {
-	data,
-	redirect,
-	Form,
-	useActionData,
-	useLoaderData,
-	useNavigate,
-} from 'react-router'
+import { data, redirect, Form, useNavigate } from 'react-router'
 import { z } from 'zod'
 import { type Route } from './+types/settings.profile.photo'
 import { Avatar, AvatarFallback, AvatarImage } from '~/components/ui/avatar'
@@ -22,15 +15,21 @@ import {
 	DialogHeader,
 	DialogTitle,
 } from '~/components/ui/dialog'
-import { getProfileByUserId } from '~/db/models/profile.server'
+import { getSettingsProfileByUserId } from '~/db/models/profile.server'
 import { getUserById } from '~/db/models/user.server'
-import { profileImage } from '~/db/schema'
+import { profile } from '~/db/schema'
 import { drizzleClient } from '~/db.server'
 import { uploadHandler } from '~/lib/file-upload.server'
+import { deleteProfileImage, uploadProfileImage } from '~/lib/s3.server'
+import { logServerWarning } from '~/lib/sentry.server'
 import { getInitials } from '~/lib/strings'
+import { shouldRevalidateExceptRootPreferences } from '~/lib/root-preference-revalidation'
 import { requireUserId } from '~/services/session-service.server'
 
+export { shouldRevalidateExceptRootPreferences as shouldRevalidate }
+
 const MAX_SIZE = 1024 * 1024 * 3 // 3MB
+const SUPPORTED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp']
 
 /*
 The preprocess call is needed because a current bug in @remix-run/web-fetch
@@ -48,14 +47,18 @@ const PhotoFormSchema = z.object({
 			)
 			.refine((file) => {
 				return file.size <= MAX_SIZE
-			}, 'Image size must be less than 3MB'),
+			}, 'Image size must be less than 3MB')
+			.refine(
+				(file) => SUPPORTED_IMAGE_TYPES.includes(file.type),
+				'Image must be a JPEG, PNG, or WebP file',
+			),
 	),
 })
 
 export async function loader({ request }: Route.LoaderArgs) {
 	const userId = await requireUserId(request)
 	const user = await getUserById(userId)
-	const profile = await getProfileByUserId(userId)
+	const profile = await getSettingsProfileByUserId(userId)
 	if (!user) {
 		throw new Error()
 		// throw await authenticator.logout(request, { redirectTo: "/" });
@@ -85,41 +88,67 @@ export async function action({ request }: Route.ActionArgs) {
 
 	const { photoFile } = submission.payload as { photoFile: File }
 
-	// Query user profile
-	const previousProfileWithImage = await drizzleClient.query.profile.findFirst({
+	const existingProfile = await drizzleClient.query.profile.findFirst({
 		where: (profile, { eq }) => eq(profile.userId, userId),
-		with: { profileImage: true },
+		columns: { id: true, image: true },
 	})
+	if (!existingProfile) {
+		throw new Response('Profile not found', { status: 404 })
+	}
 
-	// Store the old image ID before inserting new one
-	const oldImageId = previousProfileWithImage?.profileImage?.id
+	const oldImageKey = existingProfile.image
+	let newImageKey: string | undefined
 
-	// Insert new profile image and get the new ID back
-	const [newImage] = await drizzleClient
-		.insert(profileImage)
-		.values({
-			blob: Buffer.from(await photoFile.arrayBuffer()),
-			contentType: photoFile.type,
-			profileId: previousProfileWithImage?.id,
-		})
-		.returning()
+	try {
+		newImageKey = await uploadProfileImage(existingProfile.id, photoFile)
 
-	// Delete the OLD image (not the new one)
-	if (oldImageId && oldImageId !== newImage.id) {
-		await drizzleClient
-			.delete(profileImage)
-			.where(eq(profileImage.id, oldImageId))
+		const imageHasNotChanged = oldImageKey
+			? eq(profile.image, oldImageKey)
+			: isNull(profile.image)
+		const [updatedProfile] = await drizzleClient
+			.update(profile)
+			.set({ image: newImageKey })
+			.where(and(eq(profile.id, existingProfile.id), imageHasNotChanged))
+			.returning({ id: profile.id })
+
+		if (!updatedProfile) {
+			throw new Response('Profile image changed during upload', { status: 409 })
+		}
+	} catch (error) {
+		if (newImageKey && newImageKey !== oldImageKey) {
+			try {
+				await deleteProfileImage(newImageKey)
+			} catch (cleanupError) {
+				logServerWarning(
+					'Failed to clean up an unreferenced profile image',
+					cleanupError,
+					{ 'profile.id': existingProfile.id },
+				)
+			}
+		}
+		throw error
+	}
+
+	if (oldImageKey && oldImageKey !== newImageKey) {
+		try {
+			await deleteProfileImage(oldImageKey)
+		} catch (error) {
+			logServerWarning('Failed to delete the previous profile image', error, {
+				'profile.id': existingProfile.id,
+			})
+		}
 	}
 
 	return redirect('/settings/profile')
 }
 
-export default function PhotoChooserModal() {
-	const data = useLoaderData<typeof loader>()
+export default function PhotoChooserModal({
+	loaderData: data,
+	actionData,
+}: Route.ComponentProps) {
 	const [newImageSrc, setNewImageSrc] = useState<string | null>(null)
 	const fileInputRef = useRef<HTMLInputElement>(null)
 	const navigate = useNavigate()
-	const actionData = useActionData<typeof action>()
 	const [form, { photoFile }] = useForm({
 		id: 'profile-photo',
 		constraint: getZodConstraint(PhotoFormSchema),
@@ -156,7 +185,9 @@ export default function PhotoChooserModal() {
 							src={
 								newImageSrc
 									? newImageSrc
-									: '/resources/file/' + data.profile?.profileImage?.id
+									: data.profile?.image
+										? `/resources/profile-image/${data.profile.id}?v=${encodeURIComponent(data.profile.image)}`
+										: undefined
 							}
 						/>
 						<AvatarFallback>
@@ -168,7 +199,7 @@ export default function PhotoChooserModal() {
 						{...getInputProps(photoFile, { type: 'file' })}
 						ref={fileInputRef}
 						type="file"
-						accept="image/*"
+						accept="image/jpeg,image/png,image/webp"
 						className="sr-only"
 						tabIndex={-1}
 						onChange={(e) => {

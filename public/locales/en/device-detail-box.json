@@ -1,6 +1,6 @@
 {
-	"share_link": "Share this link.",
-	"close": "Close",
+	"copy_device_link": "Copy device link",
+	"copy_failed": "Could not copy device link",
 	"open_menu": "Open menu",
 	"actions": "Actions",
 	"compare": "Compare",
@@ -35,6 +35,5 @@
 	"device_logs": "Device logs",
 	"logs_owner_hint": "If this is your device, you can make changes in your device settings.",
 	"copied_to_clipboard": "Copied to clipboard",
-	"share_link_hint": "Go ahead and share your link! 🎉",
-	"copy": "Copy"
+	"share_link_hint": "You can now share this link."
 }

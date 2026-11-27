@@ -66,7 +66,6 @@ const BoxesDataQuerySchemaBase = z
 			.refine((d) => !isNaN(d.getTime()), {
 				message: 'from-date is invalid',
 			})
-			.optional()
 			.prefault(() =>
 				new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
 			),
@@ -76,7 +75,6 @@ const BoxesDataQuerySchemaBase = z
 			.refine((d) => !isNaN(d.getTime()), {
 				message: 'to-date is invalid',
 			})
-			.optional()
 			.prefault(() => new Date().toISOString()),
 
 		format: z

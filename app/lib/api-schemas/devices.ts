@@ -1,12 +1,13 @@
 import { z } from 'zod'
-import { DeviceModelEnum } from '~/db/schema/enum'
+import { ApiDeviceModelZodSchema } from '~/lib/device-enums'
+import { getSensorTemplateValidationError } from '~/lib/model-definitions'
+import { ElevationLookupConsentSchema } from '~/lib/openapi/schemas/consent'
 import {
 	DeviceLocationInputSchema,
 	HeightSchema,
 	LatitudeSchema,
 	LongitudeSchema,
 } from '~/lib/openapi/schemas/location'
-import { ElevationLookupConsentSchema } from '~/lib/openapi/schemas/consent'
 
 const DeviceLocationArrayInputSchema = z
 	.union([
@@ -37,52 +38,80 @@ export const DeviceUseAuthSchema = z
 	.union([z.boolean(), z.enum(['true', 'false'])])
 	.transform((value) => value === true || value === 'true')
 
-export const CreateDeviceSchema = z.object({
-	// public API request shape
-	name: z.string().min(1).max(100),
-	description: z
-		.string()
-		.max(5000, 'Description should not exceed 5000 characters')
-		.optional()
-		.nullable(),
-	exposure: z
-		.enum(['indoor', 'outdoor', 'mobile', 'unknown'])
-		.optional()
-		.default('unknown'),
-	location: z
-		.union([DeviceLocationArrayInputSchema, DeviceLocationInputSchema])
-		.transform((loc) => {
-			if (Array.isArray(loc)) return loc
-			return [
-				loc.lng,
-				loc.lat,
-				...(loc.height !== undefined ? [loc.height] : []),
-			]
-		}),
-	elevationLookupConsent: ElevationLookupConsentSchema.optional(),
-	grouptag: z
-		.union([z.string(), z.array(z.string())])
-		.optional()
-		.transform((tags) =>
-			typeof tags === 'string'
-				? tags.split(',').map((tag) => tag.trim())
-				: (tags ?? []),
-		),
-	model: z.enum(DeviceModelEnum.enumValues).default('custom'),
-	useAuth: DeviceUseAuthSchema.optional(),
-	sensorTemplates: z.array(z.string()).optional(),
-	sensors: z
-		.array(
-			z.object({
-				icon: z.string().optional(),
-				title: z.string().min(1),
-				unit: z.string().min(1),
-				sensorType: z.string().min(1),
+export const CreateDeviceSchema = z
+	.object({
+		// public API request shape
+		name: z.string().min(1).max(100),
+		description: z
+			.string()
+			.max(5000, 'Description should not exceed 5000 characters')
+			.optional()
+			.nullable(),
+		exposure: z
+			.enum(['indoor', 'outdoor', 'mobile', 'unknown'])
+			.optional()
+			.default('unknown'),
+		location: z
+			.union([DeviceLocationArrayInputSchema, DeviceLocationInputSchema])
+			.transform((loc) => {
+				if (Array.isArray(loc)) return loc
+				return [
+					loc.lng,
+					loc.lat,
+					...(loc.height !== undefined ? [loc.height] : []),
+				]
 			}),
+		elevationLookupConsent: ElevationLookupConsentSchema.optional(),
+		grouptag: z
+			.union([z.string(), z.array(z.string())])
+			.optional()
+			.transform((tags) =>
+				typeof tags === 'string'
+					? tags.split(',').map((tag) => tag.trim())
+					: (tags ?? []),
+			),
+		model: ApiDeviceModelZodSchema.optional().default('custom'),
+		useAuth: DeviceUseAuthSchema.optional(),
+		sensorTemplates: z.array(z.string()).optional().meta({
+			description:
+				'Required for model luftdaten.info so incoming values can be routed without ambiguity.',
+		}),
+		sensors: z
+			.array(
+				z.object({
+					icon: z.string().optional(),
+					title: z.string().min(1),
+					unit: z.string().min(1),
+					sensorType: z.string().min(1),
+				}),
+			)
+			.optional()
+			.default([]),
+	})
+	.superRefine((data, ctx) => {
+		if (data.sensors.length > 0 && data.model !== 'custom') {
+			ctx.addIssue({
+				code: 'custom',
+				path: ['sensors'],
+				message:
+					'Parameters model and sensors cannot be specified at the same time.',
+			})
+			return
+		}
+		if (data.sensors.length > 0) return
+
+		const message = getSensorTemplateValidationError(
+			data.model,
+			data.sensorTemplates,
 		)
-		.optional()
-		.default([]),
-})
+		if (message) {
+			ctx.addIssue({
+				code: 'custom',
+				path: ['sensorTemplates'],
+				message,
+			})
+		}
+	})
 
 export const DevicesQuerySchema = z.object({
 	format: z
@@ -118,11 +147,13 @@ export const DevicesQuerySchema = z.object({
 				.array(z.string())
 				.min(1, 'At least one date required')
 				.max(2, 'At most two dates allowed')
+				.refine(
+					(arr) => arr.every((value) => !isNaN(new Date(value).getTime())),
+					'Invalid date',
+				)
 				.transform((arr) => {
 					const [fromDateStr, toDateStr] = arr
 					const fromDate = new Date(fromDateStr)
-					if (isNaN(fromDate.getTime()))
-						throw new Error(`Invalid date: ${fromDateStr}`)
 
 					if (!toDateStr) {
 						return {
@@ -132,8 +163,6 @@ export const DevicesQuerySchema = z.object({
 					}
 
 					const toDate = new Date(toDateStr)
-					if (isNaN(toDate.getTime()))
-						throw new Error(`Invalid date: ${toDateStr}`)
 					return { fromDate, toDate }
 				}),
 		)
@@ -146,7 +175,7 @@ export const DevicesQuerySchema = z.object({
 	model: z
 		.string()
 		.transform((v) => v.split(',').map((entry) => entry.trim()))
-		.pipe(z.array(z.enum(DeviceModelEnum.enumValues)))
+		.pipe(z.array(ApiDeviceModelZodSchema))
 		.optional(),
 	exposure: z
 		.string()
@@ -169,11 +198,12 @@ export const DevicesQuerySchema = z.object({
 
 	bbox: z
 		.string()
+		.refine((val) => {
+			const coords = val.split(',').map(Number)
+			return coords.length === 4 && coords.every((n) => !isNaN(n))
+		}, 'Invalid bbox parameter')
 		.transform((val) => {
 			const coords = val.split(',').map(Number)
-			if (coords.length !== 4 || coords.some((n) => isNaN(n))) {
-				throw new Error('Invalid bbox parameter')
-			}
 			const [swLng, swLat, neLng, neLat] = coords
 			return {
 				coordinates: [

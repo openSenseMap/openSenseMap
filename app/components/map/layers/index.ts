@@ -1,5 +1,5 @@
 import { type LayerProps } from 'react-map-gl/maplibre'
-import type { ExpressionSpecification } from 'maplibre-gl'
+import { type ExpressionSpecification } from 'maplibre-gl'
 
 const expression = <T extends ExpressionSpecification>(value: T) => value
 

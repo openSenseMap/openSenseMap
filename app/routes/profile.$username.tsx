@@ -1,28 +1,34 @@
+import { useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
-import { redirect, useLoaderData } from 'react-router'
+import { redirect, useFetcher } from 'react-router'
 import { type Route } from './+types/profile.$username'
+import { type loader as measurementEstimateLoader } from './resources.profile-measurement-estimate.$userId'
 import { getColumns, type SenseBox } from '~/components/mydevices/dt/columns'
 import {
-	CustomTableFeatures,
+	type CustomTableFeatures,
 	DataTable,
 } from '~/components/mydevices/dt/data-table'
 import { NavBar } from '~/components/nav-bar'
 import { Avatar, AvatarFallback, AvatarImage } from '~/components/ui/avatar'
 import { Badge } from '~/components/ui/badge'
 import { Button } from '~/components/ui/button'
+import Spinner from '~/components/spinner'
 import { getPublicDeviceSchemasForUser } from '~/db/models/device-schema.server'
 import {
 	getProfileByUserId,
 	getProfileByUsername,
-	getProfileSensorsAndMeasurementsCount,
+	getProfileSensorCount,
 } from '~/db/models/profile.server'
 import { formatCount } from '~/lib/numbers'
+import { shouldRevalidateExceptRootPreferences } from '~/lib/root-preference-revalidation'
 import { getInitials } from '~/lib/strings'
 import { getUserId } from '~/services/session-service.server'
 import { claimDevice } from '~/services/transfer-service.server'
 import { userNameFromURl } from '~/services/user-service.server'
 import { useHydrated } from '~/hooks/use-hydrated'
-import { ColumnDef, RowData } from '@tanstack/react-table'
+import { type ColumnDef, type RowData } from '@tanstack/react-table'
+
+export { shouldRevalidateExceptRootPreferences as shouldRevalidate }
 
 type ActionData = {
 	success: boolean
@@ -39,8 +45,7 @@ export async function loader({ params, request }: Route.LoaderArgs) {
 		return {
 			profile: null,
 			requestingUserId,
-			sensorsCount: '0',
-			measurementsCount: '0',
+			sensorsCount: 0,
 			deviceSchemas: [],
 		}
 	}
@@ -54,14 +59,17 @@ export async function loader({ params, request }: Route.LoaderArgs) {
 		return redirect('/explore')
 	}
 
-	const counts = await getProfileSensorsAndMeasurementsCount(profile)
-	const deviceSchemas = await getPublicDeviceSchemasForUser(profile.userId)
+	const [deviceSchemas, sensorsCount] = await Promise.all([
+		getPublicDeviceSchemasForUser(profile.userId),
+		getProfileSensorCount(
+			profile.user?.devices.map((device) => device.id) ?? [],
+		),
+	])
 
 	return {
 		profile,
 		requestingUserId,
-		sensorsCount: counts.sensorsCount,
-		measurementsCount: counts.measurementsCount,
+		sensorsCount,
 		deviceSchemas,
 	}
 }
@@ -123,14 +131,25 @@ export async function action({ request, params }: Route.ActionArgs) {
 	}
 }
 
-export default function ProfilePage() {
-	const {
-		profile,
-		sensorsCount,
-		measurementsCount,
-		requestingUserId,
-		deviceSchemas,
-	} = useLoaderData<typeof loader>()
+export default function ProfilePage({ loaderData }: Route.ComponentProps) {
+	const { profile, requestingUserId, sensorsCount, deviceSchemas } = loaderData
+	const measurementFetcher = useFetcher<typeof measurementEstimateLoader>()
+	const profileUserId = profile?.userId
+	const measurementData = measurementFetcher.data
+	const estimatedMeasurementCount =
+		measurementData && measurementData.userId === profileUserId
+			? measurementData.estimatedMeasurementCount
+			: profileUserId
+				? undefined
+				: 0
+
+	useEffect(() => {
+		if (profileUserId) {
+			void measurementFetcher.load(
+				`/resources/profile-measurement-estimate/${encodeURIComponent(profileUserId)}`,
+			)
+		}
+	}, [profileUserId, measurementFetcher.load])
 
 	const { t, i18n } = useTranslation('profile')
 	const columnsTranslation = useTranslation('data-table')
@@ -145,10 +164,10 @@ export default function ProfilePage() {
 				<div className="border-border bg-card text-card-foreground flex w-full min-w-0 flex-col gap-6 rounded-xl border p-4 shadow-sm sm:p-6 lg:w-1/3">
 					<div className="flex items-center gap-4">
 						<Avatar className="h-16 w-16 shrink-0">
-							{profile?.profileImage?.id ? (
+							{profile?.image ? (
 								<AvatarImage
 									className="aspect-auto h-full w-full rounded-full object-cover"
-									src={`/resources/file/${profile.profileImage.id}`}
+									src={`/resources/profile-image/${profile.id}?v=${encodeURIComponent(profile.image)}`}
 								/>
 							) : null}
 							<AvatarFallback>
@@ -183,16 +202,27 @@ export default function ProfilePage() {
 						</div>
 						<div className="border-border bg-muted/60 flex flex-col items-center rounded-lg border p-4">
 							<span className="text-primary text-2xl font-bold">
-								{sensorsCount}
+								{formatCount(sensorsCount)}
 							</span>
 							<span className="text-sm text-gray-500 dark:text-gray-400">
 								{t('sensors')}
 							</span>
 						</div>
 						<div className="border-border bg-muted/60 flex flex-col items-center rounded-lg border p-4">
-							<span className="text-primary text-2xl font-bold">
-								{measurementsCount}
-							</span>
+							<div
+								className="text-primary text-2xl font-bold"
+								title={t('measurements_estimate_hint')}
+							>
+								{estimatedMeasurementCount === undefined ? (
+									<div role="status" aria-label={t('loading_measurements')}>
+										<Spinner />
+									</div>
+								) : estimatedMeasurementCount === null ? (
+									'—'
+								) : (
+									`≈${formatCount(estimatedMeasurementCount)}`
+								)}
+							</div>
 							<span className="text-sm text-gray-500 dark:text-gray-400">
 								{t('measurements')}
 							</span>
