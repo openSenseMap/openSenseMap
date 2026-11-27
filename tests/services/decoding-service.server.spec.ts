@@ -200,6 +200,30 @@ describe('Luftdaten decoding', () => {
 		expect(measurements[1].value).toBeCloseTo(1015.1736)
 	})
 
+	it.each(['SEN55_TS', 'SEN55_TPS'])(
+		'routes %s to the SEN55 typical particle size sensor',
+		async (valueType) => {
+			const measurements = await decodeMeasurements(
+				{ sensordatavalues: [{ value_type: valueType, value: '0.43' }] },
+				{
+					contentType: 'luftdaten',
+					sensors: [
+						{
+							id: 'particle-size-id',
+							data: { sensorDefinitionId: 'sen55_typical_particle_size' },
+						},
+					],
+				},
+			)
+
+			expect(measurements).toHaveLength(1)
+			expect(measurements[0]).toMatchObject({
+				sensor_id: 'particle-size-id',
+				value: 0.43,
+			})
+		},
+	)
+
 	it('keeps the first value when multiple values resolve to one sensor', async () => {
 		const measurements = await decodeMeasurements(
 			{
