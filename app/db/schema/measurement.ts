@@ -47,7 +47,7 @@ export const measurementRelations = relations(measurement, ({ one }) => ({
  */
 export const measurements10minView = pgMaterializedView('measurement_10min', {
 	sensorId: text('sensor_id'),
-	time: timestamp('time', { precision: 3, withTimezone: true }),
+	time: timestamp('time', { precision: 3, withTimezone: true }).notNull(),
 	value: doublePrecision('avg_value'),
 	total_values: integer('total_values'),
 	min_value: doublePrecision('min_value'),
@@ -56,7 +56,7 @@ export const measurements10minView = pgMaterializedView('measurement_10min', {
 
 export const measurements1hourView = pgMaterializedView('measurement_1hour', {
 	sensorId: text('sensor_id'),
-	time: timestamp('time', { precision: 3, withTimezone: true }),
+	time: timestamp('time', { precision: 3, withTimezone: true }).notNull(),
 	value: doublePrecision('avg_value'),
 	total_values: integer('total_values'),
 	min_value: doublePrecision('min_value'),
@@ -65,7 +65,7 @@ export const measurements1hourView = pgMaterializedView('measurement_1hour', {
 
 export const measurements1dayView = pgMaterializedView('measurement_1day', {
 	sensorId: text('sensor_id'),
-	time: timestamp('time', { precision: 3, withTimezone: true }),
+	time: timestamp('time', { precision: 3, withTimezone: true }).notNull(),
 	value: doublePrecision('avg_value'),
 	total_values: integer('total_values'),
 	min_value: doublePrecision('min_value'),
@@ -74,7 +74,7 @@ export const measurements1dayView = pgMaterializedView('measurement_1day', {
 
 export const measurements1monthView = pgMaterializedView('measurement_1month', {
 	sensorId: text('sensor_id'),
-	time: timestamp('time', { precision: 3, withTimezone: true }),
+	time: timestamp('time', { precision: 3, withTimezone: true }).notNull(),
 	value: doublePrecision('avg_value'),
 	total_values: integer('total_values'),
 	min_value: doublePrecision('min_value'),
@@ -83,7 +83,7 @@ export const measurements1monthView = pgMaterializedView('measurement_1month', {
 
 export const measurements1yearView = pgMaterializedView('measurement_1year', {
 	sensorId: text('sensor_id'),
-	time: timestamp('time', { precision: 3, withTimezone: true }),
+	time: timestamp('time', { precision: 3, withTimezone: true }).notNull(),
 	value: doublePrecision('avg_value'),
 	total_values: integer('total_values'),
 	min_value: doublePrecision('min_value'),

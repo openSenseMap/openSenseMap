@@ -23,6 +23,13 @@ export type MapViewport = {
 	zoom: number
 }
 
+export type LngLatCoordinate = readonly [longitude: number, latitude: number]
+
+export type LngLatBounds = [
+	southWest: [longitude: number, latitude: number],
+	northEast: [longitude: number, latitude: number],
+]
+
 const missingLocationValueToUndefined = (value: unknown) => {
 	if (value === null || value === undefined) {
 		return undefined
@@ -157,6 +164,34 @@ export function validLngLat(lng: number, lat: number): boolean {
 		latitude: lat,
 		longitude: lng,
 	}).success
+}
+
+/** Calculate bounds from valid longitude/latitude coordinate pairs. */
+export function getLngLatBounds(
+	coordinates: Iterable<LngLatCoordinate>,
+): LngLatBounds | null {
+	let west = Number.POSITIVE_INFINITY
+	let south = Number.POSITIVE_INFINITY
+	let east = Number.NEGATIVE_INFINITY
+	let north = Number.NEGATIVE_INFINITY
+	let hasValidCoordinate = false
+
+	for (const [longitude, latitude] of coordinates) {
+		if (!validLngLat(longitude, latitude)) continue
+
+		hasValidCoordinate = true
+		west = Math.min(west, longitude)
+		south = Math.min(south, latitude)
+		east = Math.max(east, longitude)
+		north = Math.max(north, latitude)
+	}
+
+	return hasValidCoordinate
+		? [
+				[west, south],
+				[east, north],
+			]
+		: null
 }
 
 export function isValidMapZoom(value: unknown): value is number {

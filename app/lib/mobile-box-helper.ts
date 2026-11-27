@@ -1,3 +1,6 @@
+export const MOBILE_TRIP_GAP_SECONDS = 60
+export const MOBILE_TRIP_LIMIT = 5
+
 export interface LocationPoint {
 	geometry: {
 		x: number
@@ -6,106 +9,159 @@ export interface LocationPoint {
 	time: string
 }
 
-interface Trip {
-	points: LocationPoint[]
+export interface Trip<TPoint extends LocationPoint = LocationPoint> {
+	points: TPoint[]
 	startTime: string
 	endTime: string
 }
 
-export function categorizeIntoTrips(
-	dataPoints: LocationPoint[],
-	timeThreshold: number, // in seconds, time threshold for a new trip
-): Trip[] {
-	const trips: Trip[] = []
-	let currentTrip: LocationPoint[] = []
+/**
+ * Split location points into chronological trips. A gap greater than the
+ * threshold starts a new trip.
+ */
+export function categorizeIntoTrips<TPoint extends LocationPoint>(
+	dataPoints: TPoint[],
+	timeThreshold = MOBILE_TRIP_GAP_SECONDS,
+): Trip<TPoint>[] {
+	const sortedPoints = dataPoints
+		.filter((point) => Number.isFinite(new Date(point.time).getTime()))
+		.sort((a, b) => new Date(a.time).getTime() - new Date(b.time).getTime())
+	if (sortedPoints.length === 0) return []
 
-	// Pre-sort data by time to ensure order
-	dataPoints.sort(
-		(a, b) => new Date(a.time).getTime() - new Date(b.time).getTime(),
-	)
+	const trips: Trip<TPoint>[] = []
+	let currentTrip: TPoint[] = [sortedPoints[0]]
 
-	for (let i = 1; i < dataPoints.length; i++) {
-		const previousPoint = dataPoints[i - 1]
-		const currentPoint = dataPoints[i]
-
-		// Calculate time difference in seconds
+	for (let i = 1; i < sortedPoints.length; i++) {
+		const previousPoint = sortedPoints[i - 1]
+		const currentPoint = sortedPoints[i]
 		const timeDifference =
 			(new Date(currentPoint.time).getTime() -
 				new Date(previousPoint.time).getTime()) /
 			1000
 
-		// Check if a new trip should start based solely on the time difference
-		const isNewTrip = timeDifference > timeThreshold
-
-		if (isNewTrip) {
-			if (currentTrip.length > 0) {
-				trips.push({
-					points: currentTrip,
-					startTime: currentTrip[0].time,
-					endTime: currentTrip[currentTrip.length - 1].time,
-				})
-			}
-			currentTrip = []
+		if (timeDifference > timeThreshold) {
+			trips.push(toTrip(currentTrip))
+			currentTrip = [currentPoint]
+		} else {
+			currentTrip.push(currentPoint)
 		}
-		currentTrip.push(currentPoint)
 	}
 
-	// Add the final trip
-	if (currentTrip.length > 0) {
-		trips.push({
-			points: currentTrip,
-			startTime: currentTrip[0].time,
-			endTime: currentTrip[currentTrip.length - 1].time,
-		})
-	}
-
-	// Optionally merge small trips (can be removed if not needed)
-	return mergeSmallTrips(trips, timeThreshold)
+	trips.push(toTrip(currentTrip))
+	return trips
 }
 
-function mergeSmallTrips(trips: Trip[], timeThreshold: number): Trip[] {
-	if (trips.length <= 1) return trips
+/** Return the newest trips while preserving chronological display order. */
+export function getLatestTrips<TPoint extends LocationPoint>(
+	dataPoints: TPoint[],
+	limit = MOBILE_TRIP_LIMIT,
+	timeThreshold = MOBILE_TRIP_GAP_SECONDS,
+): Trip<TPoint>[] {
+	if (limit <= 0) return []
+	return categorizeIntoTrips(dataPoints, timeThreshold).slice(-limit)
+}
 
-	const mergedTrips: Trip[] = []
-	let currentTrip: Trip | null = null
+export function getLatestTripPoints<TPoint extends LocationPoint>(
+	dataPoints: TPoint[],
+	limit = MOBILE_TRIP_LIMIT,
+	timeThreshold = MOBILE_TRIP_GAP_SECONDS,
+): TPoint[] {
+	return getLatestTrips(dataPoints, limit, timeThreshold).flatMap(
+		(trip) => trip.points,
+	)
+}
 
-	for (const trip of trips) {
-		// If a trip is too small (in terms of points or duration), merge it with the current trip
-		const tripDuration =
-			(new Date(trip.endTime).getTime() - new Date(trip.startTime).getTime()) /
-			1000
+/**
+ * Select the trips shown by the explore map. The default view is deliberately
+ * limited to the newest trips. An explicit date range is an opt-in request for
+ * the trips in that range and is therefore not truncated to the default limit.
+ */
+export function getTripsForDisplay<TPoint extends LocationPoint>(
+	dataPoints: TPoint[],
+	startTime?: Date,
+	endTime?: Date,
+): Trip<TPoint>[] {
+	const start = startTime?.getTime()
+	const end = endTime?.getTime()
 
-		if (tripDuration >= timeThreshold) {
-			if (currentTrip) {
-				mergedTrips.push(currentTrip)
-				currentTrip = null
-			}
-			mergedTrips.push(trip)
-		} else {
-			if (!currentTrip) {
-				currentTrip = { points: [], startTime: '', endTime: '' }
-			}
-			currentTrip.points.push(...trip.points)
+	if (
+		start === undefined ||
+		end === undefined ||
+		!Number.isFinite(start) ||
+		!Number.isFinite(end) ||
+		start > end
+	) {
+		return getLatestTrips(dataPoints)
+	}
 
-			// Recompute start and end times
-			if (currentTrip.points.length > 0) {
-				currentTrip.startTime = currentTrip.points[0].time
-				currentTrip.endTime =
-					currentTrip.points[currentTrip.points.length - 1].time
-			}
+	return categorizeIntoTrips(
+		dataPoints.filter((point) => {
+			const time = new Date(point.time).getTime()
+			return Number.isFinite(time) && time >= start && time <= end
+		}),
+	)
+}
+
+/**
+ * Find the canonical trip containing a timestamp. A small tolerance is useful
+ * for measurements recorded just before the first or after the last location
+ * of a trip. If tolerance windows overlap, the nearest trip wins.
+ */
+export function getTripIndexForTime<TPoint extends LocationPoint>(
+	time: Date | string | null | undefined,
+	trips: Trip<TPoint>[],
+	toleranceSeconds = 0,
+): number | null {
+	const timestamp = time == null ? Number.NaN : new Date(time).getTime()
+	if (!Number.isFinite(timestamp)) return null
+
+	const tolerance =
+		(Number.isFinite(toleranceSeconds) ? Math.max(0, toleranceSeconds) : 0) *
+		1000
+	let closestTrip: { index: number; distance: number } | null = null
+
+	for (let index = 0; index < trips.length; index++) {
+		const trip = trips[index]
+		const start = new Date(trip.startTime).getTime()
+		const end = new Date(trip.endTime).getTime()
+		if (!Number.isFinite(start) || !Number.isFinite(end)) continue
+
+		const lowerBound = Math.min(start, end)
+		const upperBound = Math.max(start, end)
+		if (
+			timestamp < lowerBound - tolerance ||
+			timestamp > upperBound + tolerance
+		) {
+			continue
+		}
+
+		const distance =
+			timestamp < lowerBound
+				? lowerBound - timestamp
+				: timestamp > upperBound
+					? timestamp - upperBound
+					: 0
+
+		if (closestTrip === null || distance < closestTrip.distance) {
+			closestTrip = { index, distance }
 		}
 	}
 
-	// Add any remaining combined trip
-	if (currentTrip && currentTrip.points.length > 0) {
-		mergedTrips.push(currentTrip)
-	}
+	return closestTrip?.index ?? null
+}
 
-	// Post-process to sort all trips by time
-	return mergedTrips.map((trip) => {
-		trip.points.sort(
-			(a, b) => new Date(a.time).getTime() - new Date(b.time).getTime(),
-		)
-		return trip
-	})
+export function isTimeWithinTrips<TPoint extends LocationPoint>(
+	time: Date | string | null | undefined,
+	trips: Trip<TPoint>[],
+	toleranceSeconds = 0,
+): boolean {
+	return getTripIndexForTime(time, trips, toleranceSeconds) !== null
+}
+
+function toTrip<TPoint extends LocationPoint>(points: TPoint[]): Trip<TPoint> {
+	return {
+		points,
+		startTime: points[0].time,
+		endTime: points[points.length - 1].time,
+	}
 }

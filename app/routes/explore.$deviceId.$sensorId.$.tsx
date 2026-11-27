@@ -1,6 +1,7 @@
-import { addDays } from 'date-fns'
-import { redirect } from 'react-router'
+import { useMemo } from 'react'
+import { redirect, useRouteLoaderData } from 'react-router'
 import { type Route } from './+types/explore.$deviceId.$sensorId.$'
+import { type loader as deviceLoader } from './explore.$deviceId'
 import Graph from '~/components/device-detail/graph'
 import MobileBoxView from '~/components/map/layers/mobile/mobile-box-view'
 import { getDeviceExposure } from '~/db/models/device.server'
@@ -10,16 +11,46 @@ import {
 } from '~/db/models/measurement.query.server'
 import { getSensor } from '~/db/models/sensor.server'
 import { type SensorWithMeasurementData } from '~/db/schema'
-import {
-	categorizeIntoTrips,
-	type LocationPoint,
-} from '~/lib/mobile-box-helper'
+import { isTimeWithinTrips, type Trip } from '~/lib/mobile-box-helper'
 import { shouldRevalidateExceptRootPreferences } from '~/lib/root-preference-revalidation'
 
 export { shouldRevalidateExceptRootPreferences as shouldRevalidate }
 
+const EMPTY_TRIPS: Trip[] = []
+
 interface SensorWithColor extends SensorWithMeasurementData {
 	color: string
+}
+
+type RawMeasurement = {
+	locationId?: bigint | null
+	time: Date | null
+	value: number | null
+	location?: {
+		id: bigint
+		x: number
+		y: number
+	} | null
+}
+
+function prepareSensorData(
+	measurements: RawMeasurement[],
+	sensorId: string,
+): SensorWithMeasurementData['data'] {
+	return measurements
+		.slice(0, MAX_CHART_MEASUREMENTS_PER_SENSOR)
+		.map((measurement) => ({
+			...measurement,
+			sensorId,
+			locationId:
+				measurement.locationId == null ? null : Number(measurement.locationId),
+			location: measurement.location
+				? {
+						...measurement.location,
+						id: Number(measurement.location.id),
+					}
+				: null,
+		}))
 }
 
 export async function loader({ params, request }: Route.LoaderArgs) {
@@ -40,6 +71,8 @@ export async function loader({ params, request }: Route.LoaderArgs) {
 	const aggregation = url.searchParams.get('aggregation') || 'raw'
 	const startDate = url.searchParams.get('date_from')
 	const endDate = url.searchParams.get('date_to')
+	const start = startDate ? new Date(startDate) : undefined
+	const end = endDate ? new Date(endDate) : undefined
 
 	if (!sensorId) {
 		throw new Response('Sensor 1 not found', { status: 404 })
@@ -49,20 +82,15 @@ export async function loader({ params, request }: Route.LoaderArgs) {
 	const sensor1Data = await getChartMeasurement(
 		sensorId,
 		aggregation,
-		startDate ? new Date(startDate) : undefined,
-		endDate ? addDays(new Date(endDate), 1) : undefined,
+		start,
+		end,
 	)
 	let sensor2: SensorWithColor | null = null
 	let sensor2Data: Awaited<ReturnType<typeof getChartMeasurement>> | null = null
 
 	if (sensorId2) {
 		sensor2 = (await getSensor(sensorId2)) as SensorWithColor
-		sensor2Data = await getChartMeasurement(
-			sensorId2,
-			aggregation,
-			startDate ? new Date(startDate) : undefined,
-			endDate ? addDays(new Date(endDate), 1) : undefined,
-		)
+		sensor2Data = await getChartMeasurement(sensorId2, aggregation, start, end)
 	}
 
 	const limitExceeded =
@@ -72,162 +100,17 @@ export async function loader({ params, request }: Route.LoaderArgs) {
 		limitExceeded && aggregation === 'raw' && !startDate && !endDate
 
 	// A selected range must never show a partial chart as though it were complete.
-	if (limitExceeded && !showingLatestOnly) {
-		sensor1.data = []
-		if (sensor2) sensor2.data = []
-		return {
-			device,
-			sensors: sensor2 ? [sensor1, sensor2] : [sensor1],
-			startDate,
-			endDate,
-			aggregation,
-			limitExceeded,
-			showingLatestOnly,
-		}
-	}
+	const hideMeasurements = limitExceeded && !showingLatestOnly
+	sensor1.data = hideMeasurements
+		? []
+		: prepareSensorData(sensor1Data, sensorId)
+	sensor1.color = sensor1.color || '#8da0cb'
 
-	const normalizedSensor1Data = (
-		sensor1Data.slice(0, MAX_CHART_MEASUREMENTS_PER_SENSOR) as {
-			sensorId: string
-			locationId: bigint | null
-			time: Date
-			value: number | null
-			location: {
-				id: bigint
-				x: number
-				y: number
-			}
-		}[]
-	).map((d) => ({
-		...d,
-		locationId: Number(d.locationId),
-		location: d.location
-			? {
-					...d.location,
-					id: Number(d.location.id),
-				}
-			: null,
-	}))
-
-	// If device exposure is 'mobile', process trips
-	if (device.exposure === 'mobile' && !startDate) {
-		// Categorize data into trips
-		const dataPoints: LocationPoint[] = normalizedSensor1Data
-			.filter((d) => d.location !== null)
-			.map((d) => ({
-				// null locations cannot be shown on the map and have been filtered above
-				// hence the ! operator is fine here
-				geometry: { x: d.location!.x, y: d.location!.y },
-				time: d.time.toISOString(), // Ensure the time is in ISO format
-			}))
-
-		const trips = categorizeIntoTrips(dataPoints, 600) // 600 seconds (10 minutes) as the time threshold
-
-		// Get the latest 5 trips
-		const latestTrips = trips.slice(0, 1)
-
-		// Calculate the time range of the latest 5 trips
-		const latestTripTimeRange = {
-			startTime: latestTrips[0].startTime,
-			endTime: latestTrips[latestTrips.length - 1].endTime,
-		}
-
-		// Filter sensor data to include only the points within the time range of the latest 5 trips
-		const filteredData = normalizedSensor1Data.filter((point) => {
-			const pointTime = point.time.getTime()
-			const tripStartTime = new Date(latestTripTimeRange.startTime).getTime()
-			const tripEndTime = new Date(latestTripTimeRange.endTime).getTime()
-
-			// Keep only the points within the time range of the latest trips
-			return pointTime >= tripStartTime && pointTime <= tripEndTime
-		})
-
-		// Update sensor1 data with the filtered data
-		sensor1.data = filteredData.map((d) => ({
-			...d,
-			sensorId: sensorId, // Set the sensorId to match
-			locationId: d.locationId ?? null, // Retain the locationId if available
-			location: d.location,
-			time: d.time, // Keep the timestamp
-			value: d.value ?? 0, // Set value to the actual value or default it to 0
-		}))
-
-		sensor1.color = sensor1.color || '#8da0cb'
-	} else {
-		sensor1.data = normalizedSensor1Data
-		sensor1.color = sensor1.color || '#8da0cb'
-	}
-
-	if (sensor2 && sensor2Data) {
-		const normalizedSensor2Data = (
-			sensor2Data.slice(0, MAX_CHART_MEASUREMENTS_PER_SENSOR) as {
-				sensorId: string
-				locationId: bigint | null
-				time: Date
-				value: number | null
-				location: {
-					id: bigint
-					x: number
-					y: number
-				}
-			}[]
-		).map((d) => ({
-			...d,
-			locationId: Number(d.locationId),
-			location: d.location
-				? {
-						...d.location,
-						id: Number(d.location.id),
-					}
-				: null,
-		}))
-
-		if (device.exposure === 'mobile') {
-			// Categorize data into trips
-			const dataPoints: LocationPoint[] = normalizedSensor2Data
-				.filter((d) => d.location !== null)
-				.map((d) => ({
-					// null locations cannot be shown on the map and have been filtered above
-					// hence the ! operator is fine here
-					geometry: { x: d.location!.x, y: d.location!.y },
-					time: d.time.toISOString(), // Ensure the time is in ISO format
-				}))
-
-			const trips = categorizeIntoTrips(dataPoints, 600) // 600 seconds (10 minutes) as the time threshold
-
-			// Get the latest trip --- slice to get more trips if needed
-			const latestTrips = trips.slice(0, 1)
-
-			// Calculate the time range of the latest 5 trips
-			const latestTripTimeRange = {
-				startTime: latestTrips[0].startTime,
-				endTime: latestTrips[latestTrips.length - 1].endTime,
-			}
-
-			// Filter sensor data to include only the points within the time range of the latest 5 trips
-			const filteredData = normalizedSensor2Data.filter((point) => {
-				const pointTime = point.time.getTime()
-				const tripStartTime = new Date(latestTripTimeRange.startTime).getTime()
-				const tripEndTime = new Date(latestTripTimeRange.endTime).getTime()
-
-				// Keep only the points within the time range of the latest trips
-				return pointTime >= tripStartTime && pointTime <= tripEndTime
-			})
-
-			// Update sensor2 data with the filtered data
-			sensor2.data = filteredData.map((d) => ({
-				...d,
-				sensorId: sensorId2, // Set the sensorId to match
-				locationId: d.locationId ?? null, // Retain the locationId if available
-				location: d.location,
-				time: d.time, // Keep the timestamp
-				value: d.value ?? 0, // Set value to the actual value or default it to 0
-			}))
-			sensor2.color = sensor2.color || '#fc8d62'
-		} else {
-			sensor2.data = normalizedSensor2Data
-			sensor2.color = sensor2.color || '#fc8d62'
-		}
+	if (sensor2 && sensorId2 && sensor2Data) {
+		sensor2.data = hideMeasurements
+			? []
+			: prepareSensorData(sensor2Data, sensorId2)
+		sensor2.color = sensor2.color || '#fc8d62'
 	}
 
 	return {
@@ -242,19 +125,45 @@ export async function loader({ params, request }: Route.LoaderArgs) {
 }
 
 export default function SensorView({ loaderData }: Route.ComponentProps) {
+	const deviceData = useRouteLoaderData<typeof deviceLoader>(
+		'routes/explore.$deviceId',
+	)
+	const trips = deviceData?.mobileTrips ?? EMPTY_TRIPS
+	const { aggregation, device, startDate, endDate } = loaderData
+	const isMobile = device.exposure === 'mobile'
+	const hasDateRange = Boolean(startDate && endDate)
+	const sensors = useMemo(() => {
+		// The explicit chart range can exceed the map's location history limit.
+		if (
+			!isMobile ||
+			aggregation !== 'raw' ||
+			hasDateRange ||
+			trips.length === 0
+		) {
+			return loaderData.sensors
+		}
+
+		return loaderData.sensors.map((sensor) => ({
+			...sensor,
+			data: sensor.data.filter((measurement) =>
+				isTimeWithinTrips(measurement.time, trips),
+			),
+		}))
+	}, [aggregation, hasDateRange, isMobile, loaderData.sensors, trips])
+
 	return (
 		<>
 			<Graph
-				aggregation={loaderData.aggregation}
-				sensors={loaderData.sensors}
-				startDate={loaderData.startDate ?? undefined}
-				endDate={loaderData.endDate ?? undefined}
+				aggregation={aggregation}
+				sensors={sensors}
+				startDate={startDate ?? undefined}
+				endDate={endDate ?? undefined}
 				limitExceeded={loaderData.limitExceeded}
 				showingLatestOnly={loaderData.showingLatestOnly}
 			/>
-			{loaderData.device?.exposure === 'mobile' &&
+			{isMobile &&
 				(!loaderData.limitExceeded || loaderData.showingLatestOnly) && (
-					<MobileBoxView sensors={loaderData.sensors} />
+					<MobileBoxView sensors={sensors} trips={trips} />
 				)}
 		</>
 	)

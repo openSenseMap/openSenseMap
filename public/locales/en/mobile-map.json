@@ -1,0 +1,13 @@
+{
+	"recentTrips": "Recent trips",
+	"tripExplanationLabel": "How trips are determined",
+	"tripExplanation": "Trips are inferred from gaps between location updates. Up to {{count}} recent trips are shown, so the grouping may not always match the actual journey.",
+	"colorByTrip": "Color by trip",
+	"colorByTripAriaLabel": "Color map points by trip",
+	"visibleTrips": "Visible trips",
+	"latest": "Latest",
+	"latestTripAriaLabel": "{{label}}, latest trip",
+	"sensorValues": "Sensor values",
+	"clusterPoints": "Cluster of {{count}} points",
+	"to": "To"
+}

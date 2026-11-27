@@ -119,8 +119,10 @@ export function assertDeviceIsMutable(
 export function getDevice({
 	id,
 	locationLimit,
+	locationRange,
 }: Pick<Device, 'id'> & {
 	locationLimit?: number
+	locationRange?: { start: Date; end: Date }
 }) {
 	return drizzleClient.query.device.findFirst({
 		where: (device, { eq }) => eq(device.id, id),
@@ -143,6 +145,13 @@ export function getDevice({
 				},
 			},
 			locations: {
+				where: locationRange
+					? between(
+							deviceToLocation.time,
+							locationRange.start,
+							locationRange.end,
+						)
+					: undefined,
 				...(locationLimit === undefined
 					? {}
 					: { orderBy: desc(deviceToLocation.time), limit: locationLimit }),
