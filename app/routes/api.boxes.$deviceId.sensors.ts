@@ -54,6 +54,7 @@ const SensorWithLatestMeasurementSchema = z
 
 const DeviceWithSensorsSchema = z
 	.object({
+		_id: z.string(),
 		id: z.string().meta({
 			description: 'Device id',
 			example: '5bdbe70f55d0ad001a04edc9',
@@ -152,8 +153,18 @@ export const loader = async ({
 			return StandardResponse.notFound(apiMessages.deviceNotFound)
 		}
 
-		const responseParsed =
-			await DeviceWithSensorsSchema.safeParseAsync(deviceWithSensors)
+		const responseParsed = await DeviceWithSensorsSchema.safeParseAsync({
+			...deviceWithSensors,
+			_id: deviceWithSensors.id,
+			sensors: deviceWithSensors.sensors.map((sensor) => ({
+				...sensor,
+				_id: sensor.id,
+				lastMeasurement: sensor.lastMeasurement && {
+					...sensor.lastMeasurement,
+					value: sensor.lastMeasurement.value?.toString() ?? null,
+				},
+			})),
+		})
 
 		if (!responseParsed.success) {
 			return StandardResponse.internalServerError()

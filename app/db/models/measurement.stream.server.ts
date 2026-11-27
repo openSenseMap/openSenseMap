@@ -44,7 +44,8 @@ export async function* streamMeasurements(
 		m.sensor_id,
 		m.time,
 		m.value,
-		l.location,
+		ST_X(l.location) AS location_lng,
+		ST_Y(l.location) AS location_lat,
 		m.location_id
 	  FROM measurement m
 	  LEFT JOIN location l ON m.location_id = l.id

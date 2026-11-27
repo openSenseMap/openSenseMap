@@ -1,4 +1,5 @@
 import { type Route } from './+types/api.users.password-reset'
+import { parseJsonOrFormRequest } from '~/lib/request-parsing'
 import { StandardResponse } from '~/lib/responses'
 import { resetPassword } from '~/services/user-service.server'
 
@@ -63,6 +64,7 @@ export const openapi: ZodOpenApiPathItemObject = {
 		requestBody: {
 			required: true,
 			content: {
+				'application/json': { schema: PasswordResetRequestSchema },
 				'application/x-www-form-urlencoded': {
 					schema: PasswordResetRequestSchema,
 				},
@@ -100,32 +102,11 @@ export const openapi: ZodOpenApiPathItemObject = {
 	},
 }
 
-const parsePasswordResetRequest = async (
-	request: Request,
-): Promise<z.output<typeof PasswordResetRequestSchema> | Response> => {
-	let formData: FormData
-
-	try {
-		formData = await request.formData()
-	} catch {
-		return StandardResponse.badRequest('Bad Request')
-	}
-
-	const parsed = await PasswordResetRequestSchema.safeParseAsync(
-		Object.fromEntries(formData.entries()),
-	)
-
-	if (!parsed.success) {
-		return StandardResponse.badRequest(
-			parsed.error.issues[0]?.message ?? 'Bad Request',
-		)
-	}
-
-	return parsed.data
-}
-
 export const action = async ({ request }: Route.ActionArgs) => {
-	const requestParsed = await parsePasswordResetRequest(request)
+	const requestParsed = await parseJsonOrFormRequest(
+		request,
+		PasswordResetRequestSchema,
+	)
 
 	if (requestParsed instanceof Response) {
 		return requestParsed
@@ -152,9 +133,7 @@ export const action = async ({ request }: Route.ActionArgs) => {
 				)
 
 			case 'success':
-				return await PasswordResetResponseSchema.safeParseAsync({
-					code: 'Ok',
-				})
+				return StandardResponse.ok(PasswordResetResponseSchema.parse({}))
 
 			default:
 				return StandardResponse.internalServerError()

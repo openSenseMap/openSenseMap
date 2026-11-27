@@ -5,8 +5,12 @@ import {
 	type FindDevicesOptions,
 } from '~/db/models/device.server'
 import { type User } from '~/db/schema'
-import { transformDeviceToApiFormat } from '~/lib/device-transform'
+import {
+	transformDeviceToApiFormat,
+	type DeviceWithSensors,
+} from '~/lib/device-transform'
 import { StandardResponse } from '~/lib/responses'
+import { z } from 'zod'
 
 import { type ZodOpenApiPathItemObject } from 'zod-openapi'
 import {
@@ -48,11 +52,12 @@ const CreateDeviceRequestSchema = CreateDeviceSchema.meta({
 	description: 'Payload for creating a new device.',
 })
 
-const CreatedDeviceResponseSchema = ApiDeviceSchema.meta({
-	id: 'CreatedDeviceResponse',
-	description:
-		'Created device response transformed through `transformDeviceToApiFormat`.',
-})
+const CreatedDeviceResponseSchema = z
+	.object({
+		message: z.literal('Box successfully created'),
+		data: ApiDeviceSchema,
+	})
+	.meta({ id: 'CreatedDeviceResponse' })
 
 export const openapi: ZodOpenApiPathItemObject = {
 	get: {
@@ -166,26 +171,37 @@ export async function loader({ request }: Route.LoaderArgs) {
 		)
 	}
 
-	const params: FindDevicesOptions = parseResult.data
+	const { date, ...query } = parseResult.data
+	const params: FindDevicesOptions = { ...query, ...date }
 
-	const devices = await findDevices(params)
+	const devices = await findDevices(params, {}, { sensors: true })
+	const boxes = devices.map((row) => {
+		const { sensors: _rawSensors, ...fields } = row as DeviceWithSensors
+		const {
+			_id,
+			currentLocation,
+			sensors,
+			lastMeasurementAt,
+			grouptag,
+			height,
+		} = transformDeviceToApiFormat(row as DeviceWithSensors)
+		return {
+			...fields,
+			_id,
+			currentLocation,
+			lastMeasurementAt,
+			height,
+			...(!params.minimal && { grouptag, sensors }),
+		}
+	})
 
 	if (params.format === 'geojson') {
 		const geojson = {
 			type: 'FeatureCollection',
-			features: devices.map((device) => ({
+			features: boxes.map(({ currentLocation, ...properties }) => ({
 				type: 'Feature',
-				geometry: {
-					type: 'Point',
-					coordinates:
-						device.heightAboveSeaLevel === null
-							? [device.longitude, device.latitude]
-							: [device.longitude, device.latitude, device.heightAboveSeaLevel],
-				},
-				properties: {
-					...device,
-					height: device.heightAboveSeaLevel,
-				},
+				geometry: { type: 'Point', coordinates: currentLocation.coordinates },
+				properties,
 			})),
 		}
 
@@ -195,17 +211,7 @@ export async function loader({ request }: Route.LoaderArgs) {
 			},
 		})
 	}
-	return Response.json(
-		devices.map((device) => ({
-			...device,
-			height: device.heightAboveSeaLevel,
-		})),
-		{
-			headers: {
-				'Content-Type': 'application/json; charset=utf-8',
-			},
-		},
-	)
+	return StandardResponse.ok(boxes)
 }
 
 export const action = async ({ request }: Route.ActionArgs) => {
@@ -268,6 +274,8 @@ async function post(request: Request, user: User) {
 		const newDevice = await createDevice(
 			{
 				name: validatedData.name,
+				description: validatedData.description,
+				useAuth: validatedData.useAuth,
 				exposure: validatedData.exposure,
 				model: sensorsProvided ? undefined : validatedData.model,
 				sensorTemplates: sensorsProvided
@@ -284,6 +292,7 @@ async function post(request: Request, user: User) {
 							title: s.title,
 							sensorType: s.sensorType,
 							unit: s.unit,
+							icon: s.icon,
 						}))
 					: undefined,
 			},
@@ -293,7 +302,10 @@ async function post(request: Request, user: User) {
 		// Build response object using helper function
 		const responseData = transformDeviceToApiFormat(newDevice)
 
-		return StandardResponse.created(responseData)
+		return StandardResponse.created({
+			message: 'Box successfully created',
+			data: responseData,
+		})
 	} catch {
 		return StandardResponse.internalServerError()
 	}

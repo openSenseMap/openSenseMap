@@ -31,6 +31,7 @@ const GetCurrentUserDeviceResponseSchema = z
 	.object({
 		code: z.literal('Ok').default('Ok'),
 		data: z.object({
+			box: CurrentUserPrivateDeviceSchema,
 			device: CurrentUserPrivateDeviceSchema,
 		}),
 	})
@@ -107,6 +108,7 @@ export const loader = async ({ request, params }: Route.LoaderArgs) => {
 				await GetCurrentUserDeviceResponseSchema.safeParseAsync({
 					code: 'Ok',
 					data: {
+						box: transformDeviceToApiFormat(device),
 						device: transformDeviceToApiFormat(device),
 					},
 				})

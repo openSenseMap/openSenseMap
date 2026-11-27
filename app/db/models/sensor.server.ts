@@ -143,16 +143,17 @@ export async function getMeasurements(
 	fromDate: string,
 	toDate: string,
 	count: number = 10000,
-): Promise<Measurement[]> {
-	return (await drizzleClient.execute(
-		sql`SELECT *
-          FROM measurement
-          WHERE sensor_id = ${sensorId} AND
-          time >= ${fromDate} AND
-          time <= ${toDate}
-          ORDER BY time DESC
-          LIMIT ${count}`,
-	)) as Measurement[]
+) {
+	return drizzleClient.execute<
+		Measurement & { lng: number | null; lat: number | null }
+	>(
+		sql`SELECT m.*, ST_X(l.location) AS lng, ST_Y(l.location) AS lat
+			FROM measurement m
+			LEFT JOIN location l ON l.id = m.location_id
+			WHERE m.sensor_id = ${sensorId} AND m.time >= ${fromDate} AND m.time <= ${toDate}
+			ORDER BY m.time DESC
+			LIMIT ${count}`,
+	)
 }
 
 export async function registerSensor(newSensor: Sensor) {
@@ -284,10 +285,6 @@ export async function findMatchingSensors(params: BoxesDataQueryParams) {
 				deviceConditions.length > 0 ? and(...deviceConditions) : undefined,
 			),
 		)
-
-	if (!rows || rows.length === 0) {
-		throw new Response('No senseBoxes found', { status: 404 })
-	}
 
 	const sensorsMap: Record<
 		string,

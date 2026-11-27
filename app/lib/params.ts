@@ -13,8 +13,10 @@ export function parseDateParam(
 	url: URL,
 	paramName: string,
 	defaultDate: Date,
+	alias?: string,
 ): Response | Date {
-	const param = url.searchParams.get(paramName)
+	const param =
+		url.searchParams.get(paramName) ?? (alias && url.searchParams.get(alias))
 	if (param) {
 		const date = new Date(param)
 		if (Number.isNaN(date.valueOf()))

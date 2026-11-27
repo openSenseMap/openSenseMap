@@ -8,6 +8,7 @@ export type BoxesDataColumn =
 	| 'lat'
 	| 'lon'
 	| 'height'
+	| 'boxId'
 	| 'boxid'
 	| 'boxName'
 	| 'exposure'
@@ -25,7 +26,9 @@ const BoxesDataQuerySchemaBase = z
 				z.string().transform((s) => s.split(',').map((x) => x.trim())),
 				z
 					.array(z.string())
-					.transform((arr) => arr.map((s) => String(s).trim())),
+					.transform((arr) =>
+						arr.flatMap((s) => s.split(',').map((id) => id.trim())),
+					),
 			])
 			.optional(),
 		bbox: z
@@ -142,21 +145,40 @@ export async function parseBoxesDataQuery(
 	request: Request,
 ): Promise<BoxesDataQueryParams> {
 	const url = new URL(request.url)
-	let params: Record<string, any>
-	if (request.method !== 'GET') {
-		const contentType = request.headers.get('content-type') || ''
-		if (contentType.includes('application/json')) {
-			try {
-				params = await request.json()
-			} catch {
-				params = Object.fromEntries(url.searchParams)
-			}
-		} else {
-			params = Object.fromEntries(url.searchParams)
-		}
-	} else {
-		params = Object.fromEntries(url.searchParams)
+	const query: Record<string, unknown> = Object.fromEntries(url.searchParams)
+	for (const name of [
+		'boxId',
+		'boxid',
+		'boxids',
+		'senseboxid',
+		'senseboxids',
+		'exposure',
+		'columns',
+	]) {
+		const values = url.searchParams.getAll(name)
+		if (values.length > 1) query[name] = values
 	}
+	const contentType = request.headers.get('content-type')?.toLowerCase() ?? ''
+	let body = {}
+	if (request.method === 'POST') {
+		try {
+			if (contentType.includes('application/json')) {
+				const parsed: unknown = await request.json()
+				if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+					throw new Error('Expected a JSON object')
+				}
+				body = parsed
+			} else if (
+				contentType.includes('application/x-www-form-urlencoded') ||
+				contentType.includes('multipart/form-data')
+			) {
+				body = Object.fromEntries(await request.formData())
+			}
+		} catch {
+			throw StandardResponse.badRequest('Invalid request body')
+		}
+	}
+	const params = { ...normalizeAliases(body), ...normalizeAliases(query) }
 
 	const parseResult = BoxesDataQuerySchemaBase.safeParse(params)
 
@@ -171,4 +193,20 @@ export async function parseBoxesDataQuery(
 	}
 
 	return parseResult.data
+}
+
+function normalizeAliases(input: Record<string, unknown>) {
+	const { boxId, senseboxid, senseboxids, boxids, separator, ...params } = input
+	const aliases = {
+		boxid: boxId ?? params.boxid ?? senseboxid ?? senseboxids ?? boxids,
+		fromDate: params.fromDate ?? params['from-date'],
+		toDate: params.toDate ?? params['to-date'],
+		delimiter: params.delimiter ?? separator,
+	}
+	return {
+		...params,
+		...Object.fromEntries(
+			Object.entries(aliases).filter(([, value]) => value !== undefined),
+		),
+	}
 }

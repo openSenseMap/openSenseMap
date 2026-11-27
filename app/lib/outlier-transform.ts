@@ -3,18 +3,16 @@ import { type Measurement } from '~/db/schema'
 
 export type TransformedMeasurement = Measurement & { isOutlier: boolean }
 
-export function transformOutliers(
-	measurements: Measurement[],
+export function transformOutliers<T extends Measurement>(
+	measurements: T[],
 	window: number,
 	replaceOutlier: boolean,
-): TransformedMeasurement[] {
-	const res: TransformedMeasurement[] = []
+): (T & TransformedMeasurement)[] {
+	const res: (T & TransformedMeasurement)[] = []
 	const values: number[] = []
 
 	for (let i = 0; i < measurements.length; i++) {
-		let current: TransformedMeasurement = measurements[
-			i
-		] as TransformedMeasurement
+		const current = measurements[i] as T & TransformedMeasurement
 		if (current.value === null) continue
 		current.isOutlier = false
 

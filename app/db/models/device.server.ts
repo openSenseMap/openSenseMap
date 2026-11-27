@@ -13,7 +13,9 @@ import {
 	type SQL,
 	gte,
 	lt,
+	lte,
 	exists,
+	inArray,
 } from 'drizzle-orm'
 import { alias, type PgTransaction } from 'drizzle-orm/pg-core'
 import { type PostgresJsQueryResultHKT } from 'drizzle-orm/postgres-js'
@@ -719,10 +721,18 @@ export async function updateDeviceImageIfUnchanged({
 	return updatedDevice
 }
 
-export async function deleteDevice({ id }: Pick<Device, 'id'>) {
+export async function deleteDevice({
+	id,
+	userId,
+}: Pick<Device, 'id'> & Partial<Pick<Device, 'userId'>>) {
 	const [deletedDevice] = await drizzleClient
 		.delete(device)
-		.where(eq(device.id, id))
+		.where(
+			and(
+				eq(device.id, id),
+				userId === undefined ? undefined : eq(device.userId, userId),
+			),
+		)
 		.returning({ id: device.id, image: device.image })
 
 	if (!deletedDevice) return false
@@ -1050,21 +1060,39 @@ const buildWhereClause = function buildWhereClause(
 	}
 
 	if (phenomenon) {
-		// @ts-ignore
-		columns['sensors'] = {
-			// @ts-ignore
-			where: (sensor, { ilike }) =>
-				// @ts-ignore
-				ilike(sensorTable['title'], `%${phenomenon}%`),
-		}
+		const dates = and(
+			fromDate ? gte(measurement.time, new Date(fromDate)) : undefined,
+			toDate ? lte(measurement.time, new Date(toDate)) : undefined,
+		)
+		const match = drizzleClient
+			.select({ id: sensor.id })
+			.from(sensor)
+			.$dynamic()
+		if (dates) match.innerJoin(measurement, eq(measurement.sensorId, sensor.id))
+		clause.push(
+			exists(
+				match.where(
+					and(
+						eq(sensor.deviceId, device.id),
+						ilike(sensor.title, `%${phenomenon}%`),
+						dates,
+					),
+				),
+			),
+		)
 	}
 
-	// simple string parameters
-	// for (const param of ['exposure', 'model'] as const) {
-	// 	if (opts[param]) {
-	// 	  clause.push(inArray(device[param], opts[param]!));
-	// 	}
-	// }
+	if (opts.model?.length)
+		clause.push(
+			inArray(device.model, opts.model as NonNullable<Device['model']>[]),
+		)
+	if (opts.exposure?.length)
+		clause.push(
+			inArray(
+				device.exposure,
+				opts.exposure as NonNullable<Device['exposure']>[],
+			),
+		)
 
 	if (grouptag) {
 		clause.push(arrayContains(device.tags, grouptag))
@@ -1092,31 +1120,6 @@ const buildWhereClause = function buildWhereClause(
 		)
 	}
 
-	if (phenomenon && (fromDate || toDate)) {
-		// @ts-ignore
-		columns['sensors'] = {
-			include: {
-				measurements: {
-					where: (measurement: any) => {
-						const conditions = []
-
-						if (fromDate && toDate) {
-							conditions.push(
-								sql`${measurement.createdAt} BETWEEN ${fromDate} AND ${toDate}`,
-							)
-						} else if (fromDate) {
-							conditions.push(sql`${measurement.createdAt} >= ${fromDate}`)
-						} else if (toDate) {
-							conditions.push(sql`${measurement.createdAt} <= ${toDate}`)
-						}
-
-						return and(...conditions)
-					},
-				},
-			},
-		}
-	}
-
 	return {
 		includeColumns: columns,
 		whereClause: clause,
@@ -1124,6 +1127,7 @@ const buildWhereClause = function buildWhereClause(
 }
 
 const MINIMAL_COLUMNS = {
+	updatedAt: true,
 	id: true,
 	name: true,
 	exposure: true,
@@ -1136,7 +1140,7 @@ const DEFAULT_COLUMNS = {
 	name: true,
 	model: true,
 	exposure: true,
-	grouptag: true,
+	tags: true,
 	image: true,
 	description: true,
 	link: true,

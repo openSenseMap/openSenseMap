@@ -34,12 +34,18 @@ import {
 	type DeviceSensorUpdate,
 } from '~/lib/openapi/schemas/device'
 import { ExposureSchema } from '~/lib/api-schemas/query'
+import { DeviceUseAuthSchema } from '~/lib/api-schemas/devices'
 import {
 	requestContentTypeJson,
 	responseContentTypeJson,
 } from '~/middleware/content-type-header.server'
 import { parseJsonBody } from '~/lib/request-parsing'
-import { DeviceLocationInputSchema } from '~/lib/openapi/schemas/location'
+import {
+	DeviceLocationInputSchema,
+	LongitudeSchema,
+	LatitudeSchema,
+	HeightSchema,
+} from '~/lib/openapi/schemas/location'
 import { ElevationLookupConsentSchema } from '~/lib/openapi/schemas/consent'
 import {
 	ElevationLookupError,
@@ -84,7 +90,7 @@ const UpdateDeviceRequestSchema = z
 			example: 'homeWifi',
 		}),
 
-		useAuth: z.boolean().optional().meta({
+		useAuth: DeviceUseAuthSchema.optional().meta({
 			description: 'Whether device API-key authentication is enabled',
 			example: true,
 		}),
@@ -94,7 +100,14 @@ const UpdateDeviceRequestSchema = z
 			example: 'https://example.com',
 		}),
 
-		location: DeviceLocationInputSchema.optional(),
+		location: z
+			.union([
+				DeviceLocationInputSchema,
+				z
+					.tuple([LongitudeSchema, LatitudeSchema, HeightSchema.optional()])
+					.transform(([lng, lat, height]) => ({ lng, lat, height })),
+			])
+			.optional(),
 
 		elevationLookupConsent: ElevationLookupConsentSchema.optional(),
 
@@ -204,7 +217,7 @@ export const openapi: ZodOpenApiPathItemObject = {
 				description: 'Device updated successfully.',
 				content: {
 					'application/json': {
-						schema: ApiDeviceSchema,
+						schema: z.object({ code: z.literal('Ok'), data: ApiDeviceSchema }),
 					},
 				},
 			},
@@ -253,9 +266,7 @@ export const openapi: ZodOpenApiPathItemObject = {
 				description: 'Device deleted successfully.',
 				content: {
 					'application/json': {
-						schema: z.null().meta({
-							description: 'JSON null response indicating successful deletion.',
-						}),
+						schema: z.object({ code: z.literal('Ok'), message: z.string() }),
 					},
 				},
 			},
@@ -300,7 +311,9 @@ const parsePathParams = (params: Route.LoaderArgs['params']) => {
 }
 
 const okDeviceResponse = async (device: unknown) => {
-	const apiDevice = transformDeviceToApiFormat(device as any)
+	const { access_token: _token, ...apiDevice } = transformDeviceToApiFormat(
+		device as any,
+	)
 	const parsed = await ApiDeviceSchema.safeParseAsync(apiDevice)
 
 	if (!parsed.success) {
@@ -545,7 +558,7 @@ async function put(request: Request, user: User, deviceId: string) {
 			return StandardResponse.internalServerError()
 		}
 
-		return StandardResponse.ok(responseParsed.data)
+		return StandardResponse.ok({ code: 'Ok', data: responseParsed.data })
 	} catch (error) {
 		if (error instanceof DeviceUpdateError) {
 			if (error.statusCode === 400) {
@@ -568,6 +581,9 @@ async function del(request: Request, user: User, deviceId: string) {
 		return StandardResponse.notFound('Device not found')
 	}
 
+	if (device.userId !== user.id)
+		return StandardResponse.forbidden(messages.deviceNotOwned)
+
 	const parsedBody = await parseJsonBody(request, DeleteDeviceRequestSchema)
 	if (parsedBody instanceof Response) return parsedBody
 
@@ -588,7 +604,11 @@ async function del(request: Request, user: User, deviceId: string) {
 			)
 		}
 
-		return StandardResponse.ok(null)
+		if (!deleted) return StandardResponse.notFound('Device not found')
+		return StandardResponse.ok({
+			code: 'Ok',
+			message: 'device and all associated measurements marked for deletion',
+		})
 	} catch {
 		return StandardResponse.internalServerError()
 	}

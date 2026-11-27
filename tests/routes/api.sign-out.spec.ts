@@ -1,10 +1,10 @@
 import { generateTestUserCredentials } from 'tests/data/generate_test_user'
-import { type Route } from '../../.react-router/types/app/routes/+types/api.sign-out'
+import { type Route } from '../../.react-router/types/app/routes/+types/api.users.sign-out'
 import { BASE_URL } from '../../vitest.setup'
 import { deleteUserByEmail } from '~/db/models/user.server'
 import { type User } from '~/db/schema'
 import { createToken } from '~/lib/jwt'
-import { action } from '~/routes/api.sign-out'
+import { action } from '~/routes/api.users.sign-out'
 import { registerUser } from '~/services/user-service.server'
 
 const VALID_SIGN_OUT_TEST_USER = generateTestUserCredentials()

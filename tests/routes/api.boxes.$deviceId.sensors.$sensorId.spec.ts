@@ -121,7 +121,7 @@ describe('openSenseMap API Routes: /boxes/:deviceId/sensors/:sensorId', () => {
 			)
 
 			if (isNaN(Number.parseFloat(body))) expect(body).toBeNull()
-			else expect(typeof body).toBe('number')
+			else expect(typeof body).toBe('string')
 		})
 	})
 

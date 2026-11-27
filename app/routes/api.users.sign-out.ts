@@ -1,11 +1,11 @@
-import { type Route } from './+types/api.sign-out'
-import { type User } from '~/db/schema'
+import { type Route } from './+types/api.users.sign-out'
 import { getUserFromJwt, revokeToken } from '~/lib/jwt'
 import {
 	InternalServerErrorSchema,
 	internalServerErrorResponse,
 	messageResponse,
 } from '~/lib/openapi/errors'
+import { apiMessages } from '~/lib/openapi/messages'
 import { StandardResponse } from '~/lib/responses'
 import { type ZodOpenApiPathItemObject } from 'zod-openapi'
 
@@ -26,16 +26,13 @@ export const openapi: ZodOpenApiPathItemObject = {
 }
 
 export const action = async ({ request }: Route.ActionArgs) => {
+	const user = await getUserFromJwt(request).catch(() => apiMessages.invalidJwt)
+	const [, jwtString] = request.headers.get('authorization')?.split(' ') ?? []
+	if (typeof user === 'string' || !jwtString) {
+		return StandardResponse.forbidden(apiMessages.invalidJwt)
+	}
+
 	try {
-		// We deliberately make casts and stuff like that, so everything
-		// but the happy path will result in an internal server error.
-		// This is done s.t. we are not leaking information if someone
-		// tries sending random token to see if users exist or similar
-		const user = (await getUserFromJwt(request)) as User
-		const rawAuthorizationHeader = request.headers
-			.get('authorization')!
-			.toString()
-		const [, jwtString = ''] = rawAuthorizationHeader.split(' ')
 		await revokeToken(user, jwtString)
 		return StandardResponse.ok({
 			code: 'Ok',

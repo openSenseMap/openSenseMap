@@ -15,7 +15,7 @@ function withTimestampsFuture(sensors: { id: string }[]) {
 	return sensors
 		.map(
 			(sensor, index) =>
-				`${sensor.id},${index},${new Date(Date.now() + index * 60_000).toISOString()}`,
+				`${sensor.id},${index},${new Date(Date.now() + 90_000 + index * 60_000).toISOString()}`,
 		)
 		.join('\n')
 }

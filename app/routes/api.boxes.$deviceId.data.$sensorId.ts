@@ -1,12 +1,8 @@
 import { type Params } from 'react-router'
 import { type Route } from './+types/api.boxes.$deviceId.data.$sensorId'
-import { getMeasurements } from '~/db/models/sensor.server'
-import { type Measurement } from '~/db/schema'
+import { getMeasurements, getSensor } from '~/db/models/sensor.server'
 import { convertToCsv } from '~/lib/csv'
-import {
-	type TransformedMeasurement,
-	transformOutliers,
-} from '~/lib/outlier-transform'
+import { transformOutliers } from '~/lib/outlier-transform'
 import { parseDateParam, parseEnumParam } from '~/lib/params'
 import { StandardResponse } from '~/lib/responses'
 import { z } from 'zod'
@@ -59,26 +55,9 @@ const SensorDataQueryParamsSchema = DateRangeQuerySchema.extend({
 
 const SensorMeasurementSchema = z
 	.object({
-		sensorId: z.string().meta({
-			description: 'ID of the sensor this measurement belongs to',
-			example: '6649b23072c4c40007105953',
-		}),
-
-		time: z.iso.datetime().meta({
-			description: 'Measurement timestamp',
-			example: '2025-11-06T23:59:57.189Z',
-		}),
-
-		value: z.number().nullable().meta({
-			description: 'Measured value',
-			example: 4.78,
-		}),
-
-		locationId: z.union([z.string(), z.number()]).nullable().meta({
-			description:
-				'ID of the location associated with this measurement. Depending on serialization this may be returned as a string or number.',
-			example: '5752066',
-		}),
+		createdAt: z.iso.datetime(),
+		value: z.string().nullable(),
+		location: z.tuple([z.number(), z.number()]).optional(),
 
 		isOutlier: z.boolean().optional().meta({
 			description:
@@ -97,20 +76,7 @@ const SensorMeasurementsJsonResponseSchema = z
 		id: 'SensorMeasurementsJsonResponse',
 		description:
 			'Up to 10000 measurements from a sensor for the requested time frame.',
-		example: [
-			{
-				sensorId: '6649b23072c4c40007105953',
-				time: '2025-11-06T23:59:57.189Z',
-				value: 4.78,
-				locationId: '5752066',
-			},
-			{
-				sensorId: '6649b23072c4c40007105953',
-				time: '2025-11-06T23:57:06.030Z',
-				value: 4.13,
-				locationId: '5752066',
-			},
-		],
+		example: [{ createdAt: '2025-11-06T23:59:57.189Z', value: '4.78' }],
 	})
 
 const SensorMeasurementsCsvResponseSchema = z.string().meta({
@@ -179,6 +145,7 @@ export const loader = async ({
 		const collected = collectParameters(request, params)
 		if (collected instanceof Response) return collected
 		const {
+			deviceId,
 			sensorId,
 			outliers,
 			outlierWindow,
@@ -189,15 +156,20 @@ export const loader = async ({
 			delimiter,
 		} = collected
 
-		let meas: Measurement[] | TransformedMeasurement[] = await getMeasurements(
+		if ((await getSensor(sensorId))?.deviceId !== deviceId) {
+			return StandardResponse.notFound(
+				'Sensor not found or not part of this device.',
+			)
+		}
+
+		const rows = await getMeasurements(
 			sensorId,
 			fromDate.toISOString(),
 			toDate.toISOString(),
 		)
-		if (meas == null) return StandardResponse.notFound('Device not found.')
-
-		if (outliers)
-			meas = transformOutliers(meas, outlierWindow, outliers == 'replace')
+		const meas = outliers
+			? transformOutliers(rows, outlierWindow, outliers === 'replace')
+			: rows
 
 		let headers: HeadersInit = {
 			'content-type':
@@ -214,8 +186,18 @@ export const loader = async ({
 			headers: headers,
 		}
 
-		if (format == 'json') return Response.json(meas, responseInit)
-		else {
+		if (format === 'json') {
+			return Response.json(
+				meas.map((m) => ({
+					createdAt: new Date(m.time).toISOString(),
+					value: m.value?.toString() ?? null,
+					location:
+						m.lng !== null && m.lat !== null ? [m.lng, m.lat] : undefined,
+					isOutlier: 'isOutlier' in m ? m.isOutlier : undefined,
+				})),
+				responseInit,
+			)
+		} else {
 			const csv = getCsv(meas, delimiter == 'comma' ? ',' : ';')
 			return new Response(csv, responseInit)
 		}
@@ -264,7 +246,6 @@ function collectParameters(
 			download: boolean
 			delimiter: string
 	  } {
-	// deviceId is there for legacy reasons
 	const deviceId = params.deviceId
 	if (deviceId === undefined)
 		return StandardResponse.badRequest('Invalid device id specified')
@@ -298,10 +279,11 @@ function collectParameters(
 		url,
 		'from-date',
 		new Date(new Date().setDate(new Date().getDate() - 2)),
+		'fromDate',
 	)
 	if (fromDate instanceof Response) return fromDate
 
-	const toDate = parseDateParam(url, 'to-date', new Date())
+	const toDate = parseDateParam(url, 'to-date', new Date(), 'toDate')
 	if (toDate instanceof Response) return toDate
 
 	const format = parseEnumParam(url, 'format', ['json', 'csv'], 'json')
@@ -328,14 +310,14 @@ function collectParameters(
 }
 
 function getCsv(
-	meas: Measurement[] | TransformedMeasurement[],
+	meas: Awaited<ReturnType<typeof getMeasurements>>[number][],
 	delimiter: string,
 ): string {
 	return convertToCsv(
 		['createdAt', 'value'],
 		meas,
 		[
-			(measurement) => measurement.time.toString(),
+			(measurement) => new Date(measurement.time).toISOString(),
 			(measurement) => measurement.value?.toString() ?? 'null',
 		],
 		delimiter,

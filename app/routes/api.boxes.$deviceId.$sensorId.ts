@@ -49,11 +49,16 @@ const PostSensorMeasurementHeaderParamsSchema = z
 
 const PostSensorMeasurementRequestSchema = z
 	.object({
-		value: z.number().meta({
-			description:
-				'Measured value of the sensor. Legacy documentation says string, but runtime requires a JSON number.',
-			example: 21.5,
-		}),
+		value: z
+			.union([
+				z.number(),
+				z.string().trim().min(1).transform(Number).pipe(z.number()),
+			])
+			.meta({
+				description:
+					'Measured value of the sensor, as a number or numeric string.',
+				example: 21.5,
+			}),
 
 		createdAt: IsoDateTimeSchema.optional().meta({
 			description:

@@ -239,11 +239,12 @@ function collectParameters(
 		url,
 		'from-date',
 		new Date(new Date().setDate(new Date().getDate() - 2)),
+		'fromDate',
 	)
 
 	if (fromDate instanceof Response) return fromDate
 
-	const toDate = parseDateParam(url, 'to-date', new Date())
+	const toDate = parseDateParam(url, 'to-date', new Date(), 'toDate')
 
 	if (toDate instanceof Response) return toDate
 

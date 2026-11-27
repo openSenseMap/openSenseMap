@@ -75,14 +75,12 @@ const LatestSensorResponseSchema = z
 			'Sensor metadata enriched with the latest measurement. `_id` is returned for legacy compatibility.',
 	})
 
-const OnlyValueResponseSchema = z
-	.union([z.string(), z.number(), z.null()])
-	.meta({
-		id: 'LatestSensorOnlyValueResponse',
-		description:
-			'Only the latest measured value. Returns `null` if no latest measurement exists.',
-		example: '4.78',
-	})
+const OnlyValueResponseSchema = z.union([z.string(), z.null()]).meta({
+	id: 'LatestSensorOnlyValueResponse',
+	description:
+		'Only the latest measured value. Returns `null` if no latest measurement exists.',
+	example: '4.78',
+})
 
 export const openapi: ZodOpenApiPathItemObject = {
 	get: {
@@ -174,7 +172,7 @@ export const loader = async ({
 		}
 
 		if (onlyValue) {
-			const value = meas.lastMeasurement?.value ?? null
+			const value = meas.lastMeasurement?.value?.toString() ?? null
 
 			const responseParsed = await OnlyValueResponseSchema.safeParseAsync(value)
 

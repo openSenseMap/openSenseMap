@@ -37,6 +37,7 @@ import {
 const DevicesDataRequestSchema = DateRangeQuerySchema.extend({
 	phenomenon: z.string().optional(),
 	grouptag: z.string().optional(),
+	boxId: z.union([z.string(), z.array(z.string())]).optional(),
 	boxid: z.union([z.string(), z.array(z.string())]).optional(),
 	exposure: z.union([ExposureSchema, z.array(ExposureSchema)]).optional(),
 	bbox: BboxSchema,
@@ -61,6 +62,7 @@ const DevicesDataQueryParamsSchema = DateRangeQuerySchema.extend({
 		example: 'co2-campaign',
 	}),
 
+	boxId: z.string().optional(),
 	boxid: z.string().optional().meta({
 		description: 'Filter by device ID.',
 		example: '5bdbe70f55d0ad001a04edc9',
@@ -91,7 +93,7 @@ const DevicesDataJsonResponseSchema = z
 		example: [
 			{
 				createdAt: '2026-05-13T12:00:00.000Z',
-				value: 21.5,
+				value: '21.5',
 				boxId: '5bdbe70f55d0ad001a04edc9',
 				boxName: 'My device',
 				sensorId: '60a13611a877b3001b8ffd59',
@@ -251,10 +253,6 @@ export async function loader({ request }: Route.LoaderArgs) {
 
 		const { sensorsMap, sensorIds } = await findMatchingSensors(params)
 
-		if (sensorIds.length === 0) {
-			return StandardResponse.notFound('No matching sensors found')
-		}
-
 		const headers = new Headers()
 		headers.set(
 			'Content-Type',
@@ -305,7 +303,14 @@ export async function loader({ request }: Route.LoaderArgs) {
 									locationId: measurement.location_id ?? null,
 								},
 								sensorsMap,
-								{},
+								measurement.location_id == null
+									? {}
+									: {
+											[String(measurement.location_id)]: {
+												lat: measurement.location_lat,
+												lon: measurement.location_lng,
+											},
+										},
 								params.columns,
 							)
 

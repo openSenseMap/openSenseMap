@@ -116,8 +116,7 @@ const normalizeLocation = (
  * @param lng The longitude value to normalize
  * @returns A normalized longitude in the value range [-180, 180)
  */
-const normalizeLongitude = (lng: number): number =>
-	lng % 180 === 0 ? -180 : lng
+const normalizeLongitude = (lng: number): number => (lng === 180 ? -180 : lng)
 
 export const postNewMeasurements = async (
 	deviceId: string,
@@ -305,7 +304,7 @@ export function transformMeasurement(
 				result.createdAt = m.createdAt ? m.createdAt.toISOString() : null
 				break
 			case 'value':
-				result.value = m.value
+				result.value = m.value?.toString() ?? null
 				break
 			case 'lat':
 				result.lat = measurementLocation?.lat ?? sensor?.lat
@@ -316,8 +315,9 @@ export function transformMeasurement(
 			case 'height':
 				result.height = measurementLocation?.height ?? sensor?.height ?? null
 				break
+			case 'boxId':
 			case 'boxid':
-				result.boxid = sensor?.boxid
+				result[col] = sensor?.boxId
 				break
 			case 'boxName':
 				result.boxName = sensor?.boxName

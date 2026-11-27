@@ -77,8 +77,8 @@ describe('openSenseMap API Routes: /boxes', () => {
 		queryableDevice = await createDevice(
 			{
 				...generateMinimalDevice(),
-				latitude: 123,
-				longitude: 12,
+				latitude: 12,
+				longitude: 123,
 				tags: [grouptag],
 				useAuth: false,
 			},
@@ -532,7 +532,7 @@ describe('openSenseMap API Routes: /boxes', () => {
 			const response = (await action({
 				request,
 			} as Route.ActionArgs)) as Response
-			const body = await response.json()
+			const { data: body } = await response.json()
 
 			if (body._id) {
 				createdDeviceIds.push(body._id)
@@ -567,7 +567,7 @@ describe('openSenseMap API Routes: /boxes', () => {
 			const response = (await action({
 				request,
 			} as Route.ActionArgs)) as Response
-			const body = await response.json()
+			const { data: body } = await response.json()
 
 			if (body._id) {
 				createdDeviceIds.push(body._id)
@@ -718,7 +718,7 @@ describe('openSenseMap API Routes: /boxes', () => {
 			const response = (await action({
 				request,
 			} as Route.ActionArgs)) as Response
-			const body = await response.json()
+			const { data: body } = await response.json()
 
 			if (body._id) {
 				createdDeviceIds.push(body._id)
@@ -749,7 +749,7 @@ describe('openSenseMap API Routes: /boxes', () => {
 			const response = (await action({
 				request: request,
 			} as Route.ActionArgs)) as Response
-			const responseData = await response.json()
+			const { data: responseData } = await response.json()
 			await deleteDevice({ id: responseData._id })
 			const expectedHeight = TEST_TERRAIN_ELEVATION + loc[2]
 
@@ -798,7 +798,7 @@ describe('openSenseMap API Routes: /boxes', () => {
 			const response = (await action({
 				request: request,
 			} as Route.ActionArgs)) as Response
-			const responseData = await response.json()
+			const { data: responseData } = await response.json()
 			await deleteDevice({ id: responseData._id })
 
 			// Assert
@@ -846,7 +846,7 @@ describe('openSenseMap API Routes: /boxes', () => {
 			const response = (await action({
 				request,
 			} as Route.ActionArgs)) as Response
-			const responseData = await response.json()
+			const { data: responseData } = await response.json()
 			if (responseData._id) createdDeviceIds.push(responseData._id)
 
 			expect(response.status).toBe(201)
@@ -874,7 +874,7 @@ describe('openSenseMap API Routes: /boxes', () => {
 			const response = (await action({
 				request,
 			} as Route.ActionArgs)) as Response
-			const responseData = await response.json()
+			const { data: responseData } = await response.json()
 			if (responseData._id) createdDeviceIds.push(responseData._id)
 
 			expect(response.status).toBe(201)

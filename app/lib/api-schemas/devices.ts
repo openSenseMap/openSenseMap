@@ -34,6 +34,10 @@ const DeviceLocationArrayInputSchema = z
 		example: [7.68123, 51.9123, 3.5],
 	})
 
+export const DeviceUseAuthSchema = z
+	.union([z.boolean(), z.enum(['true', 'false'])])
+	.transform((value) => value === true || value === 'true')
+
 export const CreateDeviceSchema = z
 	.object({
 		// public API request shape
@@ -58,8 +62,16 @@ export const CreateDeviceSchema = z
 				]
 			}),
 		elevationLookupConsent: ElevationLookupConsentSchema.optional(),
-		grouptag: z.array(z.string()).optional().default([]),
+		grouptag: z
+			.union([z.string(), z.array(z.string())])
+			.optional()
+			.transform((tags) =>
+				typeof tags === 'string'
+					? tags.split(',').map((tag) => tag.trim())
+					: (tags ?? []),
+			),
 		model: ApiDeviceModelZodSchema.optional().default('custom'),
+		useAuth: DeviceUseAuthSchema.optional(),
 		sensorTemplates: z.array(z.string()).optional().meta({
 			description:
 				'Required for model luftdaten.info so incoming values can be routed without ambiguity.',
@@ -127,7 +139,7 @@ export const DevicesQuerySchema = z.object({
 	date: z
 		.preprocess(
 			(val) => {
-				if (typeof val === 'string') return [val]
+				if (typeof val === 'string') return val.split(',')
 				if (Array.isArray(val)) return val
 				return val
 			},
@@ -158,15 +170,17 @@ export const DevicesQuerySchema = z.object({
 	phenomenon: z.string().optional(),
 	grouptag: z
 		.string()
-		.transform((v) => [v])
+		.transform((v) => v.split(',').map((entry) => entry.trim()))
 		.optional(),
 	model: z
 		.string()
-		.transform((v) => [v])
+		.transform((v) => v.split(',').map((entry) => entry.trim()))
+		.pipe(z.array(ApiDeviceModelZodSchema))
 		.optional(),
 	exposure: z
 		.string()
-		.transform((v) => [v])
+		.transform((v) => v.split(',').map((entry) => entry.trim()))
+		.pipe(z.array(z.enum(['unknown', 'indoor', 'outdoor', 'mobile'])))
 		.optional(),
 
 	near: z

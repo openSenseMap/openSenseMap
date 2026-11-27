@@ -98,12 +98,6 @@ describe('openSenseMap API Routes: /boxes/:deviceId', () => {
 		let result: any
 
 		beforeAll(async () => {
-			// Arrange
-			const request = new Request(`${BASE_URL}/${queryableDevice!.id}`, {
-				method: 'GET',
-				headers: { 'Content-Type': 'application/json' },
-			})
-
 			// Act
 			const dataFunctionValue = await deviceLoader({
 				params: {
@@ -177,7 +171,7 @@ describe('openSenseMap API Routes: /boxes/:deviceId', () => {
 				request,
 				params: { deviceId: queryableDevice?.id },
 			} as Route.ActionArgs as Route.ActionArgs)
-			const data = await response.json()
+			const { data } = await response.json()
 			const expectedHeight =
 				TEST_TERRAIN_ELEVATION + update_payload.location.height
 
@@ -256,7 +250,7 @@ describe('openSenseMap API Routes: /boxes/:deviceId', () => {
 
 			expect(response.status).toBe(200)
 
-			const data = await response.json()
+			const { data } = await response.json()
 			expect(data.name).toBe(update_payload.name)
 			expect(data.exposure).toBe(update_payload.exposure)
 
@@ -306,7 +300,7 @@ describe('openSenseMap API Routes: /boxes/:deviceId', () => {
 				request,
 				params: { deviceId: queryableDevice.id },
 			} as Route.ActionArgs)
-			const data = await response.json()
+			const { data } = await response.json()
 
 			expect(response.status).toBe(200)
 			expect(data.height).toBe(TEST_TERRAIN_ELEVATION)
@@ -363,7 +357,7 @@ describe('openSenseMap API Routes: /boxes/:deviceId', () => {
 				request,
 				params: { deviceId: queryableDevice.id },
 			} as Route.ActionArgs)
-			const responseData = await response.json()
+			const { data: responseData } = await response.json()
 
 			expect(response.status).toBe(200)
 			expect(responseData.heightAboveGround).toBe(5)
@@ -395,7 +389,7 @@ describe('openSenseMap API Routes: /boxes/:deviceId', () => {
 				request,
 				params: { deviceId: queryableDevice.id },
 			} as Route.ActionArgs)
-			const responseData = await response.json()
+			const { data: responseData } = await response.json()
 
 			expect(response.status).toBe(200)
 			expect(elevationLookup).not.toHaveBeenCalled()
@@ -425,7 +419,7 @@ describe('openSenseMap API Routes: /boxes/:deviceId', () => {
 			} as Route.ActionArgs)
 
 			expect(response.status).toBe(200)
-			const data = await response.json()
+			const { data } = await response.json()
 			expect(data.image).toBeNull()
 		})
 
@@ -449,7 +443,7 @@ describe('openSenseMap API Routes: /boxes/:deviceId', () => {
 			} as Route.ActionArgs)
 
 			expect(response.status).toBe(200)
-			const data = await response.json()
+			const { data } = await response.json()
 			expect(data.description).toBeNull()
 		})
 
@@ -473,7 +467,7 @@ describe('openSenseMap API Routes: /boxes/:deviceId', () => {
 			} as Route.ActionArgs)
 
 			expect(response.status).toBe(200)
-			const data = await response.json()
+			const { data } = await response.json()
 			expect(data.grouptag).toHaveLength(0)
 		})
 
@@ -498,7 +492,7 @@ describe('openSenseMap API Routes: /boxes/:deviceId', () => {
 			} as Route.ActionArgs)
 
 			expect(response.status).toBe(200)
-			const data = await response.json()
+			const { data } = await response.json()
 
 			expect(Array.isArray(data.grouptag)).toBe(true)
 			expect(data.grouptag).toContain('existinggroup')
@@ -525,7 +519,7 @@ describe('openSenseMap API Routes: /boxes/:deviceId', () => {
 			} as Route.ActionArgs)
 
 			expect(response.status).toBe(200)
-			const data = await response.json()
+			const { data } = await response.json()
 			expect(data.grouptag).toEqual(
 				expect.arrayContaining(['tag1', 'tag2', 'tag3']),
 			)
@@ -537,7 +531,7 @@ describe('openSenseMap API Routes: /boxes/:deviceId', () => {
 
 		beforeAll(async () => {
 			deletableDevice = await createDevice(
-				{ ...generateMinimalDevice(), latitude: 123, longitude: 12 },
+				{ ...generateMinimalDevice(), latitude: 12, longitude: 123 },
 				user!.id,
 			)
 		})
@@ -596,14 +590,6 @@ describe('openSenseMap API Routes: /boxes/:deviceId', () => {
 		})
 
 		it('should return 404 when trying to get the deleted device', async () => {
-			const getDeletedRequest = new Request(
-				`${BASE_URL}/${deletableDevice?.id}`,
-				{
-					method: 'GET',
-					headers: { 'Content-Type': 'application/json' },
-				},
-			)
-
 			const getDeletedResponse = await deviceLoader({
 				params: {
 					deviceId: deletableDevice?.id,

@@ -112,23 +112,42 @@ export const openapi: ZodOpenApiPathItemObject = {
 	},
 }
 
-const parseQueryParams = (
-	request: Request,
-): z.output<typeof DeleteSensorMeasurementsQueryParamsSchema> | Response => {
+const parseSelectors = async (request: Request) => {
 	const url = new URL(request.url)
 	const timestamps = url.searchParams.getAll('timestamps')
+	let body: Record<string, unknown> = {}
+	if (
+		request.headers
+			.get('content-type')
+			?.toLowerCase()
+			.includes('application/json')
+	) {
+		try {
+			body = z.record(z.string(), z.unknown()).parse(await request.json())
+		} catch {
+			return StandardResponse.badRequest('Invalid JSON measurement selectors')
+		}
+	}
 
 	const params = {
-		'from-date': url.searchParams.get('from-date') ?? undefined,
-		'to-date': url.searchParams.get('to-date') ?? undefined,
+		'from-date':
+			url.searchParams.get('from-date') ??
+			url.searchParams.get('fromDate') ??
+			body.fromDate ??
+			body['from-date'],
+		'to-date':
+			url.searchParams.get('to-date') ??
+			url.searchParams.get('toDate') ??
+			body.toDate ??
+			body['to-date'],
 		deleteAllMeasurements:
-			url.searchParams.get('deleteAllMeasurements') ?? undefined,
-		timestamps:
-			timestamps.length === 0
-				? undefined
-				: timestamps.length === 1
-					? timestamps[0]
-					: timestamps,
+			url.searchParams.get('deleteAllMeasurements') ??
+			(typeof body.deleteAllMeasurements === 'boolean'
+				? String(body.deleteAllMeasurements)
+				: body.deleteAllMeasurements),
+		timestamps: timestamps.length
+			? timestamps.flatMap((value) => value.split(','))
+			: body.timestamps,
 	}
 
 	const parsed = DeleteSensorMeasurementsQueryParamsSchema.safeParse(params)
@@ -173,7 +192,7 @@ export async function action({ request, params }: Route.ActionArgs) {
 				)
 			}
 
-			const queryParams = parseQueryParams(request)
+			const queryParams = await parseSelectors(request)
 
 			if (queryParams instanceof Response) {
 				return queryParams
@@ -208,7 +227,7 @@ export async function action({ request, params }: Route.ActionArgs) {
 				return StandardResponse.internalServerError()
 			}
 
-			return StandardResponse.ok(responseParsed.data)
+			return StandardResponse.ok({ code: 'Ok', ...responseParsed.data })
 		} catch (err: any) {
 			return StandardResponse.internalServerError(
 				err.message || 'An unexpected error occured',

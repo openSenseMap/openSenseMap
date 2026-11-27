@@ -1,4 +1,5 @@
 import { type Route } from './+types/api.users.request-password-reset'
+import { parseJsonOrFormRequest } from '~/lib/request-parsing'
 import { StandardResponse } from '~/lib/responses'
 import { requestPasswordReset } from '~/services/user-service.server'
 
@@ -12,7 +13,7 @@ import {
 	internalServerErrorResponse,
 } from '~/lib/openapi/errors'
 
-import { requestContentTypeForm } from '~/middleware/content-type-header.server'
+import { requestContentTypeJsonOrForm } from '~/middleware/content-type-header.server'
 
 const RequestPasswordResetRequestSchema = z
 	.object({
@@ -62,6 +63,7 @@ export const openapi: ZodOpenApiPathItemObject = {
 		requestBody: {
 			required: true,
 			content: {
+				'application/json': { schema: RequestPasswordResetRequestSchema },
 				'application/x-www-form-urlencoded': {
 					schema: RequestPasswordResetRequestSchema,
 				},
@@ -94,44 +96,15 @@ export const openapi: ZodOpenApiPathItemObject = {
 	},
 }
 
-const parsePasswordResetRequest = async (
-	request: Request,
-): Promise<z.output<typeof RequestPasswordResetRequestSchema> | Response> => {
-	let formData: FormData
-
-	try {
-		formData = await request.formData()
-	} catch {
-		return StandardResponse.badRequest('Invalid form data.')
-	}
-
-	const parsed = await RequestPasswordResetRequestSchema.safeParseAsync(
-		Object.fromEntries(formData.entries()),
-	)
-
-	if (!parsed.success) {
-		const issue = parsed.error.issues[0]
-
-		if (issue?.path.includes('email')) {
-			return StandardResponse.badRequest(
-				issue.code === 'invalid_format'
-					? 'Invalid email address.'
-					: 'No email address specified.',
-			)
-		}
-
-		return StandardResponse.badRequest(
-			issue?.message ?? 'Invalid password reset request.',
-		)
-	}
-
-	return parsed.data
-}
-
-export const middleware: Route.MiddlewareFunction[] = [requestContentTypeForm()]
+export const middleware: Route.MiddlewareFunction[] = [
+	requestContentTypeJsonOrForm(),
+]
 
 export const action = async ({ request }: Route.ActionArgs) => {
-	const parsedRequest = await parsePasswordResetRequest(request)
+	const parsedRequest = await parseJsonOrFormRequest(
+		request,
+		RequestPasswordResetRequestSchema,
+	)
 
 	if (parsedRequest instanceof Response) {
 		return parsedRequest

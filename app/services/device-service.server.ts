@@ -275,7 +275,7 @@ export const deleteDevice = async (
 		return 'integration-cleanup-failed'
 	}
 
-	return deleteDeviceById({ id: device.id })
+	return deleteDeviceById({ id: device.id, userId: user.id })
 }
 
 type TagsRow = {

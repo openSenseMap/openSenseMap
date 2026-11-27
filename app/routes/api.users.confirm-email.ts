@@ -1,24 +1,23 @@
 import { type Route } from './+types/api.users.confirm-email'
+import { z } from 'zod'
+import { parseJsonOrFormRequest } from '~/lib/request-parsing'
 import { StandardResponse } from '~/lib/responses'
 import { confirmEmail } from '~/services/user-service.server'
 
+const ConfirmEmailRequestSchema = z.object({
+	email: z.string().optional(),
+	token: z.string().trim().min(1, 'No email confirmation token specified.'),
+})
+
 export const action = async ({ request }: Route.ActionArgs) => {
-	let formData = new FormData()
+	const requestData = await parseJsonOrFormRequest(
+		request,
+		ConfirmEmailRequestSchema,
+	)
+	if (requestData instanceof Response) return requestData
 
 	try {
-		formData = await request.formData()
-	} catch {
-		// Continue so the missing-token validation below handles malformed requests.
-	}
-
-	const token = formData.get('token')?.toString().trim()
-
-	if (!token) {
-		return StandardResponse.badRequest('No email confirmation token specified.')
-	}
-
-	try {
-		const result = await confirmEmail(token)
+		const result = await confirmEmail(requestData.token)
 
 		if (result === 'success') {
 			return StandardResponse.ok({
