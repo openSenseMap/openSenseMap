@@ -1189,7 +1189,7 @@ export default function Explore({ loaderData }: Route.ComponentProps) {
 					{(pendingUi.deviceDetail ||
 						(outlet && !pendingUi.dismissDeviceDetail)) && (
 						<div className="pointer-events-none absolute inset-0 z-50">
-							<div className="pointer-events-auto h-full w-full">
+							<div className="h-full w-full [&>*]:pointer-events-auto">
 								{pendingUi.deviceDetail ? <DeviceDetailPending /> : outlet}
 							</div>
 						</div>

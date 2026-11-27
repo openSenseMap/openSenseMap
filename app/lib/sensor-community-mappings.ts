@@ -103,6 +103,7 @@ export const sensorCommunityDecoderMappings = {
 		{ valueType: 'SPS30_TS' },
 		{ valueType: 'SEN5X_TS' },
 		{ valueType: 'SEN55_TS' },
+		{ valueType: 'SEN55_TPS' },
 	],
 	sen55_temperature: [
 		{ valueType: 'SHT3X_temperature' },
