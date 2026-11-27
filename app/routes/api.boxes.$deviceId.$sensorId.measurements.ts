@@ -14,15 +14,16 @@ import { type ZodOpenApiPathItemObject } from 'zod-openapi'
 import {
 	DeviceSensorPathParamsSchema,
 	IsoDateTimeToDateSchema,
-	OkMessageResponseSchema,
 } from '~/lib/openapi/schemas/common'
 
 import {
 	BadRequestErrorSchema,
 	ForbiddenErrorSchema,
 	InternalServerErrorSchema,
+	MessageResponseSchema,
 	MethodNotAllowedErrorSchema,
 	NotFoundErrorSchema,
+	messageResponse,
 	badRequestResponse,
 	forbiddenResponse,
 	internalServerErrorResponse,
@@ -38,10 +39,12 @@ const DeleteSensorMeasurementsQueryParamsSchema = z
 			description: 'Beginning date of the measurement range to delete.',
 			example: '2026-05-13T12:00:00.000Z',
 		}),
+
 		'to-date': IsoDateTimeToDateSchema.optional().meta({
 			description: 'End date of the measurement range to delete.',
 			example: '2026-05-15T12:00:00.000Z',
 		}),
+
 		timestamps: z
 			.union([IsoDateTimeToDateSchema, z.array(IsoDateTimeToDateSchema)])
 			.optional()
@@ -79,14 +82,7 @@ export const openapi: ZodOpenApiPathItemObject = {
 		},
 
 		responses: {
-			200: {
-				description: 'Measurements deleted successfully.',
-				content: {
-					'application/json': {
-						schema: OkMessageResponseSchema,
-					},
-				},
-			},
+			200: messageResponse('Measurements deleted successfully.'),
 
 			400: badRequestResponse(
 				BadRequestErrorSchema,
@@ -116,54 +112,42 @@ export const openapi: ZodOpenApiPathItemObject = {
 	},
 }
 
-const parseSelectorParams = async (
-	request: Request,
-): Promise<
-	z.output<typeof DeleteSensorMeasurementsQueryParamsSchema> | Response
-> => {
+const parseSelectors = async (request: Request) => {
 	const url = new URL(request.url)
+	const timestamps = url.searchParams.getAll('timestamps')
 	let body: Record<string, unknown> = {}
-
-	if (request.headers.get('content-type')?.includes('application/json')) {
+	if (
+		request.headers
+			.get('content-type')
+			?.toLowerCase()
+			.includes('application/json')
+	) {
 		try {
-			const parsed: unknown = await request.json()
-			if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
-				body = parsed as Record<string, unknown>
-			}
+			body = z.record(z.string(), z.unknown()).parse(await request.json())
 		} catch {
-			return StandardResponse.badRequest('Invalid JSON in request body')
+			return StandardResponse.badRequest('Invalid JSON measurement selectors')
 		}
 	}
-
-	const queryTimestamps = url.searchParams.getAll('timestamps')
-	const rawTimestamps =
-		queryTimestamps.length > 0 ? queryTimestamps : body.timestamps
-	const timestamps = Array.isArray(rawTimestamps)
-		? rawTimestamps.flatMap((value) =>
-				typeof value === 'string' ? value.split(',') : value,
-			)
-		: typeof rawTimestamps === 'string'
-			? rawTimestamps.split(',')
-			: rawTimestamps
-	const deleteAllMeasurements =
-		url.searchParams.get('deleteAllMeasurements') ?? body.deleteAllMeasurements
 
 	const params = {
 		'from-date':
 			url.searchParams.get('from-date') ??
 			url.searchParams.get('fromDate') ??
-			body['from-date'] ??
-			body.fromDate,
+			body.fromDate ??
+			body['from-date'],
 		'to-date':
 			url.searchParams.get('to-date') ??
 			url.searchParams.get('toDate') ??
-			body['to-date'] ??
-			body.toDate,
+			body.toDate ??
+			body['to-date'],
 		deleteAllMeasurements:
-			deleteAllMeasurements === undefined
-				? undefined
-				: String(deleteAllMeasurements),
-		timestamps,
+			url.searchParams.get('deleteAllMeasurements') ??
+			(typeof body.deleteAllMeasurements === 'boolean'
+				? String(body.deleteAllMeasurements)
+				: body.deleteAllMeasurements),
+		timestamps: timestamps.length
+			? timestamps.flatMap((value) => value.split(','))
+			: body.timestamps,
 	}
 
 	const parsed = DeleteSensorMeasurementsQueryParamsSchema.safeParse(params)
@@ -208,7 +192,7 @@ export async function action({ request, params }: Route.ActionArgs) {
 				)
 			}
 
-			const queryParams = await parseSelectorParams(request)
+			const queryParams = await parseSelectors(request)
 
 			if (queryParams instanceof Response) {
 				return queryParams
@@ -235,8 +219,7 @@ export async function action({ request, params }: Route.ActionArgs) {
 				).count
 			}
 
-			const responseParsed = await OkMessageResponseSchema.safeParseAsync({
-				code: 'Ok',
+			const responseParsed = await MessageResponseSchema.safeParseAsync({
 				message: `Successfully deleted ${count} of sensor ${parsedParams.sensorId}`,
 			})
 
@@ -244,7 +227,7 @@ export async function action({ request, params }: Route.ActionArgs) {
 				return StandardResponse.internalServerError()
 			}
 
-			return StandardResponse.ok(responseParsed.data)
+			return StandardResponse.ok({ code: 'Ok', ...responseParsed.data })
 		} catch (err: any) {
 			return StandardResponse.internalServerError(
 				err.message || 'An unexpected error occured',

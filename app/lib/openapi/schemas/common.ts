@@ -27,15 +27,3 @@ export const IsoDateTimeSchema = z.iso.datetime().meta({
 export const IsoDateTimeToDateSchema = IsoDateTimeSchema.transform(
 	(value) => new Date(value),
 )
-
-export const OkMessageResponseSchema = z
-	.object({
-		code: z.literal('Ok'),
-		message: z.string().meta({
-			example: 'Operation completed successfully.',
-		}),
-	})
-	.meta({
-		id: 'OkMessageResponse',
-		description: 'Successful API response containing a message.',
-	})

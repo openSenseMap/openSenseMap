@@ -9,14 +9,11 @@ import { type ZodOpenApiPathItemObject } from 'zod-openapi'
 import {
 	BadRequestErrorSchema,
 	InternalServerErrorSchema,
-	UnsupportedMediaTypeErrorSchema,
 	badRequestResponse,
 	internalServerErrorResponse,
-	unsupportedMediaTypeResponse,
 } from '~/lib/openapi/errors'
 
 import { requestContentTypeJsonOrForm } from '~/middleware/content-type-header.server'
-import { OkMessageResponseSchema } from '~/lib/openapi/schemas/common'
 
 const RequestPasswordResetRequestSchema = z
 	.object({
@@ -43,6 +40,19 @@ const RequestPasswordResetRequestSchema = z
 		description: 'Payload for requesting a password reset.',
 	})
 
+const RequestPasswordResetResponseSchema = z
+	.object({
+		code: z.literal('Ok').default('Ok'),
+		message: z
+			.literal('Password reset initiated')
+			.default('Password reset initiated'),
+	})
+	.meta({
+		id: 'RequestPasswordResetResponse',
+		description:
+			'Password reset initiation response. This response is returned regardless of whether the email address belongs to an existing user.',
+	})
+
 export const openapi: ZodOpenApiPathItemObject = {
 	post: {
 		tags: ['User Management'],
@@ -53,9 +63,7 @@ export const openapi: ZodOpenApiPathItemObject = {
 		requestBody: {
 			required: true,
 			content: {
-				'application/json': {
-					schema: RequestPasswordResetRequestSchema,
-				},
+				'application/json': { schema: RequestPasswordResetRequestSchema },
 				'application/x-www-form-urlencoded': {
 					schema: RequestPasswordResetRequestSchema,
 				},
@@ -70,7 +78,7 @@ export const openapi: ZodOpenApiPathItemObject = {
 				description: 'Password reset initiated.',
 				content: {
 					'application/json': {
-						schema: OkMessageResponseSchema,
+						schema: RequestPasswordResetResponseSchema,
 					},
 				},
 			},
@@ -78,11 +86,6 @@ export const openapi: ZodOpenApiPathItemObject = {
 			400: badRequestResponse(
 				BadRequestErrorSchema,
 				'Bad request. The email field is missing or empty.',
-			),
-
-			415: unsupportedMediaTypeResponse(
-				UnsupportedMediaTypeErrorSchema,
-				'Unsupported content type. Use application/json, application/x-www-form-urlencoded, or multipart/form-data.',
 			),
 
 			500: internalServerErrorResponse(
@@ -94,7 +97,7 @@ export const openapi: ZodOpenApiPathItemObject = {
 }
 
 export const middleware: Route.MiddlewareFunction[] = [
-	requestContentTypeJsonOrForm(['POST']),
+	requestContentTypeJsonOrForm(),
 ]
 
 export const action = async ({ request }: Route.ActionArgs) => {
@@ -110,10 +113,11 @@ export const action = async ({ request }: Route.ActionArgs) => {
 	try {
 		await requestPasswordReset(parsedRequest.email)
 
-		const responseParsed = await OkMessageResponseSchema.safeParseAsync({
-			code: 'Ok',
-			message: 'Password reset initiated',
-		})
+		const responseParsed =
+			await RequestPasswordResetResponseSchema.safeParseAsync({
+				code: 'Ok',
+				message: 'Password reset initiated',
+			})
 
 		if (!responseParsed.success) {
 			return StandardResponse.internalServerError()

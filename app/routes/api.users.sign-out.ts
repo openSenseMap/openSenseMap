@@ -1,11 +1,9 @@
 import { type Route } from './+types/api.users.sign-out'
 import { getUserFromJwt, revokeToken } from '~/lib/jwt'
 import {
-	ForbiddenErrorSchema,
-	forbiddenResponse,
 	InternalServerErrorSchema,
 	internalServerErrorResponse,
-	okMessageResponse,
+	messageResponse,
 } from '~/lib/openapi/errors'
 import { apiMessages } from '~/lib/openapi/messages'
 import { StandardResponse } from '~/lib/responses'
@@ -18,11 +16,7 @@ export const openapi: ZodOpenApiPathItemObject = {
 		description: 'Revokes the supplied JWT access token.',
 		security: [{ bearerAuth: [] }],
 		responses: {
-			200: okMessageResponse('Successfully signed out.'),
-			403: forbiddenResponse(
-				ForbiddenErrorSchema,
-				'Invalid or missing JWT authorization.',
-			),
+			200: messageResponse('Successfully signed out.'),
 			500: internalServerErrorResponse(
 				InternalServerErrorSchema,
 				'Internal server error.',
@@ -32,22 +26,9 @@ export const openapi: ZodOpenApiPathItemObject = {
 }
 
 export const action = async ({ request }: Route.ActionArgs) => {
-	let user
-
-	try {
-		user = await getUserFromJwt(request)
-	} catch {
-		return StandardResponse.forbidden(apiMessages.invalidJwt)
-	}
-
-	if (typeof user === 'string') {
-		return StandardResponse.forbidden(apiMessages.invalidJwt)
-	}
-
-	const rawAuthorizationHeader = request.headers.get('authorization')
-	const [, jwtString] = rawAuthorizationHeader?.split(' ') ?? []
-
-	if (!jwtString) {
+	const user = await getUserFromJwt(request).catch(() => apiMessages.invalidJwt)
+	const [, jwtString] = request.headers.get('authorization')?.split(' ') ?? []
+	if (typeof user === 'string' || !jwtString) {
 		return StandardResponse.forbidden(apiMessages.invalidJwt)
 	}
 

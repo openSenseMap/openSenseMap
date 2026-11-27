@@ -24,7 +24,6 @@ describe('transformDeviceToApiFormat', () => {
 		heightAboveGround: 3.25,
 		terrainElevation: 15,
 		terrainElevationDataset: 'eudem25m',
-		apiKey: null,
 		useAuth: true,
 		public: false,
 		status: 'active',
@@ -38,9 +37,8 @@ describe('transformDeviceToApiFormat', () => {
 				title: 'Temperature',
 				unit: '°C',
 				sensorType: 'HDC1080',
-				icon: null,
 				lastMeasurement: {
-					createdAt: '2024-01-01T12:00:00.000Z',
+					createdAt: '2024-01-01T12:00:00Z',
 					value: '25.5',
 				},
 			},
@@ -49,7 +47,6 @@ describe('transformDeviceToApiFormat', () => {
 				title: 'Humidity',
 				unit: '%',
 				sensorType: 'HDC1080',
-				icon: null,
 				lastMeasurement: null,
 			},
 		],
@@ -75,7 +72,6 @@ describe('transformDeviceToApiFormat', () => {
 			terrainElevationDataset: 'eudem25m',
 			height: 18.25,
 			useAuth: true,
-			access_token: null,
 			public: false,
 			status: 'active',
 			createdAt: new Date('2024-01-01T00:00:00Z').toISOString(),
@@ -109,9 +105,8 @@ describe('transformDeviceToApiFormat', () => {
 					title: 'Temperature',
 					unit: '°C',
 					sensorType: 'HDC1080',
-					icon: null,
 					lastMeasurement: {
-						createdAt: '2024-01-01T12:00:00.000Z',
+						createdAt: '2024-01-01T12:00:00Z',
 						value: '25.5',
 					},
 				},
@@ -120,7 +115,6 @@ describe('transformDeviceToApiFormat', () => {
 					title: 'Humidity',
 					unit: '%',
 					sensorType: 'HDC1080',
-					icon: null,
 					lastMeasurement: null,
 				},
 			],
@@ -164,9 +158,8 @@ describe('transformDeviceToApiFormat', () => {
 			title: 'Temperature',
 			unit: '°C',
 			sensorType: 'HDC1080',
-			icon: null,
 			lastMeasurement: {
-				createdAt: '2024-01-01T12:00:00.000Z',
+				createdAt: '2024-01-01T12:00:00Z',
 				value: '25.5',
 			},
 		})
@@ -175,7 +168,6 @@ describe('transformDeviceToApiFormat', () => {
 			title: 'Humidity',
 			unit: '%',
 			sensorType: 'HDC1080',
-			icon: null,
 			lastMeasurement: null,
 		})
 	})

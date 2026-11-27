@@ -98,15 +98,8 @@ describe('openSenseMap API Routes: /boxes/:deviceId', () => {
 		let result: any
 
 		beforeAll(async () => {
-			// Arrange
-			const request = new Request(`${BASE_URL}/${queryableDevice!.id}`, {
-				method: 'GET',
-				headers: { 'Content-Type': 'application/json' },
-			})
-
 			// Act
 			const dataFunctionValue = await deviceLoader({
-				request,
 				params: {
 					deviceId: queryableDevice.id,
 				},
@@ -327,7 +320,6 @@ describe('openSenseMap API Routes: /boxes/:deviceId', () => {
 			])
 
 			const getResponse = (await deviceLoader({
-				request: new Request(`${BASE_URL}/${queryableDevice.id}`),
 				params: { deviceId: queryableDevice.id },
 			} as Route.LoaderArgs)) as Response
 			const persisted = await getResponse.json()
@@ -598,16 +590,7 @@ describe('openSenseMap API Routes: /boxes/:deviceId', () => {
 		})
 
 		it('should return 404 when trying to get the deleted device', async () => {
-			const getDeletedRequest = new Request(
-				`${BASE_URL}/${deletableDevice?.id}`,
-				{
-					method: 'GET',
-					headers: { 'Content-Type': 'application/json' },
-				},
-			)
-
 			const getDeletedResponse = await deviceLoader({
-				request: getDeletedRequest,
 				params: {
 					deviceId: deletableDevice?.id,
 				},

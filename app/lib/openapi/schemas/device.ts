@@ -47,10 +47,6 @@ export const ApiSensorSchema = z
 		description: 'Sensor belonging to a box/device.',
 	})
 
-const LegacySensorMutationFlagSchema = z
-	.union([z.boolean(), z.enum(['true', 'false'])])
-	.transform((value) => value === true || value === 'true')
-
 export const DeviceSensorUpdateSchema = z
 	.object({
 		_id: z.string().optional().meta({
@@ -62,18 +58,27 @@ export const DeviceSensorUpdateSchema = z
 				'Existing sensor id. `_id` is used by the legacy API and is preferred for backwards compatibility.',
 			example: '60a13611a877b3001b8ffd59',
 		}),
-		new: LegacySensorMutationFlagSchema.optional().meta({
-			description: 'Whether this sensor should be created as new.',
-			example: true,
-		}),
-		edited: LegacySensorMutationFlagSchema.optional().meta({
-			description: 'Whether this sensor should be created or updated.',
-			example: true,
-		}),
-		deleted: LegacySensorMutationFlagSchema.optional().meta({
-			description: 'Whether this sensor should be deleted.',
-			example: true,
-		}),
+		new: z
+			.union([z.literal(true), z.literal('true')])
+			.optional()
+			.meta({
+				description: 'Whether this sensor should be created as new.',
+				example: true,
+			}),
+		edited: z
+			.union([z.literal(true), z.literal('true')])
+			.optional()
+			.meta({
+				description: 'Whether this sensor should be created or updated.',
+				example: true,
+			}),
+		deleted: z
+			.union([z.literal(true), z.literal('true')])
+			.optional()
+			.meta({
+				description: 'Whether this sensor should be deleted.',
+				example: true,
+			}),
 		title: z.string().optional().meta({
 			example: 'PM10',
 		}),

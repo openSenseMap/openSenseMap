@@ -94,16 +94,11 @@ export function transformDeviceToApiFormat(
 		...rest
 	} = box
 	const timestamp = box.updatedAt.toISOString()
-	const lastMeasurementAt = (sensors ?? []).reduce<string | null>(
-		(latest, sensor) => {
-			const createdAt = sensor.lastMeasurement?.createdAt
-			if (!createdAt) return latest
-			return latest === null || Date.parse(createdAt) > Date.parse(latest)
-				? createdAt
-				: latest
-		},
-		null,
-	)
+	const lastMeasurementAt = sensors?.reduce<string | null>((latest, sensor) => {
+		const time = sensor.lastMeasurement?.createdAt
+		if (time && (!latest || Date.parse(time) > Date.parse(latest))) return time
+		return latest
+	}, null)
 	const heightAboveSeaLevel =
 		selectedHeightAboveSeaLevel !== undefined
 			? selectedHeightAboveSeaLevel

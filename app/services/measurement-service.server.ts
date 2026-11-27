@@ -2,7 +2,6 @@ import { type BoxesDataColumn } from '../lib/api-schemas/boxes-data-query-schema
 import { validLngLat } from '../lib/location'
 import { assertDeviceIsWritable } from './device-service.server'
 import {
-	deviceExists,
 	type DeviceWithoutSensors,
 	getDeviceWithoutSensors,
 	getDeviceForMeasurementWrite,
@@ -24,26 +23,18 @@ export type DeviceWithSensors = DeviceWithoutSensors & {
 	sensors: SensorWithLatestMeasurement[]
 }
 
-export class MeasurementServiceError extends Error {
-	constructor(
-		name: string,
-		message: string,
-		public readonly statusCode: number,
-	) {
-		super(message)
-		this.name = name
-	}
-}
-
 export async function getLatestMeasurementsForSensor(
 	boxId: string,
 	sensorId: string,
 	count?: number,
 ): Promise<SensorWithLatestMeasurement | null> {
-	if (!(await deviceExists({ id: boxId }))) return null
+	const device: DeviceWithoutSensors = await getDeviceWithoutSensors({
+		id: boxId,
+	})
+	if (!device) return null
 
 	// single sensor, no need for having info about device
-	return await getSensorWithLastMeasurement(boxId, sensorId, count)
+	return await getSensorWithLastMeasurement(device.id, sensorId, count)
 }
 
 /**
@@ -142,27 +133,21 @@ export const postNewMeasurements = async (
 	}
 
 	if (!hasDecoder(contentType)) {
-		throw new MeasurementServiceError(
-			'UnsupportedMediaTypeError',
-			'Unsupported content-type.',
-			415,
-		)
+		throw new Error('UnsupportedMediaTypeError: Unsupported content-type.')
 	}
 
 	const device = await getDeviceForMeasurementWrite({ id: deviceId })
 	if (!device) {
-		throw new MeasurementServiceError('NotFoundError', 'Device not found', 404)
+		throw new Error('NotFoundError: Device not found')
 	}
 
 	assertDeviceIsWritable(device)
 
-	if ((device.useAuth || hackair) && device.apiKey && !isTrustedService) {
+	if (device.useAuth && !isTrustedService) {
 		if (device.apiKey !== authorization) {
-			throw new MeasurementServiceError(
-				'UnauthorizedError',
-				'Device access token not valid!',
-				401,
-			)
+			const error = new Error('Device access token not valid!')
+			error.name = 'UnauthorizedError'
+			throw error
 		}
 	}
 
@@ -171,57 +156,12 @@ export const postNewMeasurements = async (
 		sensors: device.sensors,
 	})
 
-	if (measurements.length === 0) {
-		throw new MeasurementServiceError(
-			'UnprocessableEntityError',
-			'Cannot save empty or invalid measurements.',
-			422,
-		)
-	}
-
-	if (measurements.length > 2500) {
-		throw new MeasurementServiceError(
-			'UnprocessableEntityError',
-			'Too many measurements. Please submit at most 2500 measurements at once.',
-			422,
-		)
-	}
-
 	for (const m of measurements) {
-		if (typeof m.sensor_id !== 'string' || m.sensor_id.trim() === '') {
-			throw new MeasurementServiceError(
-				'UnprocessableEntityError',
-				'Missing sensor id',
-				422,
-			)
-		}
-		if (!Number.isFinite(m.value)) {
-			throw new MeasurementServiceError(
-				'UnprocessableEntityError',
-				'Invalid measurement value',
-				422,
-			)
-		}
-		if (!Number.isFinite(new Date(m.createdAt).getTime())) {
-			throw new MeasurementServiceError(
-				'UnprocessableEntityError',
-				'Invalid measurement timestamp',
-				422,
-			)
-		}
-
 		const locationData: LocationData | null = m.location ?? null
-		if (
-			locationData &&
-			(!validLngLat(locationData.lng, locationData.lat) ||
-				(locationData.height !== undefined &&
-					!Number.isFinite(locationData.height)))
-		) {
-			throw new MeasurementServiceError(
-				'UnprocessableEntityError',
-				'Invalid location coordinates',
-				422,
-			)
+		if (locationData && !validLngLat(locationData.lng, locationData.lat)) {
+			const error = new Error('Invalid location coordinates')
+			error.name = 'UnprocessableEntityError'
+			throw error
 		}
 	}
 
@@ -364,7 +304,7 @@ export function transformMeasurement(
 				result.createdAt = m.createdAt ? m.createdAt.toISOString() : null
 				break
 			case 'value':
-				result.value = m.value === null ? null : m.value.toString()
+				result.value = m.value?.toString() ?? null
 				break
 			case 'lat':
 				result.lat = measurementLocation?.lat ?? sensor?.lat
@@ -376,10 +316,8 @@ export function transformMeasurement(
 				result.height = measurementLocation?.height ?? sensor?.height ?? null
 				break
 			case 'boxId':
-				result.boxId = sensor?.boxId
-				break
 			case 'boxid':
-				result.boxid = sensor?.boxId
+				result[col] = sensor?.boxId
 				break
 			case 'boxName':
 				result.boxName = sensor?.boxName

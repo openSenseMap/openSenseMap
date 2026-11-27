@@ -1,20 +1,18 @@
 import { mean, median } from 'simple-statistics'
 import { type Measurement } from '~/db/schema'
 
-export type TransformedMeasurement<
-	TMeasurement extends Measurement = Measurement,
-> = TMeasurement & { isOutlier: boolean }
+export type TransformedMeasurement = Measurement & { isOutlier: boolean }
 
-export function transformOutliers<TMeasurement extends Measurement>(
-	measurements: TMeasurement[],
+export function transformOutliers<T extends Measurement>(
+	measurements: T[],
 	window: number,
 	replaceOutlier: boolean,
-): TransformedMeasurement<TMeasurement>[] {
-	const res: TransformedMeasurement<TMeasurement>[] = []
+): (T & TransformedMeasurement)[] {
+	const res: (T & TransformedMeasurement)[] = []
 	const values: number[] = []
 
 	for (let i = 0; i < measurements.length; i++) {
-		let current = measurements[i] as TransformedMeasurement<TMeasurement>
+		const current = measurements[i] as T & TransformedMeasurement
 		if (current.value === null) continue
 		current.isOutlier = false
 

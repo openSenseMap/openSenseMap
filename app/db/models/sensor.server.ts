@@ -1,7 +1,6 @@
 import { eq, sql, inArray, and } from 'drizzle-orm'
 import {
 	type Measurement,
-	location,
 	sensor,
 	device,
 	type Sensor,
@@ -75,16 +74,6 @@ export function getSensorsFromDevice(deviceId: Sensor['deviceId']) {
 	})
 }
 
-export function getSensorFromDevice(
-	deviceId: Sensor['deviceId'],
-	sensorId: Sensor['id'],
-) {
-	return drizzleClient.query.sensor.findFirst({
-		where: (sensor, { and, eq }) =>
-			and(eq(sensor.deviceId, deviceId), eq(sensor.id, sensorId)),
-	})
-}
-
 export async function getSensorWithLastMeasurement(
 	deviceId: Sensor['deviceId'],
 	sensorId: Sensor['id'],
@@ -155,28 +144,16 @@ export async function getMeasurements(
 	toDate: string,
 	count: number = 10000,
 ) {
-	return drizzleClient.query.measurement.findMany({
-		where: (measurement, { and, eq, gte, lte }) =>
-			and(
-				eq(measurement.sensorId, sensorId),
-				gte(measurement.time, new Date(fromDate)),
-				lte(measurement.time, new Date(toDate)),
-			),
-		orderBy: (measurement, { desc }) => [desc(measurement.time)],
-		limit: count,
-		// Required by the legacy response serializer for located measurements.
-		with: {
-			location: {
-				columns: {
-					id: true,
-				},
-				extras: {
-					x: sql<number>`ST_X(${location.location})`.as('x'),
-					y: sql<number>`ST_Y(${location.location})`.as('y'),
-				},
-			},
-		},
-	})
+	return drizzleClient.execute<
+		Measurement & { lng: number | null; lat: number | null }
+	>(
+		sql`SELECT m.*, ST_X(l.location) AS lng, ST_Y(l.location) AS lat
+			FROM measurement m
+			LEFT JOIN location l ON l.id = m.location_id
+			WHERE m.sensor_id = ${sensorId} AND m.time >= ${fromDate} AND m.time <= ${toDate}
+			ORDER BY m.time DESC
+			LIMIT ${count}`,
+	)
 }
 
 export async function registerSensor(newSensor: Sensor) {

@@ -50,14 +50,13 @@ const PostSensorMeasurementHeaderParamsSchema = z
 const PostSensorMeasurementRequestSchema = z
 	.object({
 		value: z
-			.union([z.number(), z.string().trim().min(1)])
-			.transform((value) => (typeof value === 'number' ? value : Number(value)))
-			.refine(Number.isFinite, {
-				message: 'Measurement value must be numeric',
-			})
+			.union([
+				z.number(),
+				z.string().trim().min(1).transform(Number).pipe(z.number()),
+			])
 			.meta({
 				description:
-					'Measured value of the sensor. JSON numbers and legacy numeric strings are accepted.',
+					'Measured value of the sensor, as a number or numeric string.',
 				example: 21.5,
 			}),
 

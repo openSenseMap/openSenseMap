@@ -10,15 +10,11 @@ import {
 	BadRequestErrorSchema,
 	ForbiddenErrorSchema,
 	InternalServerErrorSchema,
-	UnsupportedMediaTypeErrorSchema,
 	badRequestResponse,
 	forbiddenResponse,
 	internalServerErrorResponse,
-	unsupportedMediaTypeResponse,
 } from '~/lib/openapi/errors'
 import { NewPasswordSchema } from '~/lib/openapi/schemas/auth'
-import { OkMessageResponseSchema } from '~/lib/openapi/schemas/common'
-import { requestContentTypeJsonOrForm } from '~/middleware/content-type-header.server'
 
 const PasswordResetRequestSchema = z
 	.object({
@@ -42,6 +38,22 @@ const PasswordResetRequestSchema = z
 		description: 'Payload for resetting a password using an email token.',
 	})
 
+const PasswordResetResponseSchema = z
+	.object({
+		code: z.literal('Ok').default('Ok'),
+		message: z
+			.literal(
+				'Password successfully changed. You can now login with your new password',
+			)
+			.default(
+				'Password successfully changed. You can now login with your new password',
+			),
+	})
+	.meta({
+		id: 'PasswordResetResponse',
+		description: 'Password reset success response.',
+	})
+
 export const openapi: ZodOpenApiPathItemObject = {
 	post: {
 		tags: ['User Management'],
@@ -52,9 +64,7 @@ export const openapi: ZodOpenApiPathItemObject = {
 		requestBody: {
 			required: true,
 			content: {
-				'application/json': {
-					schema: PasswordResetRequestSchema,
-				},
+				'application/json': { schema: PasswordResetRequestSchema },
 				'application/x-www-form-urlencoded': {
 					schema: PasswordResetRequestSchema,
 				},
@@ -69,7 +79,7 @@ export const openapi: ZodOpenApiPathItemObject = {
 				description: 'Password changed successfully.',
 				content: {
 					'application/json': {
-						schema: OkMessageResponseSchema,
+						schema: PasswordResetResponseSchema,
 					},
 				},
 			},
@@ -84,11 +94,6 @@ export const openapi: ZodOpenApiPathItemObject = {
 				'Password reset is not possible because the token is invalid, expired, or password reset is not possible for this user.',
 			),
 
-			415: unsupportedMediaTypeResponse(
-				UnsupportedMediaTypeErrorSchema,
-				'Unsupported content type. Use application/json, application/x-www-form-urlencoded, or multipart/form-data.',
-			),
-
 			500: internalServerErrorResponse(
 				InternalServerErrorSchema,
 				'Internal server error.',
@@ -96,10 +101,6 @@ export const openapi: ZodOpenApiPathItemObject = {
 		},
 	},
 }
-
-export const middleware: Route.MiddlewareFunction[] = [
-	requestContentTypeJsonOrForm(['POST']),
-]
 
 export const action = async ({ request }: Route.ActionArgs) => {
 	const requestParsed = await parseJsonOrFormRequest(
@@ -131,19 +132,8 @@ export const action = async ({ request }: Route.ActionArgs) => {
 					'Password must be at least 8 characters.',
 				)
 
-			case 'success': {
-				const responseParsed = await OkMessageResponseSchema.safeParseAsync({
-					code: 'Ok',
-					message:
-						'Password successfully changed. You can now login with your new password',
-				})
-
-				if (!responseParsed.success) {
-					return StandardResponse.internalServerError()
-				}
-
-				return StandardResponse.ok(responseParsed.data)
-			}
+			case 'success':
+				return StandardResponse.ok(PasswordResetResponseSchema.parse({}))
 
 			default:
 				return StandardResponse.internalServerError()

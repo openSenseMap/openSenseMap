@@ -349,7 +349,6 @@ describe('openSenseMap API Routes: /users', () => {
 					request: deleteRequest,
 				} as Route.ActionArgs)) as Response
 
-				// Missing content type is rejected before the required body is parsed.
 				expect(deleteResponse.status).toBe(415)
 			})
 

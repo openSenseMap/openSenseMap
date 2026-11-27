@@ -1,10 +1,7 @@
 import { type Route } from './+types/api.boxes.$deviceId.data'
 import { isValidServiceKey } from '~/db/models/integration.server'
 import { StandardResponse } from '~/lib/responses'
-import {
-	MeasurementServiceError,
-	postNewMeasurements,
-} from '~/services/measurement-service.server'
+import { postNewMeasurements } from '~/services/measurement-service.server'
 
 import * as z from 'zod/v4'
 import { type ZodOpenApiPathItemObject } from 'zod-openapi'
@@ -247,9 +244,7 @@ export const action = async ({
 		const luftdaten = searchParams.get('luftdaten') !== null
 		const hackair = searchParams.get('hackair') !== null
 
-		const contentType = (
-			request.headers.get('content-type') || ''
-		).toLowerCase()
+		const contentType = request.headers.get('content-type') || ''
 		const serviceKey = request.headers.get('x-service-key')
 		const authorization =
 			request.headers.get('authorization') ??
@@ -259,11 +254,7 @@ export const action = async ({
 
 		let body: any
 		if (contentType.includes('application/json')) {
-			try {
-				body = await request.json()
-			} catch {
-				return StandardResponse.badRequest('Invalid JSON in request body')
-			}
+			body = await request.json()
 		} else if (contentType.includes('text/csv')) {
 			body = await request.text()
 		} else if (contentType.includes('application/sbx-bytes')) {
@@ -287,28 +278,15 @@ export const action = async ({
 			},
 		})
 	} catch (err: any) {
-		if (err instanceof MeasurementServiceError) {
-			switch (err.statusCode) {
-				case 401:
-					return StandardResponse.unauthorized(err.message)
-				case 404:
-					return StandardResponse.notFound(err.message)
-				case 415:
-					return StandardResponse.unsupportedMediaType(err.message)
-				case 422:
-					return StandardResponse.unprocessableContent(err.message)
-				default:
-					return StandardResponse.internalServerError(
-						err.message || 'An unexpected error occurred',
-					)
-			}
-		}
+		// Handle different error types
+		if (err.name === 'UnauthorizedError')
+			return StandardResponse.unauthorized(err.message)
 
-		if (err.name === 'ModelError')
+		if (err.name === 'ModelError' && err.type === 'UnprocessableEntityError')
 			return StandardResponse.unprocessableContent(err.message)
 
-		if (err.name === 'NotFoundError')
-			return StandardResponse.notFound(err.message)
+		if (err.name === 'UnsupportedMediaTypeError')
+			return StandardResponse.unsupportedMediaType(err.message)
 
 		if (err.name === 'ArchivedDeviceError')
 			return StandardResponse.conflict(

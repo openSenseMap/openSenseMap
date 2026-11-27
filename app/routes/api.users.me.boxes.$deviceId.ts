@@ -13,11 +13,9 @@ import {
 	BadRequestErrorSchema,
 	ForbiddenErrorSchema,
 	InternalServerErrorSchema,
-	NotFoundErrorSchema,
 	badRequestResponse,
 	forbiddenResponse,
 	internalServerErrorResponse,
-	notFoundResponse,
 } from '~/lib/openapi/errors'
 
 import { parsePathParams } from '~/lib/request-parsing'
@@ -67,10 +65,8 @@ export const openapi: ZodOpenApiPathItemObject = {
 
 			400: badRequestResponse(
 				BadRequestErrorSchema,
-				'Bad request. The device ID is missing or invalid.',
+				'Bad request. The device ID is missing, invalid, or no device exists for the given ID.',
 			),
-
-			404: notFoundResponse(NotFoundErrorSchema, 'Device not found.'),
 
 			403: forbiddenResponse(
 				ForbiddenErrorSchema,
@@ -99,7 +95,7 @@ export const loader = async ({ request, params }: Route.LoaderArgs) => {
 			const device = await getDevice({ id: parsedParams.deviceId })
 
 			if (!device) {
-				return StandardResponse.notFound(
+				return StandardResponse.badRequest(
 					'There is no such device with the given id',
 				)
 			}

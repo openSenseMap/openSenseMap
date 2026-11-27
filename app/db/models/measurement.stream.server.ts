@@ -23,7 +23,7 @@ export async function* streamMeasurements(
 	]
 
 	// check if sensor_id is in the array and filter by date range
-	let conditions = `m.sensor_id = ANY($1::text[]) AND m.time > $2 AND m.time < $3`
+	let conditions = `m.sensor_id = ANY($1::text[]) AND m.time BETWEEN $2 AND $3`
 
 	if (bbox) {
 		const [lngSW, latSW, lngNE, latNE] = bbox

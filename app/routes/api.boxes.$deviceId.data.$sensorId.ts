@@ -1,6 +1,6 @@
 import { type Params } from 'react-router'
 import { type Route } from './+types/api.boxes.$deviceId.data.$sensorId'
-import { getMeasurements, getSensorFromDevice } from '~/db/models/sensor.server'
+import { getMeasurements, getSensor } from '~/db/models/sensor.server'
 import { convertToCsv } from '~/lib/csv'
 import { transformOutliers } from '~/lib/outlier-transform'
 import { parseDateParam, parseEnumParam } from '~/lib/params'
@@ -33,13 +33,7 @@ const SensorDataQueryParamsSchema = DateRangeQuerySchema.extend({
 
 	'outlier-window': z.coerce.number().int().min(1).max(50).default(15).meta({
 		description:
-			'Alias for `outlierWindow`. Size of the moving window used as base to calculate outliers.',
-		example: 15,
-	}),
-
-	outlierWindow: z.coerce.number().int().min(1).max(50).optional().meta({
-		description:
-			'Legacy name for the moving-window size used to calculate outliers. Allowed values are numbers between 1 and 50.',
+			'Size of the moving window used as base to calculate outliers. Allowed values are numbers between 1 and 50.',
 		example: 15,
 	}),
 
@@ -61,26 +55,9 @@ const SensorDataQueryParamsSchema = DateRangeQuerySchema.extend({
 
 const SensorMeasurementSchema = z
 	.object({
-		location: z
-			.array(z.number())
-			.min(2)
-			.max(3)
-			.optional()
-			.meta({
-				description:
-					'Measurement coordinates as [longitude, latitude, height?].',
-				example: [7, 52, 10],
-			}),
-
-		createdAt: z.iso.datetime().meta({
-			description: 'Measurement timestamp',
-			example: '2025-11-06T23:59:57.189Z',
-		}),
-
-		value: z.string().nullable().meta({
-			description: 'Measured value',
-			example: '4.78',
-		}),
+		createdAt: z.iso.datetime(),
+		value: z.string().nullable(),
+		location: z.tuple([z.number(), z.number()]).optional(),
 
 		isOutlier: z.boolean().optional().meta({
 			description:
@@ -99,18 +76,7 @@ const SensorMeasurementsJsonResponseSchema = z
 		id: 'SensorMeasurementsJsonResponse',
 		description:
 			'Up to 10000 measurements from a sensor for the requested time frame.',
-		example: [
-			{
-				location: [7, 52],
-				createdAt: '2025-11-06T23:59:57.189Z',
-				value: '4.78',
-			},
-			{
-				location: [7, 52],
-				createdAt: '2025-11-06T23:57:06.030Z',
-				value: '4.13',
-			},
-		],
+		example: [{ createdAt: '2025-11-06T23:59:57.189Z', value: '4.78' }],
 	})
 
 const SensorMeasurementsCsvResponseSchema = z.string().meta({
@@ -190,22 +156,20 @@ export const loader = async ({
 			delimiter,
 		} = collected
 
-		const sensor = await getSensorFromDevice(deviceId, sensorId)
-		if (!sensor) {
+		if ((await getSensor(sensorId))?.deviceId !== deviceId) {
 			return StandardResponse.notFound(
 				'Sensor not found or not part of this device.',
 			)
 		}
 
-		let meas = await getMeasurements(
+		const rows = await getMeasurements(
 			sensorId,
 			fromDate.toISOString(),
 			toDate.toISOString(),
 		)
-		if (meas == null) return StandardResponse.notFound('Device not found.')
-
-		if (outliers)
-			meas = transformOutliers(meas, outlierWindow, outliers == 'replace')
+		const meas = outliers
+			? transformOutliers(rows, outlierWindow, outliers === 'replace')
+			: rows
 
 		let headers: HeadersInit = {
 			'content-type':
@@ -222,9 +186,18 @@ export const loader = async ({
 			headers: headers,
 		}
 
-		if (format == 'json')
-			return Response.json(serializeLegacyMeasurements(meas), responseInit)
-		else {
+		if (format === 'json') {
+			return Response.json(
+				meas.map((m) => ({
+					createdAt: new Date(m.time).toISOString(),
+					value: m.value?.toString() ?? null,
+					location:
+						m.lng !== null && m.lat !== null ? [m.lng, m.lat] : undefined,
+					isOutlier: 'isOutlier' in m ? m.isOutlier : undefined,
+				})),
+				responseInit,
+			)
+		} else {
 			const csv = getCsv(meas, delimiter == 'comma' ? ',' : ';')
 			return new Response(csv, responseInit)
 		}
@@ -236,6 +209,12 @@ export const loader = async ({
 function collectDelimiterParam(url: URL): 'comma' | 'semicolon' | Response {
 	const delimiterParam = url.searchParams.get('delimiter')
 	const separatorParam = url.searchParams.get('separator')
+
+	if (delimiterParam !== null && separatorParam !== null) {
+		return StandardResponse.badRequest(
+			'Please specify only one of delimiter or separator.',
+		)
+	}
 
 	const paramName = delimiterParam !== null ? 'delimiter' : 'separator'
 	const value = delimiterParam ?? separatorParam
@@ -267,7 +246,6 @@ function collectParameters(
 			download: boolean
 			delimiter: string
 	  } {
-	// deviceId is there for legacy reasons
 	const deviceId = params.deviceId
 	if (deviceId === undefined)
 		return StandardResponse.badRequest('Invalid device id specified')
@@ -280,9 +258,7 @@ function collectParameters(
 	const outliers = parseEnumParam(url, 'outliers', ['replace', 'mark'], null)
 	if (outliers instanceof Response) return outliers
 
-	const outlierWindowParam =
-		url.searchParams.get('outlierWindow') ??
-		url.searchParams.get('outlier-window')
+	const outlierWindowParam = url.searchParams.get('outlier-window')
 	let outlierWindow = 15
 
 	if (outlierWindowParam !== null) {
@@ -301,17 +277,14 @@ function collectParameters(
 
 	const fromDate = parseDateParam(
 		url,
+		'from-date',
+		new Date(new Date().setDate(new Date().getDate() - 2)),
 		'fromDate',
-		new Date(Date.now() - 2 * 24 * 60 * 60 * 1000),
-		['from-date'],
 	)
 	if (fromDate instanceof Response) return fromDate
 
-	const toDate = parseDateParam(url, 'toDate', new Date(), ['to-date'])
+	const toDate = parseDateParam(url, 'to-date', new Date(), 'toDate')
 	if (toDate instanceof Response) return toDate
-	if (fromDate > toDate) {
-		return StandardResponse.badRequest('from-date must not be after to-date')
-	}
 
 	const format = parseEnumParam(url, 'format', ['json', 'csv'], 'json')
 	if (format instanceof Response) return format
@@ -336,39 +309,15 @@ function collectParameters(
 	}
 }
 
-type MeasurementResult = Awaited<ReturnType<typeof getMeasurements>>[number]
-type MeasurementResultWithOutlier = MeasurementResult & {
-	isOutlier?: boolean
-}
-
-function serializeLegacyMeasurements(
-	measurements: MeasurementResultWithOutlier[],
-) {
-	return measurements.map((measurement) => {
-		const coordinates = measurement.location
-			? [measurement.location.x, measurement.location.y]
-			: undefined
-
-		return {
-			...(coordinates ? { location: coordinates } : {}),
-			createdAt: measurement.time.toISOString(),
-			value: measurement.value === null ? null : measurement.value.toString(),
-			...(measurement.isOutlier === undefined
-				? {}
-				: { isOutlier: measurement.isOutlier }),
-		}
-	})
-}
-
 function getCsv(
-	meas: MeasurementResultWithOutlier[],
+	meas: Awaited<ReturnType<typeof getMeasurements>>[number][],
 	delimiter: string,
 ): string {
 	return convertToCsv(
 		['createdAt', 'value'],
 		meas,
 		[
-			(measurement) => measurement.time.toISOString(),
+			(measurement) => new Date(measurement.time).toISOString(),
 			(measurement) => measurement.value?.toString() ?? 'null',
 		],
 		delimiter,

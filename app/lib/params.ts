@@ -13,22 +13,15 @@ export function parseDateParam(
 	url: URL,
 	paramName: string,
 	defaultDate: Date,
-	aliases: readonly string[] = [],
+	alias?: string,
 ): Response | Date {
-	const nameUsed = [paramName, ...aliases].find((name) =>
-		url.searchParams.has(name),
-	)
-	const param = nameUsed ? url.searchParams.get(nameUsed) : null
-	if (nameUsed) {
-		if (param === null || param.trim() === '') {
-			return StandardResponse.badRequest(
-				`Illegal value for parameter ${nameUsed}. Allowed values: RFC3339Date`,
-			)
-		}
+	const param =
+		url.searchParams.get(paramName) ?? (alias && url.searchParams.get(alias))
+	if (param) {
 		const date = new Date(param)
 		if (Number.isNaN(date.valueOf()))
 			return StandardResponse.badRequest(
-				`Illegal value for parameter ${nameUsed}. Allowed values: RFC3339Date`,
+				`Illegal value for parameter ${paramName}. Allowed values: RFC3339Date`,
 			)
 		return date
 	}

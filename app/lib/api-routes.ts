@@ -135,11 +135,10 @@ export const apiRoutes: { noauth: RouteInfo[]; auth: RouteInfo[] } = {
 			method: 'GET',
 			tosExempt: true,
 		},
-		{
-			path: `boxes/:boxId/script`,
-			method: 'GET',
-			tosExempt: true,
-		},
+		// {
+		//   path: `boxes/:boxId/script`,
+		//   method: "GET",
+		// },
 		{
 			path: `boxes`,
 			method: 'POST',

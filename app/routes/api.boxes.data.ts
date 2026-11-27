@@ -12,9 +12,11 @@ import { type ZodOpenApiPathItemObject } from 'zod-openapi'
 import {
 	BadRequestErrorSchema,
 	InternalServerErrorSchema,
+	NotFoundErrorSchema,
 	UnprocessableContentErrorSchema,
 	badRequestResponse,
 	internalServerErrorResponse,
+	notFoundResponse,
 	unprocessableContentResponse,
 } from '~/lib/openapi/errors'
 
@@ -59,14 +61,10 @@ const DevicesDataQueryParamsSchema = DateRangeQuerySchema.extend({
 		example: 'co2-campaign',
 	}),
 
-	boxId: z.string().optional().meta({
+	boxId: z.string().optional(),
+	boxid: z.string().optional().meta({
 		description: 'Filter by device ID.',
 		example: '5bdbe70f55d0ad001a04edc9',
-	}),
-
-	boxid: z.string().optional().meta({
-		description: 'Deprecated lowercase alias for `boxId`.',
-		deprecated: true,
 	}),
 
 	exposure: ExposureSchema.optional(),
@@ -152,6 +150,11 @@ export const openapi: ZodOpenApiPathItemObject = {
 				'Bad request. This can happen for invalid query parameters.',
 			),
 
+			404: notFoundResponse(
+				NotFoundErrorSchema,
+				'No matching devices or sensors found.',
+			),
+
 			422: unprocessableContentResponse(
 				UnprocessableContentErrorSchema,
 				'Unprocessable content. This can happen for invalid bounding box parameters.',
@@ -167,9 +170,9 @@ export const openapi: ZodOpenApiPathItemObject = {
 	post: {
 		tags: ['Measurements'],
 		summary:
-			'Stream measurements across devices and sensors using a request body',
+			'Stream measurements across devices and sensors using a JSON request body',
 		description:
-			'POST variant of the devices data query. Parameters can be sent as JSON or form data; query parameters take precedence when both are supplied.',
+			'POST variant of the devices data query. Parameters can be sent as a JSON request body. If the request body cannot be parsed as JSON, the server falls back to query parameters.',
 
 		requestParams: {
 			query: DevicesDataQueryParamsSchema,
@@ -179,12 +182,6 @@ export const openapi: ZodOpenApiPathItemObject = {
 			required: false,
 			content: {
 				'application/json': {
-					schema: DevicesDataRequestSchema,
-				},
-				'application/x-www-form-urlencoded': {
-					schema: DevicesDataRequestSchema,
-				},
-				'multipart/form-data': {
 					schema: DevicesDataRequestSchema,
 				},
 			},
@@ -217,6 +214,11 @@ export const openapi: ZodOpenApiPathItemObject = {
 			400: badRequestResponse(
 				BadRequestErrorSchema,
 				'Bad request. This can happen for invalid query or body parameters.',
+			),
+
+			404: notFoundResponse(
+				NotFoundErrorSchema,
+				'No matching devices or sensors found.',
 			),
 
 			422: unprocessableContentResponse(
@@ -261,7 +263,7 @@ export async function loader({ request }: Route.LoaderArgs) {
 			const filename = createDownloadFilename(
 				new Date(),
 				'download',
-				[params.phenomenon || 'data', ...params.columns],
+				[params.phenomenon || 'data'],
 				params.format,
 			)
 			headers.set('Content-Disposition', `attachment; filename=${filename}`)
@@ -290,18 +292,6 @@ export async function loader({ request }: Route.LoaderArgs) {
 						params.bbox,
 					)) {
 						for (const measurement of batch) {
-							const locationId = measurement.location_id ?? null
-							const locationsMap =
-								locationId !== null &&
-								measurement.location_lng !== null &&
-								measurement.location_lat !== null
-									? {
-											[locationId.toString()]: {
-												lon: Number(measurement.location_lng),
-												lat: Number(measurement.location_lat),
-											},
-										}
-									: {}
 							const transformed = transformMeasurement(
 								{
 									sensorId: measurement.sensor_id,
@@ -309,10 +299,17 @@ export async function loader({ request }: Route.LoaderArgs) {
 										? new Date(measurement.time)
 										: null,
 									value: measurement.value,
-									locationId,
+									locationId: measurement.location_id ?? null,
 								},
 								sensorsMap,
-								locationsMap,
+								measurement.location_id == null
+									? {}
+									: {
+											[String(measurement.location_id)]: {
+												lat: measurement.location_lat,
+												lon: measurement.location_lng,
+											},
+										},
 								params.columns,
 							)
 

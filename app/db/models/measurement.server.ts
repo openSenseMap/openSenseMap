@@ -279,10 +279,7 @@ export async function saveMeasurements(
 			locations,
 			minimalDevice.id,
 			tx,
-			{
-				shouldReturn: false,
-				timing: timing,
-			},
+			{ shouldReturn: false, timing: timing },
 		)
 		timing?.mark('insertMeasurements')
 		await updateLastMeasurements(lastMeasurements, tx, timing)

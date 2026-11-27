@@ -20,17 +20,10 @@ import {
 	InternalServerErrorSchema,
 	NotFoundErrorSchema,
 	notFoundResponse,
-	UnsupportedMediaTypeErrorSchema,
-	unsupportedMediaTypeResponse,
 	UnauthorizedErrorSchema,
 	unauthorizedResponse,
-	UnprocessableContentErrorSchema,
-	unprocessableContentResponse,
 } from '~/lib/openapi/errors'
-import {
-	DevicePathParamsSchema,
-	OkMessageResponseSchema,
-} from '~/lib/openapi/schemas/common'
+import { DevicePathParamsSchema } from '~/lib/openapi/schemas/common'
 import { apiMessages } from '~/lib/openapi/messages'
 import {
 	DeviceSensorUpdateSchema,
@@ -38,10 +31,8 @@ import {
 	ApiDeviceSchema,
 	type DeviceSensorUpdate,
 } from '~/lib/openapi/schemas/device'
-import {
-	ExposureSchema,
-	JsonGeoJsonFormatSchema,
-} from '~/lib/api-schemas/query'
+import { ExposureSchema } from '~/lib/api-schemas/query'
+import { DeviceUseAuthSchema } from '~/lib/api-schemas/devices'
 import {
 	requestContentTypeJson,
 	responseContentTypeJson,
@@ -49,10 +40,9 @@ import {
 import { parseJsonBody } from '~/lib/request-parsing'
 import {
 	DeviceLocationInputSchema,
-	GeoJsonPointSchema,
-	HeightSchema,
-	LatitudeSchema,
 	LongitudeSchema,
+	LatitudeSchema,
+	HeightSchema,
 } from '~/lib/openapi/schemas/location'
 import { ElevationLookupConsentSchema } from '~/lib/openapi/schemas/consent'
 import {
@@ -67,21 +57,6 @@ const messages = {
 	deviceNotOwned: 'You do not own this device',
 	deviceArchived: 'Device is archived and cannot be updated',
 }
-
-const GetDeviceQuerySchema = z.object({
-	format: JsonGeoJsonFormatSchema,
-})
-
-const DeviceGeoJsonResponseSchema = z
-	.object({
-		type: z.literal('Feature'),
-		geometry: GeoJsonPointSchema,
-		properties: ApiDeviceSchema,
-	})
-	.meta({
-		id: 'DeviceGeoJsonResponse',
-		description: 'A device represented as a GeoJSON Point Feature.',
-	})
 
 const UpdateDeviceRequestSchema = z
 	.object({
@@ -111,22 +86,10 @@ const UpdateDeviceRequestSchema = z
 			example: 'homeWifi',
 		}),
 
-		useAuth: z
-			.union([z.boolean(), z.enum(['true', 'false'])])
-			.transform((value) => value === true || value === 'true')
-			.optional()
-			.meta({
-				description: 'Whether device API-key authentication is enabled',
-				example: true,
-			}),
-
-		generate_access_token: z
-			.union([z.boolean(), z.enum(['true', 'false'])])
-			.transform((value) => value === true || value === 'true')
-			.optional()
-			.meta({
-				description: 'Generate a replacement device API key.',
-			}),
+		useAuth: DeviceUseAuthSchema.optional().meta({
+			description: 'Whether device API-key authentication is enabled',
+			example: true,
+		}),
 
 		weblink: z.string().optional().meta({
 			description: 'Web link for the device.',
@@ -136,31 +99,17 @@ const UpdateDeviceRequestSchema = z
 		location: z
 			.union([
 				DeviceLocationInputSchema,
-				z.tuple([LongitudeSchema, LatitudeSchema, HeightSchema.optional()]),
+				z
+					.tuple([LongitudeSchema, LatitudeSchema, HeightSchema.optional()])
+					.transform(([lng, lat, height]) => ({ lng, lat, height })),
 			])
-			.transform((location) =>
-				Array.isArray(location)
-					? {
-							lng: location[0],
-							lat: location[1],
-							height: location[2],
-						}
-					: location,
-			)
 			.optional(),
 
 		elevationLookupConsent: ElevationLookupConsentSchema.optional(),
 
 		grouptag: z
 			.union([z.string(), z.array(z.string())])
-			.transform((value) =>
-				(Array.isArray(value) ? value : [value]).flatMap((entry) =>
-					entry
-						.split(',')
-						.map((tag) => tag.trim())
-						.filter(Boolean),
-				),
-			)
+			.transform((value) => (Array.isArray(value) ? value : [value]))
 			.optional()
 			.meta({
 				description: 'Group tags assigned to the device',
@@ -173,9 +122,6 @@ const UpdateDeviceRequestSchema = z
 		}),
 
 		addons: DeviceAddonsUpdateSchema.optional(),
-
-		mqtt: z.unknown().optional(),
-		ttn: z.unknown().optional(),
 	})
 	.superRefine((body, ctx) => {
 		if (body.sensors && body.addons?.add) {
@@ -208,20 +154,6 @@ const DeleteDeviceRequestSchema = z
 		id: 'DeleteDeviceRequest',
 		description: 'Device deletion confirmation payload.',
 	})
-
-const deleteDeviceSuccessMessage =
-	'device and all associated measurements marked for deletion' as const
-
-const UpdateDeviceResponseSchema = z
-	.object({
-		code: z.literal('Ok'),
-		data: ApiDeviceSchema,
-	})
-	.meta({
-		id: 'UpdateDeviceResponse',
-		description: 'Device update response.',
-	})
-
 export const openapi: ZodOpenApiPathItemObject = {
 	get: {
 		tags: ['Devices'],
@@ -230,7 +162,6 @@ export const openapi: ZodOpenApiPathItemObject = {
 
 		requestParams: {
 			path: DevicePathParamsSchema,
-			query: GetDeviceQuerySchema,
 		},
 
 		responses: {
@@ -238,7 +169,7 @@ export const openapi: ZodOpenApiPathItemObject = {
 				description: 'Device retrieved successfully.',
 				content: {
 					'application/json': {
-						schema: z.union([ApiDeviceSchema, DeviceGeoJsonResponseSchema]),
+						schema: ApiDeviceSchema,
 					},
 				},
 			},
@@ -249,11 +180,6 @@ export const openapi: ZodOpenApiPathItemObject = {
 			),
 
 			404: notFoundResponse(NotFoundErrorSchema, 'Device not found.'),
-
-			422: unprocessableContentResponse(
-				UnprocessableContentErrorSchema,
-				'The requested response format is invalid.',
-			),
 
 			500: internalServerErrorResponse(
 				InternalServerErrorSchema,
@@ -287,7 +213,7 @@ export const openapi: ZodOpenApiPathItemObject = {
 				description: 'Device updated successfully.',
 				content: {
 					'application/json': {
-						schema: UpdateDeviceResponseSchema,
+						schema: z.object({ code: z.literal('Ok'), data: ApiDeviceSchema }),
 					},
 				},
 			},
@@ -304,11 +230,6 @@ export const openapi: ZodOpenApiPathItemObject = {
 
 			404: notFoundResponse(NotFoundErrorSchema, 'Device not found.'),
 
-			422: unprocessableContentResponse(
-				UnprocessableContentErrorSchema,
-				'MQTT and TTN integration updates are not supported by this endpoint.',
-			),
-
 			500: internalServerErrorResponse(
 				InternalServerErrorSchema,
 				'Internal server error.',
@@ -320,7 +241,7 @@ export const openapi: ZodOpenApiPathItemObject = {
 		tags: ['Devices'],
 		summary: 'Delete device',
 		description:
-			'Deletes a device owned by the current user. Requires JWT authorization and the current user password.',
+			'Deletes a device. Requires JWT authorization and the current user password.',
 		security: [{ bearerAuth: [] }],
 
 		requestParams: {
@@ -341,7 +262,7 @@ export const openapi: ZodOpenApiPathItemObject = {
 				description: 'Device deleted successfully.',
 				content: {
 					'application/json': {
-						schema: OkMessageResponseSchema,
+						schema: z.object({ code: z.literal('Ok'), message: z.string() }),
 					},
 				},
 			},
@@ -358,15 +279,10 @@ export const openapi: ZodOpenApiPathItemObject = {
 
 			403: forbiddenResponse(
 				ForbiddenErrorSchema,
-				'Invalid or missing JWT authorization, or the current user does not own the device.',
+				'Invalid or missing JWT authorization.',
 			),
 
 			404: notFoundResponse(NotFoundErrorSchema, 'Device not found.'),
-
-			415: unsupportedMediaTypeResponse(
-				UnsupportedMediaTypeErrorSchema,
-				'Unsupported content type. Use application/json.',
-			),
 
 			500: internalServerErrorResponse(
 				InternalServerErrorSchema,
@@ -386,42 +302,14 @@ const parsePathParams = (params: Route.LoaderArgs['params']) => {
 	return parsed.data
 }
 
-const okDeviceResponse = async (
-	device: unknown,
-	format: 'json' | 'geojson',
-) => {
-	const {
-		access_token: _accessToken,
-		userId: _userId,
-		user: _user,
-		archivedAt: _archivedAt,
-		orphanedAt: _orphanedAt,
-		deviceSchemaVersionId: _deviceSchemaVersionId,
-		...apiDevice
-	} = transformDeviceToApiFormat(device as any) as any
+const okDeviceResponse = async (device: unknown) => {
+	const { access_token: _token, ...apiDevice } = transformDeviceToApiFormat(
+		device as any,
+	)
 	const parsed = await ApiDeviceSchema.safeParseAsync(apiDevice)
 
 	if (!parsed.success) {
 		return StandardResponse.internalServerError()
-	}
-
-	if (format === 'geojson') {
-		const {
-			currentLocation: _currentLocation,
-			loc: _loc,
-			...properties
-		} = parsed.data
-		return StandardResponse.ok({
-			type: 'Feature',
-			geometry: {
-				type: 'Point',
-				coordinates: parsed.data.currentLocation?.coordinates ?? [
-					apiDevice.longitude,
-					apiDevice.latitude,
-				],
-			},
-			properties,
-		})
 	}
 
 	return StandardResponse.ok(parsed.data)
@@ -432,26 +320,17 @@ export const middleware: Route.MiddlewareFunction[] = [
 	responseContentTypeJson,
 ]
 
-export async function loader({ request, params }: Route.LoaderArgs) {
+export async function loader({ params }: Route.LoaderArgs) {
 	const { deviceId } = params
 
 	if (!deviceId) return StandardResponse.badRequest('Device ID is required.')
 
 	try {
-		const parsedQuery = GetDeviceQuerySchema.safeParse(
-			Object.fromEntries(new URL(request.url).searchParams),
-		)
-		if (!parsedQuery.success) {
-			return StandardResponse.unprocessableContent(
-				parsedQuery.error.issues[0]?.message ?? 'Invalid response format',
-			)
-		}
-
 		const device = await getDevice({ id: deviceId })
 
 		if (!device) return StandardResponse.notFound('Device not found.')
 
-		return await okDeviceResponse(device, parsedQuery.data.format)
+		return await okDeviceResponse(device)
 	} catch (error) {
 		if (error instanceof Response) {
 			throw error
@@ -508,12 +387,6 @@ async function put(request: Request, user: User, deviceId: string) {
 	}
 
 	const body = { ...parsedBody.data }
-
-	if (body.mqtt !== undefined || body.ttn !== undefined) {
-		return StandardResponse.unprocessableContent(
-			'MQTT and TTN integration updates are not supported by this endpoint',
-		)
-	}
 
 	const currentDevice = await getDevice({ id: deviceId })
 
@@ -646,7 +519,6 @@ async function put(request: Request, user: User, deviceId: string) {
 		image: body.image,
 		model: body.model,
 		useAuth: body.useAuth,
-		generateAccessToken: body.generate_access_token,
 		link: body.weblink,
 		location: locationData,
 		grouptag: body.grouptag,
@@ -678,10 +550,7 @@ async function put(request: Request, user: User, deviceId: string) {
 			return StandardResponse.internalServerError()
 		}
 
-		return StandardResponse.ok({
-			code: 'Ok',
-			data: responseParsed.data,
-		})
+		return StandardResponse.ok({ code: 'Ok', data: responseParsed.data })
 	} catch (error) {
 		if (error instanceof DeviceUpdateError) {
 			if (error.statusCode === 400) {
@@ -704,9 +573,8 @@ async function del(request: Request, user: User, deviceId: string) {
 		return StandardResponse.notFound('Device not found')
 	}
 
-	if (device.userId !== user.id) {
+	if (device.userId !== user.id)
 		return StandardResponse.forbidden(messages.deviceNotOwned)
-	}
 
 	const parsedBody = await parseJsonBody(request, DeleteDeviceRequestSchema)
 	if (parsedBody instanceof Response) return parsedBody
@@ -718,21 +586,14 @@ async function del(request: Request, user: User, deviceId: string) {
 			parsedBody.password,
 		)
 
-		if (deleted === 'not-owner') {
-			return StandardResponse.forbidden(messages.deviceNotOwned)
-		}
-
-		if (deleted === 'invalid-password') {
+		if (deleted === 'unauthorized') {
 			return StandardResponse.unauthorized('Password incorrect')
 		}
 
-		if (deleted === 'not-found') {
-			return StandardResponse.notFound('Device not found')
-		}
-
+		if (!deleted) return StandardResponse.notFound('Device not found')
 		return StandardResponse.ok({
 			code: 'Ok',
-			message: deleteDeviceSuccessMessage,
+			message: 'device and all associated measurements marked for deletion',
 		})
 	} catch {
 		return StandardResponse.internalServerError()

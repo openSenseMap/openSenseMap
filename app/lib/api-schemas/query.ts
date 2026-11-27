@@ -85,20 +85,12 @@ export const BboxSchema = z
 	})
 
 export const DateRangeQuerySchema = z.object({
-	fromDate: IsoDateTimeSchema.optional().meta({
-		description: 'Legacy name for the beginning of the time range.',
-		example: '2026-05-13T12:00:00.000Z',
-	}),
 	'from-date': IsoDateTimeSchema.optional().meta({
-		description: 'Alias for the beginning of the time range.',
+		description: 'Beginning of the time range.',
 		example: '2026-05-13T12:00:00.000Z',
-	}),
-	toDate: IsoDateTimeSchema.optional().meta({
-		description: 'Legacy name for the end of the time range.',
-		example: '2026-05-15T12:00:00.000Z',
 	}),
 	'to-date': IsoDateTimeSchema.optional().meta({
-		description: 'Alias for the end of the time range.',
+		description: 'End of the time range.',
 		example: '2026-05-15T12:00:00.000Z',
 	}),
 })

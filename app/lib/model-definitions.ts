@@ -21,15 +21,12 @@ const senseBoxHomeV2: readonly SensorKey[] = [
 	'scd30_co2',
 	'dps310_pressure',
 	'sps30_pm1',
-	'sps30_pm25',
 	'sps30_pm4',
 	'sps30_pm10',
+	'sps30_pm25',
 ] as const
 
-const luftdatenSds011 = [
-	'sds011_pm10',
-	'sds011_pm25',
-] as const satisfies readonly SensorKey[]
+const sds011 = ['sds011_pm10', 'sds011_pm25'] as const
 
 export const modelDefinitions = {
 	senseBoxHomeV2,
@@ -38,6 +35,21 @@ export const modelDefinitions = {
 	homeV2EthernetFeinstaub: senseBoxHomeV2,
 	homeV2Wifi: senseBoxHomeV2,
 	homeV2WifiFeinstaub: senseBoxHomeV2,
+	luftdaten_sds011: sds011,
+	luftdaten_sds011_dht11: [...sds011, 'dht11_temperature', 'dht11_humidity'],
+	luftdaten_sds011_dht22: [...sds011, 'dht22_temperature', 'dht22_humidity'],
+	luftdaten_sds011_bmp180: [
+		...sds011,
+		'bmp180_temperature',
+		'bmp180_pressure_pa',
+	],
+	luftdaten_sds011_bme280: [
+		...sds011,
+		'bme280_temperature',
+		'bme280_humidity',
+		'bme280_pressure_pa',
+	],
+	hackair_home_v2: sds011,
 
 	'senseBox:Edu': [
 		'hdc1080_temperature',
@@ -132,89 +144,14 @@ export const modelDefinitions = {
 		'sds011_pm10',
 		'sds011_pm25',
 	] as const satisfies readonly SensorKey[],
-
-	luftdaten_sds011: luftdatenSds011,
-
-	luftdaten_sds011_dht11: [
-		...luftdatenSds011,
-		'dht11_temperature',
-		'dht11_humidity',
-	] as const satisfies readonly SensorKey[],
-
-	luftdaten_sds011_dht22: [
-		...luftdatenSds011,
-		'dht22_temperature',
-		'dht22_humidity',
-	] as const satisfies readonly SensorKey[],
-
-	luftdaten_sds011_bmp180: [
-		...luftdatenSds011,
-		'bmp180_temperature',
-		'bmp180_pressure_pa',
-	] as const satisfies readonly SensorKey[],
-
-	luftdaten_sds011_bme280: [
-		...luftdatenSds011,
-		'bme280_temperature',
-		'bme280_humidity',
-		'bme280_pressure_pa',
-	] as const satisfies readonly SensorKey[],
-
-	hackair_home_v2: luftdatenSds011,
 } as const
 
-const normalizeSensorTemplate = (value: string) =>
-	value.toLowerCase().replace(/[\s_-]+/g, '')
+export const getSensorsForModel = (model: keyof typeof modelDefinitions) => {
+	const keys = modelDefinitions[model]
+	if (!keys) return []
 
-export const getSensorsForModel = (
-	model: string,
-	sensorTemplates?: readonly string[],
-) => {
-	const keys = modelDefinitions[model as keyof typeof modelDefinitions]
-	if (!keys) return undefined
-
-	const sensors = keys.map((key) => ({
+	return keys.map((key) => ({
 		id: key,
 		...sensorDefinitions[key],
 	}))
-
-	if (!sensorTemplates?.length) return sensors
-
-	const normalizedTemplates = new Set(
-		sensorTemplates.map(normalizeSensorTemplate),
-	)
-
-	return sensors.filter(
-		(sensor) =>
-			normalizedTemplates.has(normalizeSensorTemplate(sensor.id)) ||
-			normalizedTemplates.has(normalizeSensorTemplate(sensor.sensorType)),
-	)
-}
-
-export const getSensorTemplateValidationError = (
-	model: string | undefined,
-	sensorTemplates: readonly string[] | undefined,
-): string | undefined => {
-	if (!sensorTemplates?.length) return undefined
-	if (!model || model === 'custom') {
-		return 'sensorTemplates requires a predefined model.'
-	}
-
-	const modelSensors = getSensorsForModel(model)
-	if (!modelSensors) return `Unknown model: ${model}`
-
-	const unsupportedTemplates = sensorTemplates.filter((template) => {
-		const normalizedTemplate = normalizeSensorTemplate(template)
-		return !modelSensors.some(
-			(sensor) =>
-				normalizeSensorTemplate(sensor.id) === normalizedTemplate ||
-				normalizeSensorTemplate(sensor.sensorType) === normalizedTemplate,
-		)
-	})
-
-	if (unsupportedTemplates.length > 0) {
-		return `Unsupported sensor templates for model ${model}: ${unsupportedTemplates.join(', ')}`
-	}
-
-	return undefined
 }

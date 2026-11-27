@@ -1,5 +1,4 @@
 import { type ChartData, type ChartDataset, type Point } from 'chart.js'
-import { parseFiniteNumber } from '~/lib/numbers'
 
 export interface MeasurementChartPoint extends Point {
 	x: number
@@ -65,7 +64,11 @@ function toTimestamp(time: Date | string | number) {
 }
 
 function toNumericValue(value: unknown) {
-	return parseFiniteNumber(value) ?? null
+	if (value === null || value === undefined || value === '') return null
+
+	const numericValue = Number(value)
+
+	return Number.isFinite(numericValue) ? numericValue : null
 }
 
 // Filters once so that value/min/max series stay index-aligned.
