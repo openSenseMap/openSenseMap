@@ -1,0 +1,1 @@
+CREATE INDEX "archived_at_idx" ON "device" USING btree ("archived_at");

@@ -212,7 +212,7 @@ export async function getDeviceForSingleMeasurementWrite({
 	id,
 	sensorId,
 }: Pick<Device, 'id'> & { sensorId: string }) {
-	const prepared = await drizzleClient
+	const prepared = drizzleClient
 		.select({
 			id: device.id,
 			archivedAt: device.archivedAt,
@@ -794,7 +794,9 @@ const cachedLastMeasurementAt = sql<Date | null>`
 	(${sensor.lastMeasurement}->>'createdAt')::timestamptz
 `
 
-const deriveDeviceStatus = (lastMeasurementAt: SQL) => sql<Device['status']>`
+const deriveDeviceStatus = (lastMeasurementAt: SQL | SQL.Aliased) => sql<
+	Device['status']
+>`
 	CASE
 		WHEN ${lastMeasurementAt} > now() - interval '7 days' THEN 'active'::status
 		WHEN ${lastMeasurementAt} > now() - interval '30 days' THEN 'inactive'::status
@@ -813,8 +815,18 @@ export async function getDevices(
 >
 
 export async function getDevices(format: DevicesFormat = 'json') {
-	const latestMeasurementAt = sql<Date | null>`max(${cachedLastMeasurementAt})`
-	const rows = await drizzleClient
+	const latestMeasurementPerSensor = drizzleClient
+		.select({
+			deviceId: sensor.deviceId,
+			latestMeasurementAt: sql<Date | null>`max(${cachedLastMeasurementAt})`.as(
+				'latest_measurement_at',
+			),
+		})
+		.from(sensor)
+		.groupBy(sensor.deviceId)
+		.as('latest_measurement_per_sensor')
+
+	const prepared = drizzleClient
 		.select({
 			device: {
 				id: device.id,
@@ -826,13 +838,19 @@ export async function getDevices(format: DevicesFormat = 'json') {
 				createdAt: device.createdAt,
 				tags: device.tags,
 			},
-			status: deriveDeviceStatus(latestMeasurementAt),
+			status: deriveDeviceStatus(
+				latestMeasurementPerSensor.latestMeasurementAt,
+			),
 		})
 		.from(device)
-		.leftJoin(sensor, eq(sensor.deviceId, device.id))
+		.leftJoin(
+			latestMeasurementPerSensor,
+			eq(latestMeasurementPerSensor.deviceId, device.id),
+		)
 		.where(isNull(device.archivedAt))
-		.groupBy(device.id)
+		.prepare('getDevices')
 
+	const rows = await prepared.execute()
 	const devices = rows.map((row) => ({
 		...row.device,
 		status: row.status,

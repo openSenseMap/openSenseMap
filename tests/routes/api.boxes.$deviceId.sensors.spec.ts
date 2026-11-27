@@ -11,7 +11,7 @@ import { registerUser } from '~/services/user-service.server'
 const DEVICE_SENSORS_USER = generateTestUserCredentials()
 
 const DEVICE_SENSOR_BOX = {
-	name: `${DEVICE_SENSORS_USER}s Box`,
+	name: `${DEVICE_SENSORS_USER.name}s Box`,
 	exposure: 'outdoor',
 	expiresAt: null,
 	tags: [],

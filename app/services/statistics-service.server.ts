@@ -2,17 +2,13 @@ import { and, count, gt, lt, sql } from 'drizzle-orm'
 import { measurement } from '~/db/schema'
 import { drizzleClient } from '~/db.server'
 
-const getApproximateRowCount = async (tableName: string) => {
+export const getApproximateRowCount = async (tableName: string) => {
 	const [count] = await drizzleClient.execute(
 		sql`SELECT * FROM approximate_row_count(${tableName});`,
 	)
 
 	return Number(count.approximate_row_count)
 }
-
-export const getApproximateMeasurementCount = () =>
-	getApproximateRowCount('measurement')
-
 /**
  *
  * @param humanReadable
@@ -38,7 +34,7 @@ export const getStatistics = async (humanReadable: boolean = false) => {
 
 	const results = await Promise.all([
 		getApproximateRowCount('device'),
-		getApproximateMeasurementCount(),
+		getApproximateRowCount('measurement'),
 		rowCountTimeBucket(measurement, 'time', 60000),
 	])
 
