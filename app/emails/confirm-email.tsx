@@ -75,7 +75,7 @@ export const ConfirmEmailAddress = ({
 					</Text>
 					<Text>{intl.formatMessage({ id: 'description' })}</Text>
 					<Link
-						href={`${baseUrl}/account/confirm-email?token=${token})}`}
+						href={`${baseUrl}/account/confirm-email?token=${token}`}
 						target="_blank"
 						style={{
 							...link,
@@ -90,7 +90,7 @@ export const ConfirmEmailAddress = ({
 					</Text>
 					<code
 						style={code}
-					>{`${baseUrl}/account/confirm-email?token=${token})}`}</code>
+					>{`${baseUrl}/account/confirm-email?token=${token}`}</code>
 					<Text
 						style={{
 							...text,
